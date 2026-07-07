@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  Users,
+  FolderKanban,
+  HeartHandshake,
+  ClipboardList,
+  type LucideIcon,
+} from "lucide-react";
 
 interface SidebarProps {
   esAdministrador: boolean;
@@ -10,13 +18,23 @@ interface SidebarProps {
 const ITEMS: {
   href: string;
   etiqueta: string;
-  icono: string;
+  icono: LucideIcon;
   soloAdmin?: boolean;
 }[] = [
-  { href: "/dashboard", etiqueta: "Dashboard", icono: "◫" },
-  { href: "/usuarios", etiqueta: "Usuarios", icono: "◎", soloAdmin: true },
-  { href: "/proyectos", etiqueta: "Proyectos", icono: "◈" },
-  { href: "/contrapartes", etiqueta: "Beneficiarios y asociaciones", icono: "◉" },
+  { href: "/dashboard", etiqueta: "Dashboard", icono: LayoutDashboard },
+  { href: "/usuarios", etiqueta: "Usuarios", icono: Users, soloAdmin: true },
+  { href: "/proyectos", etiqueta: "Proyectos", icono: FolderKanban },
+  {
+    href: "/contrapartes",
+    etiqueta: "Beneficiarios y asociaciones",
+    icono: HeartHandshake,
+  },
+  {
+    href: "/formularios",
+    etiqueta: "Formularios",
+    icono: ClipboardList,
+    soloAdmin: true,
+  },
 ];
 
 export function Sidebar({ esAdministrador }: SidebarProps) {
@@ -36,22 +54,31 @@ export function Sidebar({ esAdministrador }: SidebarProps) {
       </div>
 
       <nav className="flex-1 space-y-1 p-3">
-        {items.map((item) => {
+        {items.map((item, index) => {
           const activo =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition ${
-                activo
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "text-zinc-600 hover:bg-emerald-50 hover:text-emerald-800"
-              }`}
-            >
-              <span className="text-base leading-none">{item.icono}</span>
-              {item.etiqueta}
-            </Link>
+            <div key={item.href}>
+              {index === 1 && (
+                <div className="mb-2 mt-6 flex items-center gap-2 px-4">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    Configuraciones
+                  </span>
+                  <div className="h-px flex-1 bg-emerald-100" />
+                </div>
+              )}
+              <Link
+                href={item.href}
+                className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition ${
+                  activo
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-zinc-600 hover:bg-emerald-50 hover:text-emerald-800"
+                }`}
+              >
+                <item.icono className="h-4 w-4 shrink-0" />
+                {item.etiqueta}
+              </Link>
+            </div>
           );
         })}
       </nav>

@@ -345,6 +345,64 @@ export interface AsignacionPersonalPayload {
   usuarioIds: string[];
 }
 
+export type TipoCampoFormulario =
+  | "TEXTO"
+  | "NUMERO"
+  | "FECHA"
+  | "SI_NO"
+  | "SELECCION_UNICA"
+  | "SELECCION_MULTIPLE"
+  | "GPS"
+  | "FOTO"
+  | "FIRMA"
+  | "ARCHIVO";
+
+export interface CampoFormulario {
+  id: string;
+  etiqueta: string;
+  clave: string;
+  tipoCampo: TipoCampoFormulario;
+  esObligatorio: boolean;
+  orden: number;
+  opciones?: { valores?: string[] } | Record<string, unknown>;
+  reglasValidacion?: Record<string, unknown>;
+}
+
+export interface PlantillaFormulario {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  version: number;
+  estaActivo: boolean;
+  subactividadIds: string[];
+  campos?: CampoFormulario[];
+}
+
+export interface CampoFormularioPayload {
+  id?: string;
+  etiqueta: string;
+  clave: string;
+  tipoCampo: TipoCampoFormulario;
+  esObligatorio?: boolean;
+  orden?: number;
+  opciones?: Record<string, unknown>;
+  reglasValidacion?: Record<string, unknown>;
+}
+
+export interface CrearPlantillaFormularioPayload {
+  nombre: string;
+  descripcion?: string;
+  subactividadIds?: string[];
+  campos: CampoFormularioPayload[];
+}
+
+export interface ActualizarPlantillaFormularioPayload {
+  nombre?: string;
+  descripcion?: string;
+  subactividadIds?: string[];
+  campos?: CampoFormularioPayload[];
+}
+
 export interface AsignacionTerritoriosPayload {
   veredaIds: string[];
 }

@@ -1,5 +1,6 @@
 import type {
   ActividadPlan,
+  ActualizarPlantillaFormularioPayload,
   ActualizarProyectoPayload,
   ActualizarUsuarioPayload,
   AsignacionAsociacionesPayload,
@@ -15,6 +16,7 @@ import type {
   CrearAsociacionPayload,
   CrearBeneficiarioPayload,
   CrearJornadaPayload,
+  CrearPlantillaFormularioPayload,
   CrearProyectoPayload,
   CrearSubactividadPayload,
   CrearUsuarioPayload,
@@ -23,6 +25,7 @@ import type {
   KpisDashboard,
   OrdenProyecto,
   PlanProyecto,
+  PlantillaFormulario,
   ProgresoProyecto,
   Proyecto,
   RespuestaPaginada,
@@ -528,4 +531,82 @@ export async function obtenerKpisDashboard(token: string): Promise<KpisDashboard
     indicadoresMonitoreados: indicadores.length,
     proyectosRecientes: recientes.datos,
   };
+}
+
+export async function listarPlantillasFormulario(
+  token: string,
+): Promise<PlantillaFormulario[]> {
+  return fetchConAuth<PlantillaFormulario[]>("/formularios/plantillas", token);
+}
+
+export async function obtenerPlantillaFormulario(
+  token: string,
+  id: string,
+): Promise<PlantillaFormulario> {
+  return fetchConAuth<PlantillaFormulario>(
+    `/formularios/plantillas/${id}`,
+    token,
+  );
+}
+
+export async function crearPlantillaFormulario(
+  token: string,
+  payload: CrearPlantillaFormularioPayload,
+): Promise<PlantillaFormulario> {
+  return fetchConAuth<PlantillaFormulario>("/formularios/plantillas", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actualizarPlantillaFormulario(
+  token: string,
+  id: string,
+  payload: ActualizarPlantillaFormularioPayload,
+): Promise<PlantillaFormulario> {
+  return fetchConAuth<PlantillaFormulario>(
+    `/formularios/plantillas/${id}`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function publicarPlantillaFormulario(
+  token: string,
+  id: string,
+): Promise<PlantillaFormulario> {
+  return fetchConAuth<PlantillaFormulario>(
+    `/formularios/plantillas/${id}/publicar`,
+    token,
+    { method: "POST" },
+  );
+}
+
+export async function clonarPlantillaFormulario(
+  token: string,
+  id: string,
+): Promise<PlantillaFormulario> {
+  return fetchConAuth<PlantillaFormulario>(
+    `/formularios/plantillas/${id}/clonar`,
+    token,
+    { method: "POST" },
+  );
+}
+
+export async function asignarSubactividadesPlantilla(
+  token: string,
+  id: string,
+  subactividadIds: string[],
+): Promise<PlantillaFormulario> {
+  return fetchConAuth<PlantillaFormulario>(
+    `/formularios/plantillas/${id}/subactividades`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ subactividadIds }),
+    },
+  );
 }
