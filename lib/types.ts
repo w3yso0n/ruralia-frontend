@@ -375,6 +375,7 @@ export interface PlantillaFormulario {
   version: number;
   estaActivo: boolean;
   subactividadIds: string[];
+  usuarioIds: string[];
   campos?: CampoFormulario[];
 }
 
@@ -393,6 +394,7 @@ export interface CrearPlantillaFormularioPayload {
   nombre: string;
   descripcion?: string;
   subactividadIds?: string[];
+  usuarioIds?: string[];
   campos: CampoFormularioPayload[];
 }
 
@@ -400,6 +402,7 @@ export interface ActualizarPlantillaFormularioPayload {
   nombre?: string;
   descripcion?: string;
   subactividadIds?: string[];
+  usuarioIds?: string[];
   campos?: CampoFormularioPayload[];
 }
 

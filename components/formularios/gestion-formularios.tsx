@@ -5,14 +5,16 @@ import Link from "next/link";
 import { Alerta, Modal, Spinner } from "@/components/ui/modal";
 import {
   asignarSubactividadesPlantilla,
+  asignarUsuariosPlantilla,
   clonarPlantillaFormulario,
   listarPlantillasFormulario,
   listarProyectos,
+  listarUsuarios,
   obtenerPlanProyecto,
   publicarPlantillaFormulario,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { PlantillaFormulario, Proyecto } from "@/lib/types";
+import type { PlantillaFormulario, Proyecto, Usuario } from "@/lib/types";
 
 interface OpcionSubactividad {
   id: string;
@@ -38,13 +40,24 @@ export function GestionFormularios() {
   const [cargandoGrupos, setCargandoGrupos] = useState(false);
   const [subactividadIds, setSubactividadIds] = useState<string[]>([]);
 
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
+
+  const [todosUsuarios, setTodosUsuarios] = useState<Usuario[]>([]);
+  const [plantillaViendoUsuarios, setPlantillaViendoUsuarios] =
+    useState<PlantillaFormulario | null>(null);
+
   const cargar = useCallback(async () => {
     if (!token) return;
     setCargando(true);
     setError(null);
     try {
-      const datos = await listarPlantillasFormulario(token);
+      const [datos, respuestaUsuarios] = await Promise.all([
+        listarPlantillasFormulario(token),
+        listarUsuarios(token, { limite: 100 }),
+      ]);
       setPlantillas(datos);
+      setTodosUsuarios(respuestaUsuarios.datos);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar plantillas");
     } finally {
@@ -55,6 +68,10 @@ export function GestionFormularios() {
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  function nombreUsuario(id: string) {
+    return todosUsuarios.find((u) => u.id === id)?.nombreCompleto ?? id;
+  }
 
   async function manejarPublicar(plantilla: PlantillaFormulario) {
     if (!token) return;
@@ -90,12 +107,16 @@ export function GestionFormularios() {
     if (!token) return;
     setPlantillaAsignando(plantilla);
     setSubactividadIds(plantilla.subactividadIds ?? []);
+    setUsuarioIds(plantilla.usuarioIds ?? []);
     setCargandoGrupos(true);
     setError(null);
     try {
-      const respuesta = await listarProyectos(token, { limite: 100 });
+      const [respuestaProyectos, respuestaUsuarios] = await Promise.all([
+        listarProyectos(token, { limite: 100 }),
+        listarUsuarios(token, { limite: 100, estaActivo: true }),
+      ]);
       const gruposCargados: GrupoProyecto[] = [];
-      for (const proyecto of respuesta.datos) {
+      for (const proyecto of respuestaProyectos.datos) {
         const plan = await obtenerPlanProyecto(token, proyecto.id);
         const subactividades: OpcionSubactividad[] = [];
         for (const actividad of plan.actividades) {
@@ -111,6 +132,7 @@ export function GestionFormularios() {
         }
       }
       setGrupos(gruposCargados);
+      setUsuarios(respuestaUsuarios.datos);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar proyectos");
     } finally {
@@ -124,21 +146,30 @@ export function GestionFormularios() {
     );
   }
 
+  function alternarUsuarioAsignacion(id: string) {
+    setUsuarioIds((prev) =>
+      prev.includes(id) ? prev.filter((u) => u !== id) : [...prev, id],
+    );
+  }
+
   async function confirmarAsignacion() {
     if (!token || !plantillaAsignando) return;
     setEnviando(true);
     setError(null);
     try {
-      await asignarSubactividadesPlantilla(
-        token,
-        plantillaAsignando.id,
-        subactividadIds,
-      );
+      await Promise.all([
+        asignarSubactividadesPlantilla(
+          token,
+          plantillaAsignando.id,
+          subactividadIds,
+        ),
+        asignarUsuariosPlantilla(token, plantillaAsignando.id, usuarioIds),
+      ]);
       setExito("Asignación actualizada correctamente");
       setPlantillaAsignando(null);
       await cargar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al asignar proyectos");
+      setError(err instanceof Error ? err.message : "Error al asignar");
     } finally {
       setEnviando(false);
     }
@@ -178,6 +209,7 @@ export function GestionFormularios() {
                   <th className="px-5 py-3 font-semibold">Versión</th>
                   <th className="px-5 py-3 font-semibold">Campos</th>
                   <th className="px-5 py-3 font-semibold">Proyectos asignados</th>
+                  <th className="px-5 py-3 font-semibold">Usuarios asignados</th>
                   <th className="px-5 py-3 font-semibold">Estado</th>
                   <th className="px-5 py-3 font-semibold">Acciones</th>
                 </tr>
@@ -185,7 +217,7 @@ export function GestionFormularios() {
               <tbody className="divide-y divide-zinc-100">
                 {plantillas.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-zinc-500">
+                    <td colSpan={7} className="px-5 py-8 text-center text-zinc-500">
                       No hay plantillas de formulario creadas
                     </td>
                   </tr>
@@ -219,6 +251,23 @@ export function GestionFormularios() {
                             Sin asignar
                           </span>
                         )}
+                      </td>
+                      <td className="px-5 py-3">
+                        <button
+                          type="button"
+                          onClick={() => setPlantillaViendoUsuarios(plantilla)}
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium transition ${
+                            plantilla.usuarioIds.length > 0
+                              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                              : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+                          }`}
+                        >
+                          {plantilla.usuarioIds.length > 0
+                            ? `${plantilla.usuarioIds.length} usuario${
+                                plantilla.usuarioIds.length !== 1 ? "s" : ""
+                              }`
+                            : "Sin asignar"}
+                        </button>
                       </td>
                       <td className="px-5 py-3">
                         <span
@@ -276,51 +325,86 @@ export function GestionFormularios() {
       </div>
 
       <Modal
-        titulo="Asignar proyectos"
+        titulo="Asignar plantilla"
         abierto={plantillaAsignando !== null}
         onCerrar={() => setPlantillaAsignando(null)}
         ancho="lg"
       >
-        <div className="space-y-4">
+        <div className="space-y-5">
           <p className="text-sm text-zinc-600">
-            Selecciona en qué subactividades estará disponible{" "}
-            <strong>{plantillaAsignando?.nombre}</strong>. Esto reemplaza la
-            asignación actual.
+            Define dónde estará disponible{" "}
+            <strong>{plantillaAsignando?.nombre}</strong>. Ambas secciones
+            reemplazan la asignación actual y son independientes entre sí.
           </p>
 
-          {cargandoGrupos ? (
-            <Spinner className="py-8" />
-          ) : grupos.length === 0 ? (
-            <p className="text-sm text-zinc-500">
-              No hay proyectos con subactividades registradas todavía.
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              Por proyecto / subactividad
             </p>
-          ) : (
-            <div className="max-h-96 space-y-4 overflow-y-auto">
-              {grupos.map((grupo) => (
-                <div key={grupo.proyecto.id}>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                    {grupo.proyecto.nombre}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {grupo.subactividades.map((sub) => (
-                      <button
-                        key={sub.id}
-                        type="button"
-                        onClick={() => alternarSubactividad(sub.id)}
-                        className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                          subactividadIds.includes(sub.id)
-                            ? "bg-emerald-600 text-white"
-                            : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                        }`}
-                      >
-                        {sub.etiqueta}
-                      </button>
-                    ))}
+            {cargandoGrupos ? (
+              <Spinner className="py-8" />
+            ) : grupos.length === 0 ? (
+              <p className="text-sm text-zinc-500">
+                No hay proyectos con subactividades registradas todavía.
+              </p>
+            ) : (
+              <div className="max-h-56 space-y-4 overflow-y-auto">
+                {grupos.map((grupo) => (
+                  <div key={grupo.proyecto.id}>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                      {grupo.proyecto.nombre}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {grupo.subactividades.map((sub) => (
+                        <button
+                          key={sub.id}
+                          type="button"
+                          onClick={() => alternarSubactividad(sub.id)}
+                          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                            subactividadIds.includes(sub.id)
+                              ? "bg-emerald-600 text-white"
+                              : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                          }`}
+                        >
+                          {sub.etiqueta}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              Directamente a usuarios
+            </p>
+            {cargandoGrupos ? (
+              <Spinner className="py-8" />
+            ) : usuarios.length === 0 ? (
+              <p className="text-sm text-zinc-500">
+                No hay usuarios activos registrados todavía.
+              </p>
+            ) : (
+              <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">
+                {usuarios.map((usuario) => (
+                  <button
+                    key={usuario.id}
+                    type="button"
+                    onClick={() => alternarUsuarioAsignacion(usuario.id)}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                      usuarioIds.includes(usuario.id)
+                        ? "bg-emerald-600 text-white"
+                        : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                    }`}
+                  >
+                    {usuario.nombreCompleto}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="flex justify-end gap-3 pt-2">
             <button
@@ -337,6 +421,45 @@ export function GestionFormularios() {
               className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
             >
               {enviando ? "Guardando..." : "Guardar asignación"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        titulo="Usuarios asignados"
+        abierto={plantillaViendoUsuarios !== null}
+        onCerrar={() => setPlantillaViendoUsuarios(null)}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-zinc-600">
+            Usuarios con acceso directo a{" "}
+            <strong>{plantillaViendoUsuarios?.nombre}</strong>.
+          </p>
+          {plantillaViendoUsuarios &&
+          plantillaViendoUsuarios.usuarioIds.length === 0 ? (
+            <p className="text-sm text-zinc-500">
+              No hay usuarios asignados directamente a este formulario.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {plantillaViendoUsuarios?.usuarioIds.map((id) => (
+                <span
+                  key={id}
+                  className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700"
+                >
+                  {nombreUsuario(id)}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={() => setPlantillaViendoUsuarios(null)}
+              className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700"
+            >
+              Cerrar
             </button>
           </div>
         </div>

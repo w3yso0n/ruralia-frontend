@@ -7,6 +7,7 @@ import {
   actualizarPlantillaFormulario,
   crearPlantillaFormulario,
   listarProyectos,
+  listarUsuarios,
   obtenerPlanProyecto,
   obtenerPlantillaFormulario,
 } from "@/lib/api";
@@ -15,6 +16,7 @@ import type {
   CampoFormularioPayload,
   Proyecto,
   TipoCampoFormulario,
+  Usuario,
 } from "@/lib/types";
 
 interface EditorPlantillaFormularioProps {
@@ -92,6 +94,9 @@ export function EditorPlantillaFormulario({
   const [grupos, setGrupos] = useState<GrupoProyecto[]>([]);
   const [subactividadIds, setSubactividadIds] = useState<string[]>([]);
 
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
+
   const [campos, setCampos] = useState<CampoEnEdicion[]>([campoVacio(0)]);
 
   useEffect(() => {
@@ -122,6 +127,15 @@ export function EditorPlantillaFormulario({
   }, [token]);
 
   useEffect(() => {
+    if (!token) return;
+    listarUsuarios(token, { limite: 100, estaActivo: true })
+      .then((r) => setUsuarios(r.datos))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : "Error al cargar usuarios"),
+      );
+  }, [token]);
+
+  useEffect(() => {
     if (!esEdicion || !token || !plantillaId) return;
     setCargando(true);
     obtenerPlantillaFormulario(token, plantillaId)
@@ -130,6 +144,7 @@ export function EditorPlantillaFormulario({
         setDescripcion(plantilla.descripcion ?? "");
         setEstaActivo(plantilla.estaActivo);
         setSubactividadIds(plantilla.subactividadIds ?? []);
+        setUsuarioIds(plantilla.usuarioIds ?? []);
         setCampos(
           (plantilla.campos ?? [])
             .slice()
@@ -162,6 +177,12 @@ export function EditorPlantillaFormulario({
   function alternarSubactividad(id: string) {
     setSubactividadIds((prev) =>
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+    );
+  }
+
+  function alternarUsuario(id: string) {
+    setUsuarioIds((prev) =>
+      prev.includes(id) ? prev.filter((u) => u !== id) : [...prev, id],
     );
   }
 
@@ -228,6 +249,7 @@ export function EditorPlantillaFormulario({
           nombre,
           descripcion: descripcion || undefined,
           subactividadIds,
+          usuarioIds,
           campos: camposPayload,
         });
       } else {
@@ -235,6 +257,7 @@ export function EditorPlantillaFormulario({
           nombre,
           descripcion: descripcion || undefined,
           subactividadIds,
+          usuarioIds,
           campos: camposPayload,
         });
       }
@@ -344,6 +367,40 @@ export function EditorPlantillaFormulario({
                     ))}
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+          <h3 className="mb-1 text-sm font-semibold text-zinc-900">
+            Usuarios asignados (opcional)
+          </h3>
+          <p className="mb-4 text-xs text-zinc-500">
+            Asigna la plantilla directamente a usuarios específicos, sin
+            depender de un proyecto o subactividad. Útil para encuestas
+            generales que el usuario responde sin una jornada asociada.
+          </p>
+
+          {usuarios.length === 0 ? (
+            <p className="text-sm text-zinc-500">
+              No hay usuarios activos registrados todavía.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {usuarios.map((usuario) => (
+                <button
+                  key={usuario.id}
+                  type="button"
+                  onClick={() => alternarUsuario(usuario.id)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                    usuarioIds.includes(usuario.id)
+                      ? "bg-emerald-600 text-white"
+                      : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                  }`}
+                >
+                  {usuario.nombreCompleto}
+                </button>
               ))}
             </div>
           )}

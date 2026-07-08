@@ -610,3 +610,18 @@ export async function asignarSubactividadesPlantilla(
     },
   );
 }
+
+export async function asignarUsuariosPlantilla(
+  token: string,
+  id: string,
+  usuarioIds: string[],
+): Promise<PlantillaFormulario> {
+  return fetchConAuth<PlantillaFormulario>(
+    `/formularios/plantillas/${id}/usuarios`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ usuarioIds }),
+    },
+  );
+}
