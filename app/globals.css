@@ -21,3 +21,16 @@ body {
 code {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
 }
+
+@keyframes auth-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.auth-marquee-track {
+  animation: auth-marquee 45s linear infinite;
+}

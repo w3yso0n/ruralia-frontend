@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -44,9 +45,14 @@ export function Sidebar({ esAdministrador }: SidebarProps) {
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-emerald-100 bg-white">
       <div className="flex items-center gap-3 border-b border-emerald-100 px-5 py-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-sm font-bold text-white">
-          R
-        </div>
+        <Image
+          src="/icono.png"
+          alt="Ruralia"
+          width={40}
+          height={40}
+          className="h-10 w-10 shrink-0 rounded-xl object-contain"
+          priority
+        />
         <div>
           <p className="font-semibold text-zinc-900">Ruralia</p>
           <p className="text-xs text-zinc-500">Panel de gestión</p>

@@ -16,6 +16,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Ruralia — Panel de gestión",
   description: "Panel web de Ruralia para monitorear proyectos rurales",
+  icons: {
+    icon: "/icono.png",
+    apple: "/icono.png",
+  },
 };
 
 export default function RootLayout({
