@@ -197,7 +197,7 @@ export function WizardCrearProyecto() {
   return (
     <div className="mx-auto max-w-3xl">
       <nav className="mb-6 text-sm text-zinc-500">
-        <Link href="/proyectos" className="hover:text-emerald-700">
+        <Link href="/proyectos" className="hover:text-ruralia-teal-text">
           Proyectos
         </Link>
         <span className="mx-2">›</span>
@@ -215,9 +215,9 @@ export function WizardCrearProyecto() {
             key={etiqueta}
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               i === paso
-                ? "bg-emerald-600 text-white"
+                ? "bg-ruralia-teal text-white"
                 : i < paso
-                  ? "bg-emerald-100 text-emerald-800"
+                  ? "bg-ruralia-teal-border text-ruralia-teal-text"
                   : "bg-zinc-100 text-zinc-500"
             }`}
           >
@@ -232,7 +232,7 @@ export function WizardCrearProyecto() {
         </div>
       ) : null}
 
-      <div className="mt-6 rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+      <div className="mt-6 rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
         {paso === 0 && (
           <div className="space-y-4">
             <div>
@@ -453,7 +453,7 @@ export function WizardCrearProyecto() {
               <button
                 type="button"
                 onClick={() => setActividades([...actividades, ""])}
-                className="text-sm font-semibold text-emerald-700 hover:underline"
+                className="text-sm font-semibold text-ruralia-teal-text hover:underline"
               >
                 + Añadir actividad
               </button>
@@ -509,7 +509,7 @@ export function WizardCrearProyecto() {
           <button
             type="button"
             onClick={avanzar}
-            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+            className="rounded-xl bg-ruralia-teal px-4 py-2.5 text-sm font-semibold text-white hover:bg-ruralia-teal-hover"
           >
             Siguiente
           </button>
@@ -518,7 +518,7 @@ export function WizardCrearProyecto() {
             type="button"
             disabled={enviando}
             onClick={() => void finalizar()}
-            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+            className="rounded-xl bg-ruralia-teal px-4 py-2.5 text-sm font-semibold text-white hover:bg-ruralia-teal-hover disabled:opacity-60"
           >
             {enviando ? "Creando..." : "Crear proyecto"}
           </button>

@@ -1,16 +1,73 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
-import { cargarGoogleMapsBase } from "@/lib/google-maps";
+import {
+  GOOGLE_MAP_ID,
+  cargarGoogleMapsDashboard,
+  crearContenidoMarcadorCircular,
+} from "@/lib/google-maps";
 import type { MockVeredaCobertura } from "@/lib/mock/dashboard-mock";
+import type { EstadoProyecto } from "@/lib/types";
 
 interface MapaCoberturaVeredasProps {
   veredas: MockVeredaCobertura[];
 }
 
+interface FilaProyectoCobertura {
+  proyectoId: string;
+  nombre: string;
+  estado: EstadoProyecto;
+  vereda: string;
+  municipio: string;
+  departamento: string;
+}
+
+function veredaTieneProyectoActivo(vereda: MockVeredaCobertura): boolean {
+  return vereda.proyectos.some((p) => p.estado === "ACTIVO");
+}
+
+function veredaTieneProyectoSuspendido(vereda: MockVeredaCobertura): boolean {
+  return vereda.proyectos.some((p) => p.estado === "SUSPENDIDO");
+}
+
+function colorMarcadorVereda(vereda: MockVeredaCobertura): string {
+  if (veredaTieneProyectoActivo(vereda)) return "#42827A";
+  if (veredaTieneProyectoSuspendido(vereda)) return "#dc2626";
+  return "#a1a1aa";
+}
+
+function etiquetaEstado(estado: EstadoProyecto): string {
+  switch (estado) {
+    case "ACTIVO":
+      return "Activo";
+    case "SUSPENDIDO":
+      return "Suspendido";
+    case "COMPLETADO":
+      return "Completado";
+    case "BORRADOR":
+      return "Borrador";
+  }
+}
+
+function claseBadgeEstado(estado: EstadoProyecto): string {
+  if (estado === "ACTIVO") {
+    return "border-ruralia-teal/40 bg-ruralia-teal-soft text-ruralia-teal-text";
+  }
+  if (estado === "SUSPENDIDO") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+  return "border-zinc-200 bg-zinc-100 text-zinc-600";
+}
+
+function estilosBadgeInfo(estado: EstadoProyecto): { bg: string; color: string } {
+  if (estado === "ACTIVO") return { bg: "#eef3f2", color: "#2d524d" };
+  if (estado === "SUSPENDIDO") return { bg: "#fef2f2", color: "#b91c1c" };
+  return { bg: "#f4f4f5", color: "#71717a" };
+}
+
 /**
- * Mapa de cobertura territorial: veredas con proyectos ACTIVOS.
+ * Mapa de cobertura territorial: veredas con proyectos activos e inactivos.
  * Fuente real: proyecto_veredas + centroide AVG(jornadas.lat/lng) por vereda.
  * Datos mock → lib/mock/dashboard-mock.ts → veredasCobertura
  */
@@ -20,14 +77,31 @@ export function MapaCoberturaVeredas({ veredas }: MapaCoberturaVeredasProps) {
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState(false);
 
+  const filasProyectos = useMemo<FilaProyectoCobertura[]>(() => {
+    return veredas.flatMap((vereda) =>
+      vereda.proyectos.map((proyecto) => ({
+        proyectoId: proyecto.proyectoId,
+        nombre: proyecto.nombre,
+        estado: proyecto.estado,
+        vereda: vereda.nombre,
+        municipio: vereda.municipio,
+        departamento: vereda.departamento,
+      })),
+    );
+  }, [veredas]);
+
+  const conteoActivos = filasProyectos.filter((p) => p.estado === "ACTIVO").length;
+  const conteoInactivos = filasProyectos.length - conteoActivos;
+
   useEffect(() => {
     if (!contenedorRef.current || veredas.length === 0) return;
 
     let cancelado = false;
     const infoWindows: google.maps.InfoWindow[] = [];
+    const marcadores: google.maps.marker.AdvancedMarkerElement[] = [];
 
-    cargarGoogleMapsBase()
-      .then((google) => {
+    cargarGoogleMapsDashboard()
+      .then(({ Map, InfoWindow, LatLngBounds, AdvancedMarkerElement }) => {
         if (cancelado || !contenedorRef.current) return;
 
         const centro = {
@@ -37,52 +111,48 @@ export function MapaCoberturaVeredas({ veredas }: MapaCoberturaVeredasProps) {
             veredas.reduce((sum, v) => sum + v.longitud, 0) / veredas.length,
         };
 
-        const mapa = new google.maps.Map(contenedorRef.current, {
+        const mapa = new Map(contenedorRef.current, {
           center: centro,
           zoom: 10,
+          mapId: GOOGLE_MAP_ID,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: true,
-          styles: [
-            {
-              featureType: "poi",
-              elementType: "labels",
-              stylers: [{ visibility: "off" }],
-            },
-          ],
         });
 
         mapaRef.current = mapa;
-        const bounds = new google.maps.LatLngBounds();
+        const bounds = new LatLngBounds();
 
         veredas.forEach((vereda) => {
           const posicion = { lat: vereda.latitud, lng: vereda.longitud };
           bounds.extend(posicion);
 
-          const marker = new google.maps.Marker({
-            position: posicion,
+          const marker = new AdvancedMarkerElement({
             map: mapa,
+            position: posicion,
             title: vereda.nombre,
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 10,
-              fillColor: "#059669",
-              fillOpacity: 0.95,
-              strokeColor: "#ffffff",
-              strokeWeight: 2,
-            },
+            content: crearContenidoMarcadorCircular(colorMarcadorVereda(vereda)),
           });
 
-          const proyectosHtml = vereda.proyectosActivos
-            .map(
-              (p) =>
-                `<li><strong>${p.nombre}</strong> — ${p.progresoPorcentaje}% · ${p.beneficiarios} benef.</li>`,
-            )
+          marcadores.push(marker);
+
+          const proyectosHtml = vereda.proyectos
+            .map((p) => {
+              const badge = estilosBadgeInfo(p.estado);
+              return `<li style="margin-bottom:4px">
+                <strong>${p.nombre}</strong>
+                <span style="display:inline-block;margin-left:6px;font-size:10px;padding:1px 6px;border-radius:999px;background:${badge.bg};color:${badge.color}">
+                  ${etiquetaEstado(p.estado)}
+                </span>
+                <br />
+                <span style="font-size:11px;color:#666">${p.progresoPorcentaje}% · ${p.beneficiarios} benef.</span>
+              </li>`;
+            })
             .join("");
 
-          const info = new google.maps.InfoWindow({
+          const info = new InfoWindow({
             content: `
-              <div style="font-family:system-ui;max-width:240px;padding:4px">
+              <div style="font-family:system-ui;max-width:260px;padding:4px">
                 <p style="font-weight:600;margin:0 0 4px">${vereda.nombre}</p>
                 <p style="font-size:12px;color:#666;margin:0 0 8px">${vereda.municipio}, ${vereda.departamento}</p>
                 <ul style="font-size:12px;margin:0;padding-left:16px">${proyectosHtml}</ul>
@@ -111,12 +181,15 @@ export function MapaCoberturaVeredas({ veredas }: MapaCoberturaVeredasProps) {
     return () => {
       cancelado = true;
       infoWindows.forEach((iw) => iw.close());
+      marcadores.forEach((marker) => {
+        marker.map = null;
+      });
     };
   }, [veredas]);
 
   if (veredas.length === 0) {
     return (
-      <p className="text-sm text-zinc-500">No hay veredas con cobertura activa.</p>
+      <p className="text-sm text-zinc-500">No hay veredas con cobertura registrada.</p>
     );
   }
 
@@ -124,7 +197,7 @@ export function MapaCoberturaVeredas({ veredas }: MapaCoberturaVeredasProps) {
     <div className="relative">
       {!listo && !error ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-zinc-50/80">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-ruralia-teal-border border-t-ruralia-teal" />
         </div>
       ) : null}
 
@@ -144,15 +217,52 @@ export function MapaCoberturaVeredas({ veredas }: MapaCoberturaVeredasProps) {
 
       <div
         ref={contenedorRef}
-        className="h-[320px] w-full rounded-xl border border-emerald-100 bg-zinc-100 lg:h-[380px]"
+        className="h-[320px] w-full rounded-xl border border-ruralia-teal-border bg-zinc-100 lg:h-[380px]"
         aria-label="Mapa de cobertura por veredas"
       />
 
       <div className="mt-3 flex flex-wrap gap-3 text-xs text-zinc-600">
         <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-full bg-emerald-600" />
-          Vereda con proyecto activo ({veredas.length})
+          <span className="h-3 w-3 rounded-full bg-ruralia-teal" />
+          Activo ({veredas.filter(veredaTieneProyectoActivo).length})
         </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded-full bg-red-600" />
+          Suspendido (
+          {veredas.filter((v) => veredaTieneProyectoSuspendido(v) && !veredaTieneProyectoActivo(v)).length}
+          )
+        </span>
+      </div>
+
+      <div className="mt-4 overflow-hidden rounded-xl border border-ruralia-teal-border">
+        <div className="border-b border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-2.5">
+          <p className="text-sm font-semibold text-zinc-900">Proyectos en el mapa</p>
+          <p className="text-xs text-zinc-500">
+            {conteoActivos} activos · {conteoInactivos} inactivos
+          </p>
+        </div>
+        <ul className="divide-y divide-ruralia-teal-border">
+          {filasProyectos.map((fila) => (
+            <li
+              key={`${fila.proyectoId}-${fila.vereda}`}
+              className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-zinc-900">
+                  {fila.nombre}
+                </p>
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  {fila.vereda} · {fila.municipio}, {fila.departamento}
+                </p>
+              </div>
+              <span
+                className={`inline-flex w-fit shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${claseBadgeEstado(fila.estado)}`}
+              >
+                {etiquetaEstado(fila.estado)}
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

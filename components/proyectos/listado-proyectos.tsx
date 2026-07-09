@@ -116,7 +116,7 @@ export function ListadoProyectos() {
         {puedeGestionar ? (
           <Link
             href="/proyectos/nuevo"
-            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+            className="rounded-xl bg-ruralia-teal px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ruralia-teal-hover"
           >
             + Nuevo proyecto
           </Link>
@@ -134,7 +134,7 @@ export function ListadoProyectos() {
             setBusqueda(e.target.value);
             setPagina(1);
           }}
-          className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 lg:col-span-2"
+          className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal lg:col-span-2"
         />
         <select
           value={filtroEstado}
@@ -210,12 +210,12 @@ export function ListadoProyectos() {
       {cargando ? (
         <Spinner />
       ) : proyectos.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-emerald-200 bg-white p-12 text-center">
+        <div className="rounded-2xl border border-dashed border-ruralia-teal-border bg-white p-12 text-center">
           <p className="text-zinc-600">No se encontraron proyectos</p>
           {puedeGestionar ? (
             <Link
               href="/proyectos/nuevo"
-              className="mt-4 inline-block text-sm font-semibold text-emerald-700 hover:underline"
+              className="mt-4 inline-block text-sm font-semibold text-ruralia-teal-text hover:underline"
             >
               Crear el primer proyecto
             </Link>

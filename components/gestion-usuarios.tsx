@@ -208,7 +208,7 @@ export function GestionUsuarios() {
         <button
           type="button"
           onClick={abrirCrear}
-          className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+          className="rounded-xl bg-ruralia-teal px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ruralia-teal-hover"
         >
           + Nuevo usuario
         </button>
@@ -228,17 +228,17 @@ export function GestionUsuarios() {
             setBusqueda(e.target.value);
             setPagina(1);
           }}
-          className="w-full max-w-sm rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+          className="w-full max-w-sm rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal focus:ring-4 focus:ring-ruralia-teal/10"
         />
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-ruralia-teal-border bg-white shadow-sm">
         {cargando ? (
           <Spinner />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-zinc-100 bg-emerald-50/50 text-xs uppercase tracking-wide text-emerald-800">
+              <thead className="border-b border-zinc-100 bg-ruralia-teal-soft/50 text-xs uppercase tracking-wide text-ruralia-teal-text">
                 <tr>
                   <th className="px-5 py-3 font-semibold">Nombre</th>
                   <th className="px-5 py-3 font-semibold">Correo</th>
@@ -266,7 +266,7 @@ export function GestionUsuarios() {
                           {usuario.roles.map((rol) => (
                             <span
                               key={rol.id}
-                              className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700"
+                              className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs text-ruralia-teal-text"
                             >
                               {etiquetaRol(rol.nombre)}
                             </span>
@@ -277,7 +277,7 @@ export function GestionUsuarios() {
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                             usuario.estaActivo
-                              ? "bg-emerald-50 text-emerald-700"
+                              ? "bg-ruralia-teal-soft text-ruralia-teal-text"
                               : "bg-zinc-100 text-zinc-500"
                           }`}
                         >
@@ -289,7 +289,7 @@ export function GestionUsuarios() {
                           <button
                             type="button"
                             onClick={() => abrirVer(usuario.id)}
-                            className="text-emerald-700 hover:underline"
+                            className="text-ruralia-teal-text hover:underline"
                           >
                             Ver
                           </button>
@@ -378,7 +378,7 @@ export function GestionUsuarios() {
                 {usuarioSeleccionado.roles.map((rol) => (
                   <span
                     key={rol.id}
-                    className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700"
+                    className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-ruralia-teal-text"
                   >
                     {etiquetaRol(rol.nombre)}
                   </span>
@@ -413,7 +413,7 @@ export function GestionUsuarios() {
                     nombreCompleto: e.target.value,
                   }))
                 }
-                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500"
+                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal"
               />
             </div>
             <div>
@@ -427,7 +427,7 @@ export function GestionUsuarios() {
                 onChange={(e) =>
                   setFormulario((f) => ({ ...f, correo: e.target.value }))
                 }
-                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500"
+                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal"
               />
             </div>
             <div>
@@ -442,7 +442,7 @@ export function GestionUsuarios() {
                 onChange={(e) =>
                   setFormulario((f) => ({ ...f, contrasena: e.target.value }))
                 }
-                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500"
+                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal"
               />
             </div>
             <div>
@@ -457,7 +457,7 @@ export function GestionUsuarios() {
                     onClick={() => toggleRol(rol)}
                     className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                       formulario.roles.includes(rol)
-                        ? "bg-emerald-600 text-white"
+                        ? "bg-ruralia-teal text-white"
                         : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                     }`}
                   >
@@ -493,7 +493,7 @@ export function GestionUsuarios() {
               <button
                 type="submit"
                 disabled={enviando}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className="rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {enviando ? "Guardando..." : "Guardar"}
               </button>

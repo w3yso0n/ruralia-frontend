@@ -286,7 +286,7 @@ export function EditorPlantillaFormulario({
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               estaActivo
-                ? "bg-emerald-50 text-emerald-700"
+                ? "bg-ruralia-teal-soft text-ruralia-teal-text"
                 : "bg-zinc-100 text-zinc-500"
             }`}
           >
@@ -298,7 +298,7 @@ export function EditorPlantillaFormulario({
       {error ? <Alerta mensaje={error} /> : null}
 
       <form onSubmit={manejarGuardar} className="space-y-6">
-        <div className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
           <h3 className="mb-4 text-sm font-semibold text-zinc-900">
             Información general
           </h3>
@@ -312,7 +312,7 @@ export function EditorPlantillaFormulario({
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 placeholder="Ej: Visita de seguimiento agrícola"
-                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal focus:ring-4 focus:ring-ruralia-teal/10"
               />
             </div>
             <div>
@@ -323,13 +323,13 @@ export function EditorPlantillaFormulario({
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
                 rows={2}
-                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal focus:ring-4 focus:ring-ruralia-teal/10"
               />
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
           <h3 className="mb-1 text-sm font-semibold text-zinc-900">
             Proyectos asignados (opcional)
           </h3>
@@ -358,7 +358,7 @@ export function EditorPlantillaFormulario({
                         onClick={() => alternarSubactividad(sub.id)}
                         className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                           subactividadIds.includes(sub.id)
-                            ? "bg-emerald-600 text-white"
+                            ? "bg-ruralia-teal text-white"
                             : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                         }`}
                       >
@@ -372,7 +372,7 @@ export function EditorPlantillaFormulario({
           )}
         </div>
 
-        <div className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
           <h3 className="mb-1 text-sm font-semibold text-zinc-900">
             Usuarios asignados (opcional)
           </h3>
@@ -395,7 +395,7 @@ export function EditorPlantillaFormulario({
                   onClick={() => alternarUsuario(usuario.id)}
                   className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                     usuarioIds.includes(usuario.id)
-                      ? "bg-emerald-600 text-white"
+                      ? "bg-ruralia-teal text-white"
                       : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                   }`}
                 >
@@ -406,7 +406,7 @@ export function EditorPlantillaFormulario({
           )}
         </div>
 
-        <div className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-zinc-900">
               Campos del formulario
@@ -414,7 +414,7 @@ export function EditorPlantillaFormulario({
             <button
               type="button"
               onClick={agregarCampo}
-              className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+              className="rounded-lg border border-ruralia-teal-border px-3 py-1.5 text-xs font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft"
             >
               + Agregar campo
             </button>
@@ -477,7 +477,7 @@ export function EditorPlantillaFormulario({
                         })
                       }
                       placeholder="Ej: ¿Cuántas hectáreas se sembraron?"
-                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
                     />
                   </div>
                   <div>
@@ -491,7 +491,7 @@ export function EditorPlantillaFormulario({
                           tipoCampo: e.target.value as TipoCampoFormulario,
                         })
                       }
-                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
                     >
                       {TIPOS_CAMPO.map((tipo) => (
                         <option key={tipo.valor} value={tipo.valor}>
@@ -516,7 +516,7 @@ export function EditorPlantillaFormulario({
                       }
                       rows={3}
                       placeholder={"Opción 1\nOpción 2\nOpción 3"}
-                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
                     />
                   </div>
                 ) : null}
@@ -550,7 +550,7 @@ export function EditorPlantillaFormulario({
           <button
             type="submit"
             disabled={guardando}
-            className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+            className="rounded-xl bg-ruralia-teal px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-ruralia-teal-hover disabled:opacity-60"
           >
             {guardando ? "Guardando..." : "Guardar plantilla"}
           </button>

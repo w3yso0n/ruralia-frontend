@@ -3,9 +3,9 @@
 import type { MockProgresoProyecto } from "@/lib/mock/dashboard-mock";
 
 const COLOR_TIPO: Record<string, string> = {
-  AGRICOLA: "bg-emerald-500",
-  AMBIENTAL: "bg-teal-600",
-  TURISMO: "bg-lime-500",
+  AGRICOLA: "bg-ruralia-teal",
+  AMBIENTAL: "bg-ruralia-teal",
+  TURISMO: "bg-ruralia-teal-muted",
   OTRO: "bg-zinc-400",
 };
 
@@ -29,7 +29,7 @@ export function GraficaProgresoProyectos({
                 {proyecto.conteoBeneficiarios} beneficiarios vinculados
               </p>
             </div>
-            <span className="shrink-0 text-sm font-semibold text-emerald-700">
+            <span className="shrink-0 text-sm font-semibold text-ruralia-teal-text">
               {proyecto.progresoPorcentaje}%
             </span>
           </div>

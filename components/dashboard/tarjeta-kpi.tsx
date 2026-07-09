@@ -19,13 +19,13 @@ export function TarjetaKpi({
     <div
       className={`rounded-2xl border p-6 transition ${
         destacado
-          ? "border-emerald-200 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white shadow-lg shadow-emerald-900/10"
-          : "border-emerald-100 bg-white shadow-sm"
+          ? "border-ruralia-teal-border bg-gradient-to-br from-ruralia-teal to-ruralia-teal-hover text-white shadow-lg shadow-ruralia-navy/10"
+          : "border-ruralia-teal-border bg-white shadow-sm"
       }`}
     >
       <p
         className={`text-sm font-medium ${
-          destacado ? "text-emerald-100" : "text-emerald-700"
+          destacado ? "text-white/85" : "text-ruralia-teal-text"
         }`}
       >
         {etiqueta}
@@ -39,7 +39,7 @@ export function TarjetaKpi({
       </p>
       <p
         className={`mt-1 text-xs ${
-          destacado ? "text-emerald-100/80" : "text-zinc-500"
+          destacado ? "text-white/80" : "text-zinc-500"
         }`}
       >
         {descripcion}
@@ -47,7 +47,7 @@ export function TarjetaKpi({
       {tendencia ? (
         <p
           className={`mt-2 text-xs font-medium ${
-            destacado ? "text-emerald-100" : "text-emerald-600"
+            destacado ? "text-white/85" : "text-ruralia-teal"
           }`}
         >
           {tendencia}
@@ -111,7 +111,7 @@ export function ListaProyectosRecientes({
                 : ""}
             </p>
           </div>
-          <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+          <span className="shrink-0 rounded-full bg-ruralia-teal-soft px-3 py-1 text-xs font-medium text-ruralia-teal-text">
             {etiquetaEstado(proyecto.estado)}
           </span>
         </li>
@@ -132,11 +132,7 @@ export function AvisoDatosMock({ activo }: AvisoDatosMockProps) {
     <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
       <p className="font-semibold">Modo demostración — datos mock</p>
       <p className="mt-1 text-xs leading-relaxed opacity-90">
-        Los indicadores, gráficas y mapas usan datos de prueba documentados en{" "}
-        <code className="rounded bg-amber-100 px-1">lib/mock/dashboard-mock.ts</code>{" "}
-        y{" "}
-        <code className="rounded bg-amber-100 px-1">docs/DASHBOARD-MOCK-DATA.md</code>
-        . Elimínalos cuando el backend exponga los endpoints reales.
+        Los indicadores, gráficas y mapas usan datos de prueba
       </p>
     </div>
   );

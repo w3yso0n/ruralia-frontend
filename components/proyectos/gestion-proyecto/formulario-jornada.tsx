@@ -214,7 +214,7 @@ export function FormularioJornada({
       <button
         type="submit"
         disabled={enviando || !veredas.length}
-        className="w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+        className="w-full rounded-xl bg-ruralia-teal py-2.5 text-sm font-semibold text-white disabled:opacity-50"
       >
         {enviando ? "Guardando..." : "Crear jornada"}
       </button>

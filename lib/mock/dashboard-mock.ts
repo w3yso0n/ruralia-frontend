@@ -23,7 +23,7 @@ export const DASHBOARD_USAR_MOCK = true;
 // ---------------------------------------------------------------------------
 
 /**
- * Vereda con proyectos activos para mapa de cobertura.
+ * Vereda con proyectos para mapa de cobertura (activos e inactivos).
  * Fuente real: proyecto_veredas + proyectos ACTIVO.
  * Coordenadas: AVG(jornadas.latitud/longitud) por vereda
  *   (igual que GET /reportes/proyecto/:id/mapa-calor).
@@ -36,7 +36,7 @@ export interface MockVeredaCobertura {
   departamento: string;
   latitud: number;
   longitud: number;
-  proyectosActivos: Array<{
+  proyectos: Array<{
     proyectoId: string;
     nombre: string;
     estado: EstadoProyecto;
@@ -217,7 +217,7 @@ export const MOCK_DASHBOARD: MockDashboardCompleto = {
       departamento: "Antioquia",
       latitud: 6.1742,
       longitud: -75.3368,
-      proyectosActivos: [
+      proyectos: [
         {
           proyectoId: "mock-proy-001",
           nombre: "Huertas familiares",
@@ -234,7 +234,7 @@ export const MOCK_DASHBOARD: MockDashboardCompleto = {
       departamento: "Antioquia",
       latitud: 6.0586,
       longitud: -75.5031,
-      proyectosActivos: [
+      proyectos: [
         {
           proyectoId: "mock-proy-003",
           nombre: "Ruta agroecoturística",
@@ -252,47 +252,13 @@ export const MOCK_DASHBOARD: MockDashboardCompleto = {
       ],
     },
     {
-      veredaId: "mock-vereda-003",
-      nombre: "San Antonio de Pereira",
-      municipio: "Rionegro",
-      departamento: "Antioquia",
-      latitud: 6.1412,
-      longitud: -75.3721,
-      proyectosActivos: [
-        {
-          proyectoId: "mock-proy-002",
-          nombre: "Restauración de cuencas",
-          estado: "ACTIVO",
-          progresoPorcentaje: 58,
-          beneficiarios: 45,
-        },
-      ],
-    },
-    {
-      veredaId: "mock-vereda-004",
-      nombre: "Piedras Blancas",
-      municipio: "Guarne",
-      departamento: "Antioquia",
-      latitud: 6.2814,
-      longitud: -75.4489,
-      proyectosActivos: [
-        {
-          proyectoId: "mock-proy-002",
-          nombre: "Restauración de cuencas",
-          estado: "ACTIVO",
-          progresoPorcentaje: 58,
-          beneficiarios: 38,
-        },
-      ],
-    },
-    {
       veredaId: "mock-vereda-005",
       nombre: "Santa Elena",
       municipio: "Medellín",
       departamento: "Antioquia",
       latitud: 6.2341,
       longitud: -75.5054,
-      proyectosActivos: [
+      proyectos: [
         {
           proyectoId: "mock-proy-001",
           nombre: "Huertas familiares",
@@ -309,7 +275,7 @@ export const MOCK_DASHBOARD: MockDashboardCompleto = {
       departamento: "Antioquia",
       latitud: 6.0308,
       longitud: -75.4312,
-      proyectosActivos: [
+      proyectos: [
         {
           proyectoId: "mock-proy-004",
           nombre: "Fortalecimiento ASOAGRO Sur",
@@ -319,9 +285,24 @@ export const MOCK_DASHBOARD: MockDashboardCompleto = {
         },
       ],
     },
+    {
+      veredaId: "mock-vereda-007",
+      nombre: "Alto del Corral",
+      municipio: "Sonsón",
+      departamento: "Antioquia",
+      latitud: 5.7123,
+      longitud: -75.3145,
+      proyectos: [
+        {
+          proyectoId: "mock-proy-005",
+          nombre: "Capacitación ganadera — Alto Oriente",
+          estado: "SUSPENDIDO",
+          progresoPorcentaje: 22,
+          beneficiarios: 15,
+        },
+      ],
+    },
   ],
-
-  /** Jornadas georreferenciadas del proyecto mock-proy-001, orden cronológico. */
   seguimientoDestacado: {
     proyectoId: "mock-proy-001",
     nombreProyecto: "Huertas familiares — Oriente antioqueño",

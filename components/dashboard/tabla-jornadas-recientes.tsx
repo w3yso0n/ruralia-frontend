@@ -8,7 +8,7 @@ const ESTADO_JORNADA: Record<
 > = {
   COMPLETADA: {
     etiqueta: "Completada",
-    clase: "bg-emerald-50 text-emerald-700",
+    clase: "bg-ruralia-teal-soft text-ruralia-teal-text",
   },
   EN_PROGRESO: {
     etiqueta: "En progreso",

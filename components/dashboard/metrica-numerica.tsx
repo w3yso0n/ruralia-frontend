@@ -14,8 +14,8 @@ export function MetricaNumerica({
 }: MetricaNumericaProps) {
   return (
     <div className="flex flex-col items-center gap-2 text-center">
-      <div className="flex h-[120px] w-[120px] flex-col items-center justify-center rounded-full border-4 border-emerald-100 bg-emerald-50">
-        <span className="text-3xl font-bold text-emerald-800">{valor}</span>
+      <div className="flex h-[120px] w-[120px] flex-col items-center justify-center rounded-full border-4 border-ruralia-teal-border bg-ruralia-teal-soft">
+        <span className="text-3xl font-bold text-ruralia-teal-text">{valor}</span>
       </div>
       <div>
         <p className="text-sm font-medium text-zinc-800">{etiqueta}</p>

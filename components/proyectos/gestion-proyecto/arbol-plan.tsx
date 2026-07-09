@@ -59,7 +59,7 @@ export function ArbolPlan({
                   }
                   className={`flex-1 rounded-lg px-2 py-1.5 text-left ${
                     activa
-                      ? "bg-emerald-100 font-medium text-emerald-900"
+                      ? "bg-ruralia-teal-border font-medium text-ruralia-teal-text"
                       : "hover:bg-zinc-50"
                   }`}
                 >
@@ -88,7 +88,7 @@ export function ArbolPlan({
                       }
                       className={`ml-6 block w-[calc(100%-1.5rem)] rounded-lg px-2 py-1.5 text-left ${
                         subActiva
-                          ? "bg-emerald-100 font-medium text-emerald-900"
+                          ? "bg-ruralia-teal-border font-medium text-ruralia-teal-text"
                           : "text-zinc-600 hover:bg-zinc-50"
                       }`}
                     >

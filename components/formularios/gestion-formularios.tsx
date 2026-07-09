@@ -188,7 +188,7 @@ export function GestionFormularios() {
         </div>
         <Link
           href="/formularios/nuevo"
-          className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+          className="rounded-xl bg-ruralia-teal px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ruralia-teal-hover"
         >
           + Nueva plantilla
         </Link>
@@ -197,13 +197,13 @@ export function GestionFormularios() {
       {error ? <Alerta mensaje={error} /> : null}
       {exito ? <Alerta mensaje={exito} tipo="exito" /> : null}
 
-      <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-ruralia-teal-border bg-white shadow-sm">
         {cargando ? (
           <Spinner />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-zinc-100 bg-emerald-50/50 text-xs uppercase tracking-wide text-emerald-800">
+              <thead className="border-b border-zinc-100 bg-ruralia-teal-soft/50 text-xs uppercase tracking-wide text-ruralia-teal-text">
                 <tr>
                   <th className="px-5 py-3 font-semibold">Nombre</th>
                   <th className="px-5 py-3 font-semibold">Versión</th>
@@ -242,7 +242,7 @@ export function GestionFormularios() {
                       </td>
                       <td className="px-5 py-3 text-zinc-600">
                         {plantilla.subactividadIds.length > 0 ? (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+                          <span className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs text-ruralia-teal-text">
                             {plantilla.subactividadIds.length} subactividad
                             {plantilla.subactividadIds.length !== 1 ? "es" : ""}
                           </span>
@@ -258,7 +258,7 @@ export function GestionFormularios() {
                           onClick={() => setPlantillaViendoUsuarios(plantilla)}
                           className={`rounded-full px-2 py-0.5 text-xs font-medium transition ${
                             plantilla.usuarioIds.length > 0
-                              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                              ? "bg-ruralia-teal-soft text-ruralia-teal-text hover:bg-ruralia-teal-border"
                               : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
                           }`}
                         >
@@ -273,7 +273,7 @@ export function GestionFormularios() {
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                             plantilla.estaActivo
-                              ? "bg-emerald-50 text-emerald-700"
+                              ? "bg-ruralia-teal-soft text-ruralia-teal-text"
                               : "bg-zinc-100 text-zinc-500"
                           }`}
                         >
@@ -284,7 +284,7 @@ export function GestionFormularios() {
                         <div className="flex gap-3">
                           <Link
                             href={`/formularios/${plantilla.id}`}
-                            className="text-emerald-700 hover:underline"
+                            className="text-ruralia-teal-text hover:underline"
                           >
                             Editar
                           </Link>
@@ -362,7 +362,7 @@ export function GestionFormularios() {
                           onClick={() => alternarSubactividad(sub.id)}
                           className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                             subactividadIds.includes(sub.id)
-                              ? "bg-emerald-600 text-white"
+                              ? "bg-ruralia-teal text-white"
                               : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                           }`}
                         >
@@ -395,7 +395,7 @@ export function GestionFormularios() {
                     onClick={() => alternarUsuarioAsignacion(usuario.id)}
                     className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                       usuarioIds.includes(usuario.id)
-                        ? "bg-emerald-600 text-white"
+                        ? "bg-ruralia-teal text-white"
                         : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                     }`}
                   >
@@ -418,7 +418,7 @@ export function GestionFormularios() {
               type="button"
               onClick={confirmarAsignacion}
               disabled={enviando || cargandoGrupos}
-              className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              className="rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
             >
               {enviando ? "Guardando..." : "Guardar asignación"}
             </button>
@@ -446,7 +446,7 @@ export function GestionFormularios() {
               {plantillaViendoUsuarios?.usuarioIds.map((id) => (
                 <span
                   key={id}
-                  className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700"
+                  className="rounded-full bg-ruralia-teal-soft px-3 py-1 text-xs font-medium text-ruralia-teal-text"
                 >
                   {nombreUsuario(id)}
                 </span>

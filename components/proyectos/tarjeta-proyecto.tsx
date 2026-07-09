@@ -25,7 +25,7 @@ export function TarjetaProyecto({ proyecto }: { proyecto: Proyecto }) {
   const progreso = proyecto.progresoPorcentaje ?? 0;
 
   return (
-    <article className="flex flex-col rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm transition hover:border-emerald-200 hover:shadow-md">
+    <article className="flex flex-col rounded-2xl border border-ruralia-teal-border bg-white p-5 shadow-sm transition hover:border-ruralia-teal-border hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold text-zinc-900">{proyecto.nombre}</h3>
@@ -33,7 +33,7 @@ export function TarjetaProyecto({ proyecto }: { proyecto: Proyecto }) {
             {proyecto.tipo.replace(/_/g, " ")}
           </p>
         </div>
-        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+        <span className="rounded-full bg-ruralia-teal-soft px-2.5 py-1 text-xs font-medium text-ruralia-teal-text">
           {etiquetaEstado(proyecto.estado)}
         </span>
       </div>
@@ -45,7 +45,7 @@ export function TarjetaProyecto({ proyecto }: { proyecto: Proyecto }) {
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
           <div
-            className="h-full rounded-full bg-emerald-500 transition-all"
+            className="h-full rounded-full bg-ruralia-teal transition-all"
             style={{ width: `${progreso}%` }}
           />
         </div>
@@ -77,7 +77,7 @@ export function TarjetaProyecto({ proyecto }: { proyecto: Proyecto }) {
             <span
               key={miembro.id}
               title={miembro.nombreCompleto}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-emerald-100 text-xs font-semibold text-emerald-800"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-ruralia-teal-border text-xs font-semibold text-ruralia-teal-text"
             >
               {iniciales(miembro.nombreCompleto)}
             </span>
@@ -93,7 +93,7 @@ export function TarjetaProyecto({ proyecto }: { proyecto: Proyecto }) {
       <div className="mt-5 flex gap-2 pt-2">
         <Link
           href={`/proyectos/${proyecto.id}`}
-          className="flex-1 rounded-xl bg-emerald-600 px-3 py-2 text-center text-sm font-semibold text-white transition hover:bg-emerald-700"
+          className="flex-1 rounded-xl bg-ruralia-teal px-3 py-2 text-center text-sm font-semibold text-white transition hover:bg-ruralia-teal-hover"
         >
           Gestionar
         </Link>

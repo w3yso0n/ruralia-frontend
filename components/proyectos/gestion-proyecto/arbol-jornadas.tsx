@@ -34,8 +34,8 @@ export function ArbolJornadas({
               onClick={() => onSeleccionarJornada(jornada.id)}
               className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
                 activa
-                  ? "bg-emerald-600 text-white"
-                  : "hover:bg-emerald-50 text-zinc-800"
+                  ? "bg-ruralia-teal text-white"
+                  : "hover:bg-ruralia-teal-soft text-zinc-800"
               }`}
             >
               <span>
@@ -43,20 +43,20 @@ export function ArbolJornadas({
                   {new Date(jornada.fecha).toLocaleDateString("es-CO")}
                 </span>
                 <span
-                  className={`ml-2 text-xs ${activa ? "text-emerald-100" : "text-zinc-400"}`}
+                  className={`ml-2 text-xs ${activa ? "text-white/85" : "text-zinc-400"}`}
                 >
                   {jornada.vereda?.nombre ?? "Sin vereda"}
                 </span>
               </span>
               <span
-                className={`text-xs ${activa ? "text-emerald-100" : cancelada ? "text-red-500" : "text-zinc-500"}`}
+                className={`text-xs ${activa ? "text-white/85" : cancelada ? "text-red-500" : "text-zinc-500"}`}
               >
                 {jornada.estado.replace(/_/g, " ")}
               </span>
             </button>
 
             {activa && jornada.actividades?.length ? (
-              <ul className="ml-3 mt-1 space-y-1 border-l-2 border-emerald-100 pl-3">
+              <ul className="ml-3 mt-1 space-y-1 border-l-2 border-ruralia-teal-border pl-3">
                 {jornada.actividades.map((ja) => (
                   <li key={ja.id} className="text-xs text-zinc-600">
                     · {ja.actividad.nombre}

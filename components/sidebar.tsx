@@ -43,14 +43,15 @@ export function Sidebar({ esAdministrador }: SidebarProps) {
   const items = ITEMS.filter((item) => !item.soloAdmin || esAdministrador);
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-emerald-100 bg-white">
-      <div className="flex items-center gap-3 border-b border-emerald-100 px-5 py-5">
+    <aside className="flex w-64 shrink-0 flex-col border-r border-ruralia-teal-border bg-white">
+      <div className="flex items-center gap-3 border-b border-ruralia-teal-border px-5 py-5">
         <Image
-          src="/icono.png"
+          src="/icono-fondo-blanco.png"
           alt="Ruralia"
           width={40}
           height={40}
-          className="h-10 w-10 shrink-0 rounded-xl object-contain"
+          unoptimized
+          className="h-10 w-10 shrink-0 rounded-xl bg-transparent object-contain"
           priority
         />
         <div>
@@ -70,15 +71,15 @@ export function Sidebar({ esAdministrador }: SidebarProps) {
                   <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
                     Configuraciones
                   </span>
-                  <div className="h-px flex-1 bg-emerald-100" />
+                  <div className="h-px flex-1 bg-ruralia-teal-border" />
                 </div>
               )}
               <Link
                 href={item.href}
                 className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition ${
                   activo
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "text-zinc-600 hover:bg-emerald-50 hover:text-emerald-800"
+                    ? "bg-ruralia-teal text-white shadow-sm"
+                    : "text-zinc-600 hover:bg-ruralia-teal-soft hover:text-ruralia-teal-text"
                 }`}
               >
                 <item.icono className="h-4 w-4 shrink-0" />

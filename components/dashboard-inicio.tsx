@@ -39,11 +39,11 @@ function TarjetaSeccion({
 }) {
   return (
     <section
-      className={`rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm ${className}`}
+      className={`rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm ${className}`}
     >
       <div className="mb-5 flex items-start gap-3">
         {Icono ? (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ruralia-teal-soft text-ruralia-teal-text">
             <Icono className="h-5 w-5" />
           </div>
         ) : null}
@@ -159,7 +159,7 @@ export function DashboardInicio() {
                 valor={mock.medidores.jornadasConEvidencia}
                 etiqueta="Jornadas con evidencia"
                 subetiqueta="Completadas con foto adjunta"
-                color="#2732a6"
+                color="#356960"
               />
               <MetricaNumerica
                 valor={mock.medidores.jornadasMesActual}
@@ -188,7 +188,7 @@ export function DashboardInicio() {
           <div className="grid gap-6 xl:grid-cols-2">
             <TarjetaSeccion
               titulo="Mapa de cobertura territorial"
-              descripcion="Veredas con proyectos activos (centroide de jornadas)"
+              descripcion="Veredas con proyectos activos e inactivos (centroide de jornadas)"
               icono={Map}
             >
               <MapaCoberturaVeredas veredas={mock.veredasCobertura} />

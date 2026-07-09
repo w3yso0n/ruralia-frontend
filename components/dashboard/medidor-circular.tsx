@@ -12,7 +12,7 @@ export function MedidorCircular({
   valor,
   etiqueta,
   subetiqueta,
-  color = "#059669",
+  color = "#42827A",
   tamano = 120,
 }: MedidorCircularProps) {
   const porcentaje = Math.min(100, Math.max(0, valor));

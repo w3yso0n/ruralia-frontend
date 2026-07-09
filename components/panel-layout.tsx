@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Sidebar } from "@/components/sidebar";
@@ -17,8 +18,8 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
 
   if (cargando || !usuario || !token) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f4f7f2]">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-ruralia-teal-border border-t-ruralia-teal" />
       </div>
     );
   }
@@ -29,13 +30,21 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
   const roles = usuario.roles.map((rol) => rol.nombre).join(", ");
 
   return (
-    <div className="flex min-h-screen bg-[#f4f7f2]">
+    <div className="flex min-h-screen bg-background">
       <Sidebar esAdministrador={esAdministrador} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-emerald-100 bg-white px-6 py-4">
+        <header className="border-b border-ruralia-teal-border bg-ruralia-surface px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="lg:hidden">
+            <div className="flex items-center gap-2 lg:hidden">
+              <Image
+                src="/icono-fondo-blanco.png"
+                alt="Ruralia"
+                width={32}
+                height={32}
+                unoptimized
+                className="h-8 w-8 bg-transparent object-contain"
+              />
               <p className="font-semibold text-zinc-900">Ruralia</p>
             </div>
             <div className="ml-auto flex items-center gap-4">

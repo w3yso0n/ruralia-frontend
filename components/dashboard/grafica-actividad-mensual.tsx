@@ -25,12 +25,12 @@ export function GraficaActividadMensual({ datos }: GraficaActividadMensualProps)
             >
               <div className="flex w-full items-end justify-center gap-0.5">
                 <div
-                  className="w-2.5 rounded-t bg-emerald-500 sm:w-3"
+                  className="w-2.5 rounded-t bg-ruralia-teal sm:w-3"
                   style={{ height: hJornadas }}
                   title={`${punto.jornadas} jornadas`}
                 />
                 <div
-                  className="w-2.5 rounded-t bg-teal-300 sm:w-3"
+                  className="w-2.5 rounded-t bg-ruralia-teal-muted sm:w-3"
                   style={{ height: hFormularios }}
                   title={`${punto.formularios} formularios`}
                 />
@@ -42,11 +42,11 @@ export function GraficaActividadMensual({ datos }: GraficaActividadMensualProps)
       </div>
       <div className="flex flex-wrap gap-4 text-xs text-zinc-600">
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" />
+          <span className="h-2.5 w-2.5 rounded-sm bg-ruralia-teal" />
           Jornadas de campo
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-teal-300" />
+          <span className="h-2.5 w-2.5 rounded-sm bg-ruralia-teal-muted" />
           Formularios capturados
         </span>
       </div>

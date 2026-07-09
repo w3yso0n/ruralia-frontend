@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
-import { cargarGoogleMapsBase } from "@/lib/google-maps";
+import {
+  GOOGLE_MAP_ID,
+  cargarGoogleMapsDashboard,
+  crearContenidoMarcadorCircular,
+} from "@/lib/google-maps";
 import type { MockSeguimientoCampo } from "@/lib/mock/dashboard-mock";
 
 interface MapaSeguimientoCampoProps {
@@ -10,8 +14,8 @@ interface MapaSeguimientoCampoProps {
 }
 
 const COLOR_ESTADO = {
-  COMPLETADA: "#059669",
-  EN_PROGRESO: "#0ea5e9",
+  COMPLETADA: "#42827A",
+  EN_PROGRESO: "#42827A",
   PLANIFICADA: "#a1a1aa",
 } as const;
 
@@ -37,9 +41,10 @@ export function MapaSeguimientoCampo({ seguimiento }: MapaSeguimientoCampoProps)
 
     let cancelado = false;
     const infoWindows: google.maps.InfoWindow[] = [];
+    const marcadores: google.maps.marker.AdvancedMarkerElement[] = [];
 
-    cargarGoogleMapsBase()
-      .then((google) => {
+    cargarGoogleMapsDashboard()
+      .then(({ Map, InfoWindow, LatLngBounds, Polyline, AdvancedMarkerElement }) => {
         if (cancelado || !contenedorRef.current) return;
 
         const puntosRuta = jornadas.map((j) => ({
@@ -47,18 +52,19 @@ export function MapaSeguimientoCampo({ seguimiento }: MapaSeguimientoCampoProps)
           lng: j.longitud,
         }));
 
-        const bounds = new google.maps.LatLngBounds();
+        const bounds = new LatLngBounds();
         puntosRuta.forEach((p) => bounds.extend(p));
 
-        const mapa = new google.maps.Map(contenedorRef.current, {
+        const mapa = new Map(contenedorRef.current, {
           center: bounds.getCenter(),
           zoom: 11,
+          mapId: GOOGLE_MAP_ID,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: true,
         });
 
-        new google.maps.Polyline({
+        new Polyline({
           path: puntosRuta,
           geodesic: true,
           strokeColor: "#d4d4d8",
@@ -74,10 +80,10 @@ export function MapaSeguimientoCampo({ seguimiento }: MapaSeguimientoCampoProps)
             : jornadas.filter((j) => j.estado === "COMPLETADA").length;
 
         if (ultimoAvance >= 2) {
-          new google.maps.Polyline({
+          new Polyline({
             path: puntosRuta.slice(0, ultimoAvance),
             geodesic: true,
-            strokeColor: "#059669",
+            strokeColor: "#42827A",
             strokeOpacity: 1,
             strokeWeight: 4,
             map: mapa,
@@ -86,27 +92,19 @@ export function MapaSeguimientoCampo({ seguimiento }: MapaSeguimientoCampoProps)
 
         jornadas.forEach((jornada, index) => {
           const posicion = { lat: jornada.latitud, lng: jornada.longitud };
-          const marker = new google.maps.Marker({
-            position: posicion,
+          const marker = new AdvancedMarkerElement({
             map: mapa,
-            label: {
-              text: String(index + 1),
-              color: "#fff",
-              fontSize: "11px",
-              fontWeight: "600",
-            },
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 11,
-              fillColor: COLOR_ESTADO[jornada.estado],
-              fillOpacity: 1,
-              strokeColor: "#fff",
-              strokeWeight: 2,
-            },
+            position: posicion,
             title: jornada.nombre,
+            content: crearContenidoMarcadorCircular(
+              COLOR_ESTADO[jornada.estado],
+              { etiqueta: String(index + 1), tamano: 24 },
+            ),
           });
 
-          const info = new google.maps.InfoWindow({
+          marcadores.push(marker);
+
+          const info = new InfoWindow({
             content: `
               <div style="font-family:system-ui;max-width:220px;padding:4px">
                 <p style="font-weight:600;margin:0 0 4px">${jornada.nombre}</p>
@@ -137,6 +135,9 @@ export function MapaSeguimientoCampo({ seguimiento }: MapaSeguimientoCampoProps)
     return () => {
       cancelado = true;
       infoWindows.forEach((iw) => iw.close());
+      marcadores.forEach((marker) => {
+        marker.map = null;
+      });
     };
   }, [jornadas]);
 
@@ -155,7 +156,7 @@ export function MapaSeguimientoCampo({ seguimiento }: MapaSeguimientoCampoProps)
     <div className="relative">
       {!listo && !error ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-zinc-50/80">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-ruralia-teal-border border-t-ruralia-teal" />
         </div>
       ) : null}
 
@@ -171,7 +172,7 @@ export function MapaSeguimientoCampo({ seguimiento }: MapaSeguimientoCampoProps)
 
       <div
         ref={contenedorRef}
-        className="h-[320px] w-full rounded-xl border border-emerald-100 bg-zinc-100 lg:h-[380px]"
+        className="h-[320px] w-full rounded-xl border border-ruralia-teal-border bg-zinc-100 lg:h-[380px]"
         aria-label="Mapa de jornadas georreferenciadas"
       />
 
@@ -194,15 +195,15 @@ export function MapaSeguimientoCampo({ seguimiento }: MapaSeguimientoCampoProps)
 
       <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-zinc-600">
         <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-6 bg-emerald-600" />
+          <span className="h-0.5 w-6 bg-ruralia-teal" />
           Avance ({seguimiento.progresoAvancePorcentaje}%)
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-full bg-emerald-600" />
+          <span className="h-3 w-3 rounded-full bg-ruralia-teal" />
           Completada
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-full bg-sky-500" />
+          <span className="h-3 w-3 rounded-full bg-ruralia-accent" />
           En progreso
         </span>
         <span className="flex items-center gap-1.5">

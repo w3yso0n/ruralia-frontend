@@ -32,7 +32,7 @@ export function GestionContrapartes() {
           onClick={() => setTab("beneficiarios")}
           className={`border-b-2 px-4 py-2 text-sm font-medium ${
             tab === "beneficiarios"
-              ? "border-emerald-600 text-emerald-700"
+              ? "border-ruralia-teal text-ruralia-teal-text"
               : "border-transparent text-zinc-500 hover:text-zinc-800"
           }`}
         >
@@ -43,7 +43,7 @@ export function GestionContrapartes() {
           onClick={() => setTab("asociaciones")}
           className={`border-b-2 px-4 py-2 text-sm font-medium ${
             tab === "asociaciones"
-              ? "border-emerald-600 text-emerald-700"
+              ? "border-ruralia-teal text-ruralia-teal-text"
               : "border-transparent text-zinc-500 hover:text-zinc-800"
           }`}
         >

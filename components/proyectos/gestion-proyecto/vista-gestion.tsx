@@ -122,7 +122,7 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
   return (
     <>
       <nav className="mb-4 text-sm text-zinc-500">
-        <Link href="/proyectos" className="hover:text-emerald-700">
+        <Link href="/proyectos" className="hover:text-ruralia-teal-text">
           Proyectos
         </Link>
         <span className="mx-2">›</span>
@@ -169,7 +169,7 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                 proyecto.estado === "ACTIVO"
-                  ? "bg-emerald-50 text-emerald-700"
+                  ? "bg-ruralia-teal-soft text-ruralia-teal-text"
                   : proyecto.estado === "BORRADOR"
                     ? "bg-amber-50 text-amber-800"
                     : "bg-zinc-100 text-zinc-600"
@@ -186,7 +186,7 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
           </p>
         </div>
         <div className="text-right">
-          <p className="text-3xl font-bold text-emerald-700">
+          <p className="text-3xl font-bold text-ruralia-teal-text">
             {progreso?.progresoPorcentaje ?? 0}%
           </p>
           <p className="text-xs text-zinc-500">Progreso del plan</p>
@@ -203,7 +203,7 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
             onClick={() => setTab(t.id)}
             className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium ${
               tab === t.id
-                ? "border-emerald-600 text-emerald-700"
+                ? "border-ruralia-teal text-ruralia-teal-text"
                 : "border-transparent text-zinc-500 hover:text-zinc-800"
             }`}
           >
@@ -221,25 +221,25 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
           />
           {estadisticas ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-2xl border border-emerald-100 bg-white p-5">
+              <div className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
                 <p className="text-sm text-zinc-500">Beneficiarios</p>
                 <p className="text-2xl font-bold">
                   {estadisticas.conteoBeneficiarios}
                 </p>
               </div>
-              <div className="rounded-2xl border border-emerald-100 bg-white p-5">
+              <div className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
                 <p className="text-sm text-zinc-500">Jornadas</p>
                 <p className="text-2xl font-bold">
                   {estadisticas.conteoJornadas}
                 </p>
               </div>
-              <div className="rounded-2xl border border-emerald-100 bg-white p-5">
+              <div className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
                 <p className="text-sm text-zinc-500">Formularios</p>
                 <p className="text-2xl font-bold">
                   {estadisticas.conteoFormulariosEnviados}
                 </p>
               </div>
-              <div className="rounded-2xl border border-emerald-100 bg-white p-5">
+              <div className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
                 <p className="text-sm text-zinc-500">Actividades completadas</p>
                 <p className="text-2xl font-bold">
                   {progreso?.actividadesCompletadas ?? 0} /{" "}

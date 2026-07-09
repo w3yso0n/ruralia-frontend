@@ -1,13 +1,56 @@
 @import "tailwindcss";
 
+/*
+ * Paleta Ruralia — docs/PALETA-COLORES.md
+ *
+ * Obligatorios:
+ *   Dark Navy  #121C2D
+ *   White      #FFFFFF
+ *   Teal       #42827A
+ */
 :root {
-  --background: #f4f7f2;
+  --background: #f5f6f8;
   --foreground: #171717;
+
+  --ruralia-navy: #121c2d;
+  --ruralia-navy-light: #1a2838;
+  --ruralia-white: #ffffff;
+  --ruralia-teal: #42827a;
+  --ruralia-teal-hover: #356960;
+  --ruralia-teal-muted: #5a9690;
+  --ruralia-teal-soft: #eef3f2;
+  --ruralia-teal-border: #d4e4e1;
+  --ruralia-teal-text: #2d524d;
+
+  /* Alias retrocompatibles */
+  --ruralia-brand: var(--ruralia-navy);
+  --ruralia-brand-deep: var(--ruralia-navy-light);
+  --ruralia-primary: var(--ruralia-teal);
+  --ruralia-primary-hover: var(--ruralia-teal-hover);
+  --ruralia-accent: var(--ruralia-teal);
+  --ruralia-accent-soft: var(--ruralia-teal-soft);
+  --ruralia-surface: var(--ruralia-white);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-ruralia-navy: var(--ruralia-navy);
+  --color-ruralia-navy-light: var(--ruralia-navy-light);
+  --color-ruralia-white: var(--ruralia-white);
+  --color-ruralia-teal: var(--ruralia-teal);
+  --color-ruralia-teal-hover: var(--ruralia-teal-hover);
+  --color-ruralia-teal-muted: var(--ruralia-teal-muted);
+  --color-ruralia-teal-soft: var(--ruralia-teal-soft);
+  --color-ruralia-teal-border: var(--ruralia-teal-border);
+  --color-ruralia-teal-text: var(--ruralia-teal-text);
+  --color-ruralia-brand: var(--ruralia-brand);
+  --color-ruralia-brand-deep: var(--ruralia-brand-deep);
+  --color-ruralia-primary: var(--ruralia-primary);
+  --color-ruralia-primary-hover: var(--ruralia-primary-hover);
+  --color-ruralia-accent: var(--ruralia-accent);
+  --color-ruralia-accent-soft: var(--ruralia-accent-soft);
+  --color-ruralia-surface: var(--ruralia-surface);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -33,4 +76,80 @@ code {
 
 .auth-marquee-track {
   animation: auth-marquee 45s linear infinite;
+}
+
+@keyframes auth-wave-drift {
+  0%,
+  100% {
+    transform: translate3d(-80px, 0, 0);
+  }
+  50% {
+    transform: translate3d(80px, -16px, 0);
+  }
+}
+
+.auth-wave-layer {
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.auth-wave-layer-1 {
+  animation: auth-wave-drift 22s ease-in-out infinite alternate;
+}
+
+.auth-wave-layer-2 {
+  animation: auth-wave-drift 28s ease-in-out infinite alternate-reverse;
+}
+
+.auth-wave-layer-3 {
+  animation: auth-wave-drift 18s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-marquee-track,
+  .auth-wave-layer {
+    animation: none;
+  }
+
+  .auth-offline-badge,
+  .auth-offline-dot {
+    animation: none;
+  }
+}
+
+@keyframes auth-offline-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 20px 40px -12px rgb(66 130 122 / 0.35),
+      0 0 0 1px rgb(66 130 122 / 0.25);
+  }
+  50% {
+    box-shadow:
+      0 24px 48px -10px rgb(66 130 122 / 0.5),
+      0 0 0 1px rgb(66 130 122 / 0.45);
+  }
+}
+
+@keyframes auth-offline-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgb(66 130 122 / 0.55);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.15);
+    box-shadow: 0 0 0 4px rgb(66 130 122 / 0);
+  }
+}
+
+.auth-offline-badge {
+  animation: auth-offline-glow 4s ease-in-out infinite;
+}
+
+.auth-offline-dot {
+  animation: auth-offline-dot-pulse 2.4s ease-in-out infinite;
 }

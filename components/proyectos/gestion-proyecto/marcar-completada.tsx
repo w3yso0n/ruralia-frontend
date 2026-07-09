@@ -49,7 +49,7 @@ export function MarcarCompletada({
         type="button"
         disabled={enviando}
         onClick={() => onCompletar(nota)}
-        className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+        className="rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       >
         {enviando ? "Guardando..." : "Marcar completada"}
       </button>

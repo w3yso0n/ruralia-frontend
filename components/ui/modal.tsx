@@ -53,7 +53,7 @@ interface SpinnerProps {
 export function Spinner({ className = "py-20" }: SpinnerProps) {
   return (
     <div className={`flex items-center justify-center ${className}`}>
-      <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600" />
+      <div className="h-10 w-10 animate-spin rounded-full border-4 border-ruralia-teal-border border-t-ruralia-teal" />
     </div>
   );
 }
@@ -69,7 +69,7 @@ export function Alerta({ mensaje, tipo = "error" }: AlertaProps) {
       className={`mb-4 rounded-xl px-4 py-3 text-sm ${
         tipo === "error"
           ? "border border-red-200 bg-red-50 text-red-700"
-          : "border border-emerald-200 bg-emerald-50 text-emerald-800"
+          : "border border-ruralia-teal-border bg-ruralia-teal-soft text-ruralia-teal-text"
       }`}
     >
       {mensaje}

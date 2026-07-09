@@ -17,8 +17,8 @@ export const metadata: Metadata = {
   title: "Ruralia — Panel de gestión",
   description: "Panel web de Ruralia para monitorear proyectos rurales",
   icons: {
-    icon: "/icono.png",
-    apple: "/icono.png",
+    icon: "/icono-fondo-blanco.png",
+    apple: "/icono-fondo-blanco.png",
   },
 };
 

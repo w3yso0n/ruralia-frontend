@@ -176,7 +176,7 @@ export function SelectorVereda({
       </label>
 
       {seleccionada ? (
-        <div className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/40 px-4 py-3">
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-3">
           <div>
             <p className="font-medium text-zinc-900">{seleccionada.nombre}</p>
             <p className="mt-1 text-xs text-zinc-500">
@@ -188,7 +188,7 @@ export function SelectorVereda({
           <button
             type="button"
             onClick={limpiar}
-            className="text-sm font-semibold text-emerald-700 hover:underline"
+            className="text-sm font-semibold text-ruralia-teal-text hover:underline"
           >
             Cambiar
           </button>
@@ -215,7 +215,7 @@ export function SelectorVereda({
                 }}
                 onFocus={() => setMostrarSugerencias(true)}
                 placeholder="Ej: Vereda El Paraíso, Marinilla, Antioquia"
-                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal focus:ring-4 focus:ring-ruralia-teal/10"
               />
 
               {mostrarSugerencias && sugerencias.length > 0 ? (
@@ -228,7 +228,7 @@ export function SelectorVereda({
                       <button
                         type="button"
                         onClick={() => elegirExistente(v)}
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-emerald-50"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-ruralia-teal-soft"
                       >
                         <span className="font-medium">{v.nombre}</span>
                         {v.municipioNombre ? (
@@ -290,7 +290,7 @@ export function SelectorVereda({
               <button
                 type="submit"
                 disabled={cargando}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className="rounded-lg bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {cargando ? "Registrando..." : "Registrar territorio"}
               </button>
@@ -302,7 +302,7 @@ export function SelectorVereda({
               <button
                 type="button"
                 onClick={() => setModoManual(true)}
-                className="font-semibold text-emerald-700 hover:underline"
+                className="font-semibold text-ruralia-teal-text hover:underline"
               >
                 Registrar manualmente
               </button>
@@ -310,7 +310,7 @@ export function SelectorVereda({
               <button
                 type="button"
                 onClick={() => setModoManual(false)}
-                className="font-semibold text-emerald-700 hover:underline"
+                className="font-semibold text-ruralia-teal-text hover:underline"
               >
                 Volver a búsqueda
               </button>

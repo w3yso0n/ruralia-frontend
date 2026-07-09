@@ -105,7 +105,7 @@ export function PanelJornadas({
           <button
             type="button"
             onClick={() => setMostrarFormulario((v) => !v)}
-            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            className="rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white hover:bg-ruralia-teal-hover"
           >
             {mostrarFormulario ? "Ver jornadas" : "+ Nueva jornada"}
           </button>
@@ -113,7 +113,7 @@ export function PanelJornadas({
       </div>
 
       {mostrarFormulario && puedeGestionar ? (
-        <section className="rounded-2xl border border-emerald-200 bg-emerald-50/30 p-6">
+        <section className="rounded-2xl border border-ruralia-teal-border bg-ruralia-teal-soft/30 p-6">
           <h3 className="mb-4 font-semibold text-zinc-900">Nueva jornada</h3>
           <FormularioJornada
             veredas={proyecto.veredas ?? []}
@@ -125,7 +125,7 @@ export function PanelJornadas({
         </section>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-          <aside className="rounded-2xl border border-emerald-100 bg-white p-4">
+          <aside className="rounded-2xl border border-ruralia-teal-border bg-white p-4">
             <h3 className="mb-3 font-semibold text-zinc-900">Jornadas</h3>
             <ArbolJornadas
               jornadas={jornadas}
@@ -134,7 +134,7 @@ export function PanelJornadas({
             />
           </aside>
 
-          <section className="rounded-2xl border border-emerald-100 bg-white p-6">
+          <section className="rounded-2xl border border-ruralia-teal-border bg-white p-6">
             {!jornadaSeleccionada ? (
               <p className="text-zinc-500">
                 Selecciona una jornada del árbol o crea una nueva.
@@ -200,7 +200,7 @@ export function PanelJornadas({
                             </p>
                           ) : null}
                         </div>
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+                        <span className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs text-ruralia-teal-text">
                           {ja.estadoEjecucion}
                         </span>
                       </li>

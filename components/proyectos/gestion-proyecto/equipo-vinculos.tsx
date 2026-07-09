@@ -162,7 +162,7 @@ export function EquipoVinculos({
   if (!puedeGestionar) {
     return (
       <div className="space-y-4">
-        <section className="rounded-2xl border border-emerald-100 bg-white p-5">
+        <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
           <h3 className="font-semibold text-zinc-900">Equipo interno</h3>
           <ul className="mt-3 space-y-2 text-sm">
             {proyecto.personal?.length ? (
@@ -174,7 +174,7 @@ export function EquipoVinculos({
             )}
           </ul>
         </section>
-        <section className="rounded-2xl border border-emerald-100 bg-white p-5">
+        <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
           <h3 className="font-semibold text-zinc-900">Contraparte</h3>
           {contraparte.tipo === "beneficiario" ? (
             <p className="mt-2 text-sm text-zinc-600">
@@ -215,7 +215,7 @@ export function EquipoVinculos({
       {error ? <Alerta mensaje={error} /> : null}
       {exito ? <Alerta mensaje={exito} tipo="exito" /> : null}
 
-      <section className="rounded-2xl border border-emerald-100 bg-white p-5">
+      <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-zinc-900">Equipo interno</h3>
@@ -227,7 +227,7 @@ export function EquipoVinculos({
             type="button"
             disabled={enviando}
             onClick={() => void guardarSeccion("personal")}
-            className="shrink-0 text-sm font-semibold text-emerald-700 hover:underline disabled:opacity-50"
+            className="shrink-0 text-sm font-semibold text-ruralia-teal-text hover:underline disabled:opacity-50"
           >
             Guardar
           </button>
@@ -246,7 +246,7 @@ export function EquipoVinculos({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-emerald-100 bg-white p-5">
+      <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-zinc-900">Contraparte</h3>
@@ -259,7 +259,7 @@ export function EquipoVinculos({
             type="button"
             disabled={enviando}
             onClick={() => void guardarSeccion("vinculos")}
-            className="shrink-0 text-sm font-semibold text-emerald-700 hover:underline disabled:opacity-50"
+            className="shrink-0 text-sm font-semibold text-ruralia-teal-text hover:underline disabled:opacity-50"
           >
             Guardar
           </button>
@@ -313,14 +313,14 @@ export function EquipoVinculos({
         )}
       </section>
 
-      <section className="rounded-2xl border border-emerald-100 bg-white p-5">
+      <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-semibold text-zinc-900">Territorio (veredas)</h3>
           <button
             type="button"
             disabled={enviando}
             onClick={() => void guardarSeccion("territorio")}
-            className="text-sm font-semibold text-emerald-700 hover:underline disabled:opacity-50"
+            className="text-sm font-semibold text-ruralia-teal-text hover:underline disabled:opacity-50"
           >
             Guardar
           </button>
