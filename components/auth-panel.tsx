@@ -221,9 +221,9 @@ export function AuthPanel() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
+    <div className="fixed inset-0 flex flex-col overflow-hidden lg:flex-row">
       {/* Panel izquierdo — marca */}
-      <section className="relative flex min-h-[42vh] flex-col overflow-hidden bg-ruralia-navy p-8 text-white lg:min-h-screen lg:w-1/2 lg:p-12">
+      <section className="relative flex h-[42vh] flex-col overflow-hidden bg-ruralia-navy p-8 text-white lg:h-screen lg:w-1/2 lg:p-12">
         <FondoLogin />
 
         <div className="relative z-10 flex h-full flex-col">
@@ -256,17 +256,17 @@ export function AuthPanel() {
       </section>
 
       {/* Panel derecho — formulario */}
-      <section className="flex min-h-[58vh] w-full items-center justify-center bg-background px-6 py-10 lg:min-h-screen lg:w-1/2 lg:px-10 xl:px-14">
-        <div className="w-full max-w-lg">
-          <div className="w-full rounded-3xl border border-ruralia-teal-border bg-white p-10 shadow-2xl shadow-ruralia-navy/10 lg:p-12">
-            <div className="mb-8 flex flex-col items-center text-center">
+      <section className="flex h-[58vh] w-full items-center justify-center overflow-hidden bg-background px-6 py-10 lg:h-screen lg:w-1/2 lg:px-10 xl:px-14">
+        <div className="w-full max-w-md">
+          <div className="w-full rounded-3xl border border-ruralia-teal-border bg-white p-8 shadow-2xl shadow-ruralia-navy/10 lg:p-10">
+            <div className="mb-6 flex flex-col items-center text-center">
               <Image
                 src="/icono-fondo-blanco.png"
                 alt="Ruralia"
                 width={240}
                 height={240}
                 unoptimized
-                className="mb-2 h-auto w-full max-w-[240px] bg-transparent object-contain"
+                className="mb-2 h-auto w-full max-w-[120px] bg-transparent object-contain"
                 priority
               />
               <h2 className="text-xl font-semibold text-zinc-900">
