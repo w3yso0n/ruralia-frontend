@@ -5,7 +5,7 @@ interface ModalProps {
   abierto: boolean;
   onCerrar: () => void;
   children: React.ReactNode;
-  ancho?: "md" | "lg";
+  ancho?: "md" | "lg" | "xl";
 }
 
 export function Modal({
@@ -17,6 +17,9 @@ export function Modal({
 }: ModalProps) {
   if (!abierto) return null;
 
+  const maxW =
+    ancho === "xl" ? "max-w-5xl" : ancho === "lg" ? "max-w-2xl" : "max-w-lg";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button
@@ -26,9 +29,7 @@ export function Modal({
         onClick={onCerrar}
       />
       <div
-        className={`relative max-h-[90vh] w-full overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl ${
-          ancho === "lg" ? "max-w-2xl" : "max-w-lg"
-        }`}
+        className={`relative max-h-[90vh] w-full overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl ${maxW}`}
       >
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-zinc-900">{titulo}</h2>

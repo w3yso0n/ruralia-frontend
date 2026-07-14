@@ -188,7 +188,7 @@ export function SelectorVereda({
           <button
             type="button"
             onClick={limpiar}
-            className="text-sm font-semibold text-ruralia-teal-text hover:underline"
+            className="rounded-lg px-2 py-1 text-sm font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal-soft"
           >
             Cambiar
           </button>
@@ -302,7 +302,7 @@ export function SelectorVereda({
               <button
                 type="button"
                 onClick={() => setModoManual(true)}
-                className="font-semibold text-ruralia-teal-text hover:underline"
+                className="rounded-lg px-1.5 py-0.5 font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal-soft"
               >
                 Registrar manualmente
               </button>
@@ -310,7 +310,7 @@ export function SelectorVereda({
               <button
                 type="button"
                 onClick={() => setModoManual(false)}
-                className="font-semibold text-ruralia-teal-text hover:underline"
+                className="rounded-lg px-1.5 py-0.5 font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal-soft"
               >
                 Volver a búsqueda
               </button>

@@ -11,6 +11,11 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { SelectorVereda } from "@/components/ui/selector-vereda";
+import {
+  btnAccionPeligro,
+  btnAccionPrimaria,
+  btnAccionSecundaria,
+} from "@/lib/estilos-boton";
 import type {
   Beneficiario,
   CrearBeneficiarioPayload,
@@ -299,11 +304,11 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
                         </span>
                       </td>
                       <td className="px-5 py-3">
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-1.5">
                           <button
                             type="button"
                             onClick={() => void abrirVer(b.id)}
-                            className="text-ruralia-teal-text hover:underline"
+                            className={btnAccionPrimaria}
                           >
                             Ver
                           </button>
@@ -312,14 +317,14 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
                               <button
                                 type="button"
                                 onClick={() => void abrirEditar(b.id)}
-                                className="text-zinc-600 hover:underline"
+                                className={btnAccionSecundaria}
                               >
                                 Editar
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setConfirmarEliminar(b)}
-                                className="text-red-600 hover:underline"
+                                className={btnAccionPeligro}
                               >
                                 Eliminar
                               </button>

@@ -16,6 +16,7 @@ import {
   listarJornadas,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { usePermisos } from "@/lib/use-permisos";
 import type {
   EstadisticasProyecto,
   Jornada,
@@ -33,7 +34,8 @@ interface VistaGestionProyectoProps {
 export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) {
   const searchParams = useSearchParams();
   const tabInicial = searchParams.get("tab");
-  const { token, usuario } = useAuth();
+  const { token } = useAuth();
+  const { puede } = usePermisos();
   const [tab, setTab] = useState<Tab>(
     tabInicial === "jornadas" || tabInicial === "equipo"
       ? tabInicial
@@ -50,9 +52,8 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
   const [error, setError] = useState<string | null>(null);
   const [activando, setActivando] = useState(false);
 
-  const puedeGestionar = !!usuario?.roles.some((rol) =>
-    ["ADMINISTRADOR", "COORDINADOR"].includes(rol.nombre),
-  );
+  const puedeGestionar = puede("proyectos.editar");
+
 
   const cargar = useCallback(async () => {
     if (!token) return;

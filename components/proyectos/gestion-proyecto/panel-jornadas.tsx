@@ -163,7 +163,7 @@ export function PanelJornadas({
                     <button
                       type="button"
                       onClick={() => void manejarCancelar()}
-                      className="text-sm text-red-600 hover:underline"
+                      className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-600 hover:text-white"
                     >
                       Cancelar jornada
                     </button>

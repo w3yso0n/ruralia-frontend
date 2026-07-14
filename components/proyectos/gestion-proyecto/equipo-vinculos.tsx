@@ -227,7 +227,7 @@ export function EquipoVinculos({
             type="button"
             disabled={enviando}
             onClick={() => void guardarSeccion("personal")}
-            className="shrink-0 text-sm font-semibold text-ruralia-teal-text hover:underline disabled:opacity-50"
+            className="shrink-0 rounded-lg bg-ruralia-teal-soft px-3 py-1.5 text-sm font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal hover:text-white disabled:opacity-50"
           >
             Guardar
           </button>
@@ -259,7 +259,7 @@ export function EquipoVinculos({
             type="button"
             disabled={enviando}
             onClick={() => void guardarSeccion("vinculos")}
-            className="shrink-0 text-sm font-semibold text-ruralia-teal-text hover:underline disabled:opacity-50"
+            className="shrink-0 rounded-lg bg-ruralia-teal-soft px-3 py-1.5 text-sm font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal hover:text-white disabled:opacity-50"
           >
             Guardar
           </button>
@@ -320,7 +320,7 @@ export function EquipoVinculos({
             type="button"
             disabled={enviando}
             onClick={() => void guardarSeccion("territorio")}
-            className="text-sm font-semibold text-ruralia-teal-text hover:underline disabled:opacity-50"
+            className="rounded-lg bg-ruralia-teal-soft px-3 py-1.5 text-sm font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal hover:text-white disabled:opacity-50"
           >
             Guardar
           </button>

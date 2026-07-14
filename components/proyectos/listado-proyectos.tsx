@@ -11,6 +11,7 @@ import {
   listarVeredas,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { usePermisos } from "@/lib/use-permisos";
 import type {
   EstadoProyecto,
   OrdenProyecto,
@@ -18,7 +19,8 @@ import type {
 } from "@/lib/types";
 
 export function ListadoProyectos() {
-  const { token, usuario } = useAuth();
+  const { token } = useAuth();
+  const { puede } = usePermisos();
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [total, setTotal] = useState(0);
   const [pagina, setPagina] = useState(1);
@@ -40,9 +42,8 @@ export function ListadoProyectos() {
     { id: string; nombre: string }[]
   >([]);
 
-  const puedeGestionar = usuario?.roles.some((rol) =>
-    ["ADMINISTRADOR", "COORDINADOR"].includes(rol.nombre),
-  );
+  const puedeGestionar = puede("proyectos.crear");
+
 
   const limite = 12;
 
@@ -86,19 +87,25 @@ export function ListadoProyectos() {
   useEffect(() => {
     if (!token) return;
     void Promise.all([
-      listarUsuarios(token, { limite: 100, estaActivo: true }),
-      listarAsociaciones(token, { limite: 100 }),
-      listarVeredas(token, { limite: 100 }),
+      listarUsuarios(token, { limite: 100, estaActivo: true }).catch(() => null),
+      listarAsociaciones(token, { limite: 100 }).catch(() => null),
+      listarVeredas(token, { limite: 100 }).catch(() => null),
     ]).then(([usuarios, asociaciones, veredas]) => {
-      setOpcionesPersonal(
-        usuarios.datos.map((u) => ({ id: u.id, nombre: u.nombreCompleto })),
-      );
-      setOpcionesAsociaciones(
-        asociaciones.datos.map((a) => ({ id: a.id, nombre: a.nombre })),
-      );
-      setOpcionesVeredas(
-        veredas.datos.map((v) => ({ id: v.id, nombre: v.nombre })),
-      );
+      if (usuarios) {
+        setOpcionesPersonal(
+          usuarios.datos.map((u) => ({ id: u.id, nombre: u.nombreCompleto })),
+        );
+      }
+      if (asociaciones) {
+        setOpcionesAsociaciones(
+          asociaciones.datos.map((a) => ({ id: a.id, nombre: a.nombre })),
+        );
+      }
+      if (veredas) {
+        setOpcionesVeredas(
+          veredas.datos.map((v) => ({ id: v.id, nombre: v.nombre })),
+        );
+      }
     });
   }, [token]);
 
@@ -215,7 +222,7 @@ export function ListadoProyectos() {
           {puedeGestionar ? (
             <Link
               href="/proyectos/nuevo"
-              className="mt-4 inline-block text-sm font-semibold text-ruralia-teal-text hover:underline"
+              className="mt-4 inline-flex rounded-xl bg-ruralia-teal-soft px-4 py-2 text-sm font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal hover:text-white"
             >
               Crear el primer proyecto
             </Link>

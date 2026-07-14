@@ -24,14 +24,11 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const esAdministrador = usuario.roles.some(
-    (rol) => rol.nombre === "ADMINISTRADOR",
-  );
   const roles = usuario.roles.map((rol) => rol.nombre).join(", ");
 
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar esAdministrador={esAdministrador} />
+      <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="border-b border-ruralia-teal-border bg-ruralia-surface px-6 py-4">

@@ -11,6 +11,11 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { SelectorVereda } from "@/components/ui/selector-vereda";
+import {
+  btnAccionPeligro,
+  btnAccionPrimaria,
+  btnAccionSecundaria,
+} from "@/lib/estilos-boton";
 import type { Asociacion, CrearAsociacionPayload, Vereda } from "@/lib/types";
 
 type ModoModal = "crear" | "editar" | "ver" | null;
@@ -269,11 +274,11 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                         </span>
                       </td>
                       <td className="px-5 py-3">
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-1.5">
                           <button
                             type="button"
                             onClick={() => void abrirVer(a.id)}
-                            className="text-ruralia-teal-text hover:underline"
+                            className={btnAccionPrimaria}
                           >
                             Ver
                           </button>
@@ -282,14 +287,14 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                               <button
                                 type="button"
                                 onClick={() => void abrirEditar(a.id)}
-                                className="text-zinc-600 hover:underline"
+                                className={btnAccionSecundaria}
                               >
                                 Editar
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setConfirmarEliminar(a)}
-                                className="text-red-600 hover:underline"
+                                className={btnAccionPeligro}
                               >
                                 Eliminar
                               </button>

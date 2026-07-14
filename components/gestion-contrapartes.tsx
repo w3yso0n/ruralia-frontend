@@ -11,9 +11,8 @@ export function GestionContrapartes() {
   const { usuario } = useAuth();
   const [tab, setTab] = useState<Tab>("beneficiarios");
 
-  const puedeGestionar = !!usuario?.roles.some((rol) =>
-    ["ADMINISTRADOR", "COORDINADOR"].includes(rol.nombre),
-  );
+  const puedeGestionar = !!usuario && (usuario.permisos ?? []).includes("contrapartes.editar");
+
 
   return (
     <>

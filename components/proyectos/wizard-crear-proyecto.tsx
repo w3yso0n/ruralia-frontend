@@ -443,7 +443,7 @@ export function WizardCrearProyecto() {
                       onClick={() =>
                         setActividades(actividades.filter((_, j) => j !== i))
                       }
-                      className="text-sm text-red-600"
+                      className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-600 hover:text-white"
                     >
                       Quitar
                     </button>
@@ -453,7 +453,7 @@ export function WizardCrearProyecto() {
               <button
                 type="button"
                 onClick={() => setActividades([...actividades, ""])}
-                className="text-sm font-semibold text-ruralia-teal-text hover:underline"
+                className="rounded-lg px-2 py-1 text-sm font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal-soft"
               >
                 + Añadir actividad
               </button>

@@ -1,13 +1,68 @@
 export interface Rol {
   id: string;
   nombre: string;
+  descripcion?: string;
+  esSistema?: boolean;
 }
 
-export type NombreRol =
-  | "ADMINISTRADOR"
-  | "COORDINADOR"
-  | "TECNICO"
-  | "VISUALIZADOR";
+export interface Permiso {
+  id: string;
+  clave: string;
+  modulo: string;
+  accion: string;
+  descripcion?: string;
+  orden: number;
+}
+
+export interface ModuloPermisos {
+  modulo: string;
+  permisos: Permiso[];
+}
+
+export interface RolDetalle {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  esSistema: boolean;
+  estaActivo: boolean;
+  permisoIds: string[];
+  permisoClaves: string[];
+  conteoPermisos: number;
+  conteoUsuarios: number;
+}
+
+/** Permisos que el rol CUANTIVA no puede perder (alineado con backend). */
+export const PERMISOS_CRITICOS_CUANTIVA: readonly string[] = [
+  "roles.ver",
+  "roles.crear",
+  "roles.editar",
+  "roles.eliminar",
+  "usuarios.ver",
+  "usuarios.editar",
+  "usuarios.gestionar_roles",
+] as const;
+
+export const ETIQUETAS_ROL: Record<string, string> = {
+  CUANTIVA: "Cuantiva",
+  ADMINISTRADOR: "Administrador",
+  COORDINADOR_DEPARTAMENTAL: "Coordinador departamental",
+  COORDINADOR_ZONA: "Coordinador de zona",
+  CAMPO: "Campo",
+  VISUALIZADOR: "Visualizador",
+  // legacy
+  COORDINADOR: "Coordinador",
+  TECNICO: "Campo",
+};
+
+export function etiquetaRol(nombre: string): string {
+  return (
+    ETIQUETAS_ROL[nombre] ??
+    nombre
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/^\w/, (c) => c.toUpperCase())
+  );
+}
 
 export interface Usuario {
   id: string;
@@ -18,6 +73,7 @@ export interface Usuario {
   estaActivo: boolean;
   creadoEn: string;
   roles: Rol[];
+  permisos?: string[];
 }
 
 export interface UsuarioResumen {
@@ -270,7 +326,7 @@ export interface CrearUsuarioPayload {
   contrasena: string;
   nombreCompleto: string;
   urlFoto?: string;
-  roles: NombreRol[];
+  rolIds: string[];
 }
 
 export interface ActualizarUsuarioPayload {
@@ -279,7 +335,20 @@ export interface ActualizarUsuarioPayload {
   nombreCompleto?: string;
   urlFoto?: string;
   estaActivo?: boolean;
-  roles?: NombreRol[];
+  rolIds?: string[];
+}
+
+export interface CrearRolPayload {
+  nombre: string;
+  descripcion?: string;
+  permisoIds?: string[];
+}
+
+export interface ActualizarRolPayload {
+  nombre?: string;
+  descripcion?: string;
+  estaActivo?: boolean;
+  permisoIds?: string[];
 }
 
 export interface CrearProyectoPayload {

@@ -24,6 +24,7 @@ interface AuthContextValue {
   token: string | null;
   cerrarSesion: () => Promise<void>;
   refrescarToken: () => Promise<string | null>;
+  refrescarUsuario: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -80,6 +81,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return idToken;
   }, [usuarioFirebase]);
 
+  const refrescarUsuario = useCallback(async () => {
+    if (!usuarioFirebase) return;
+    const idToken = await usuarioFirebase.getIdToken();
+    setToken(idToken);
+    const datos = await obtenerUsuarioActual(idToken);
+    setUsuario(datos);
+  }, [usuarioFirebase]);
+
   const value = useMemo(
     () => ({
       cargando,
@@ -88,8 +97,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token,
       cerrarSesion,
       refrescarToken,
+      refrescarUsuario,
     }),
-    [cargando, usuarioFirebase, usuario, token, cerrarSesion, refrescarToken],
+    [
+      cargando,
+      usuarioFirebase,
+      usuario,
+      token,
+      cerrarSesion,
+      refrescarToken,
+      refrescarUsuario,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -3,6 +3,7 @@ import type {
   ActualizarPlantillaFormularioPayload,
   ActualizarProyectoPayload,
   ActualizarUsuarioPayload,
+  ActualizarRolPayload,
   AsignacionAsociacionesPayload,
   AsignacionBeneficiariosPayload,
   AsignacionPersonalPayload,
@@ -18,18 +19,20 @@ import type {
   CrearJornadaPayload,
   CrearPlantillaFormularioPayload,
   CrearProyectoPayload,
+  CrearRolPayload,
   CrearSubactividadPayload,
   CrearUsuarioPayload,
   EstadisticasProyecto,
   Jornada,
   KpisDashboard,
+  ModuloPermisos,
   OrdenProyecto,
   PlanProyecto,
   PlantillaFormulario,
   ProgresoProyecto,
   Proyecto,
   RespuestaPaginada,
-  Rol,
+  RolDetalle,
   SubactividadPlan,
   Usuario,
   Vereda,
@@ -135,8 +138,46 @@ export async function eliminarUsuario(
   return fetchConAuth<void>(`/usuarios/${id}`, token, { method: "DELETE" });
 }
 
-export async function listarRoles(token: string): Promise<Rol[]> {
-  return fetchConAuth<Rol[]>("/usuarios/roles", token);
+export async function listarRoles(token: string): Promise<RolDetalle[]> {
+  return fetchConAuth<RolDetalle[]>("/roles", token);
+}
+
+export async function obtenerRol(
+  token: string,
+  id: string,
+): Promise<RolDetalle> {
+  return fetchConAuth<RolDetalle>(`/roles/${id}`, token);
+}
+
+export async function crearRol(
+  token: string,
+  payload: CrearRolPayload,
+): Promise<RolDetalle> {
+  return fetchConAuth<RolDetalle>("/roles", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actualizarRol(
+  token: string,
+  id: string,
+  payload: ActualizarRolPayload,
+): Promise<RolDetalle> {
+  return fetchConAuth<RolDetalle>(`/roles/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function eliminarRol(token: string, id: string): Promise<void> {
+  return fetchConAuth<void>(`/roles/${id}`, token, { method: "DELETE" });
+}
+
+export async function listarPermisos(
+  token: string,
+): Promise<ModuloPermisos[]> {
+  return fetchConAuth<ModuloPermisos[]>("/permisos", token);
 }
 
 export async function listarProyectos(

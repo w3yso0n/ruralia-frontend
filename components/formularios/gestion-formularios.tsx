@@ -14,6 +14,10 @@ import {
   publicarPlantillaFormulario,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import {
+  btnAccionPrimaria,
+  btnAccionSecundaria,
+} from "@/lib/estilos-boton";
 import type { PlantillaFormulario, Proyecto, Usuario } from "@/lib/types";
 
 interface OpcionSubactividad {
@@ -281,17 +285,17 @@ export function GestionFormularios() {
                         </span>
                       </td>
                       <td className="px-5 py-3">
-                        <div className="flex gap-3">
+                        <div className="flex flex-wrap gap-1.5">
                           <Link
                             href={`/formularios/${plantilla.id}`}
-                            className="text-ruralia-teal-text hover:underline"
+                            className={btnAccionPrimaria}
                           >
                             Editar
                           </Link>
                           <button
                             type="button"
                             onClick={() => abrirAsignar(plantilla)}
-                            className="text-zinc-600 hover:underline"
+                            className={btnAccionSecundaria}
                           >
                             Asignar
                           </button>
@@ -300,7 +304,7 @@ export function GestionFormularios() {
                               type="button"
                               onClick={() => manejarPublicar(plantilla)}
                               disabled={enviando}
-                              className="text-zinc-600 hover:underline disabled:opacity-50"
+                              className={btnAccionSecundaria}
                             >
                               Publicar
                             </button>
@@ -309,7 +313,7 @@ export function GestionFormularios() {
                             type="button"
                             onClick={() => manejarClonar(plantilla)}
                             disabled={enviando}
-                            className="text-zinc-600 hover:underline disabled:opacity-50"
+                            className={btnAccionSecundaria}
                           >
                             Clonar
                           </button>

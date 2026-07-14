@@ -36,7 +36,7 @@ export function ResumenAsignaciones({
             <button
               type="button"
               onClick={onIrAEquipo}
-              className="text-sm font-semibold text-ruralia-teal-text hover:underline"
+              className="rounded-lg px-2 py-1 text-sm font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal-soft"
             >
               Editar
             </button>
@@ -87,7 +87,7 @@ export function ResumenAsignaciones({
             <button
               type="button"
               onClick={onIrAEquipo}
-              className="text-sm font-semibold text-ruralia-teal-text hover:underline"
+              className="rounded-lg px-2 py-1 text-sm font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal-soft"
             >
               Editar
             </button>
