@@ -23,14 +23,14 @@ interface EditorPlantillaFormularioProps {
   plantillaId?: string;
 }
 
-interface OpcionSubactividad {
+interface OpcionProceso {
   id: string;
   etiqueta: string;
 }
 
 interface GrupoProyecto {
   proyecto: Proyecto;
-  subactividades: OpcionSubactividad[];
+  procesos: OpcionProceso[];
 }
 
 interface CampoEnEdicion extends CampoFormularioPayload {
@@ -92,7 +92,7 @@ export function EditorPlantillaFormulario({
   const [estaActivo, setEstaActivo] = useState(false);
 
   const [grupos, setGrupos] = useState<GrupoProyecto[]>([]);
-  const [subactividadIds, setSubactividadIds] = useState<string[]>([]);
+  const [procesoIds, setProcesoIds] = useState<string[]>([]);
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
@@ -106,17 +106,19 @@ export function EditorPlantillaFormulario({
         const gruposCargados: GrupoProyecto[] = [];
         for (const proyecto of respuesta.datos) {
           const plan = await obtenerPlanProyecto(token, proyecto.id);
-          const subactividades: OpcionSubactividad[] = [];
+          const procesos: OpcionProceso[] = [];
           for (const actividad of plan.actividades) {
             for (const sub of actividad.subactividades ?? []) {
-              subactividades.push({
-                id: sub.id,
-                etiqueta: `${actividad.nombre} — ${sub.nombre}`,
-              });
+              for (const proceso of sub.procesos ?? []) {
+                procesos.push({
+                  id: proceso.id,
+                  etiqueta: `${actividad.nombre} — ${sub.nombre} — ${proceso.nombre}`,
+                });
+              }
             }
           }
-          if (subactividades.length) {
-            gruposCargados.push({ proyecto, subactividades });
+          if (procesos.length) {
+            gruposCargados.push({ proyecto, procesos });
           }
         }
         setGrupos(gruposCargados);
@@ -143,7 +145,7 @@ export function EditorPlantillaFormulario({
         setNombre(plantilla.nombre);
         setDescripcion(plantilla.descripcion ?? "");
         setEstaActivo(plantilla.estaActivo);
-        setSubactividadIds(plantilla.subactividadIds ?? []);
+        setProcesoIds(plantilla.procesoIds ?? []);
         setUsuarioIds(plantilla.usuarioIds ?? []);
         setCampos(
           (plantilla.campos ?? [])
@@ -174,9 +176,9 @@ export function EditorPlantillaFormulario({
       .finally(() => setCargando(false));
   }, [esEdicion, token, plantillaId]);
 
-  function alternarSubactividad(id: string) {
-    setSubactividadIds((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+  function alternarProceso(id: string) {
+    setProcesoIds((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
     );
   }
 
@@ -248,7 +250,7 @@ export function EditorPlantillaFormulario({
         await actualizarPlantillaFormulario(token, plantillaId, {
           nombre,
           descripcion: descripcion || undefined,
-          subactividadIds,
+          procesoIds,
           usuarioIds,
           campos: camposPayload,
         });
@@ -256,7 +258,7 @@ export function EditorPlantillaFormulario({
         await crearPlantillaFormulario(token, {
           nombre,
           descripcion: descripcion || undefined,
-          subactividadIds,
+          procesoIds,
           usuarioIds,
           campos: camposPayload,
         });
@@ -331,17 +333,17 @@ export function EditorPlantillaFormulario({
 
         <div className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
           <h3 className="mb-1 text-sm font-semibold text-zinc-900">
-            Proyectos asignados (opcional)
+            Procesos asignados (opcional)
           </h3>
           <p className="mb-4 text-xs text-zinc-500">
-            Puedes crear la plantilla sin asignarla a ningún proyecto y
-            asignarla más adelante. Selecciona una o varias subactividades
-            donde estará disponible.
+            Vincula la plantilla a uno o más procesos del plan. El técnico la verá
+            al registrar jornadas contra metas de esos procesos.
           </p>
 
           {grupos.length === 0 ? (
             <p className="text-sm text-zinc-500">
-              No hay proyectos con subactividades registradas todavía.
+              No hay proyectos con procesos definidos. Configúralos en Plan del
+              proyecto.
             </p>
           ) : (
             <div className="space-y-4">
@@ -351,18 +353,18 @@ export function EditorPlantillaFormulario({
                     {grupo.proyecto.nombre}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {grupo.subactividades.map((sub) => (
+                    {grupo.procesos.map((proceso) => (
                       <button
-                        key={sub.id}
+                        key={proceso.id}
                         type="button"
-                        onClick={() => alternarSubactividad(sub.id)}
+                        onClick={() => alternarProceso(proceso.id)}
                         className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                          subactividadIds.includes(sub.id)
+                          procesoIds.includes(proceso.id)
                             ? "bg-ruralia-teal text-white"
                             : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                         }`}
                       >
-                        {sub.etiqueta}
+                        {proceso.etiqueta}
                       </button>
                     ))}
                   </div>

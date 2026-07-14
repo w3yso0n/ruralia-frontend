@@ -6,7 +6,6 @@ import { ArbolJornadas } from "@/components/proyectos/gestion-proyecto/arbol-jor
 import { FormularioJornada } from "@/components/proyectos/gestion-proyecto/formulario-jornada";
 import {
   cancelarJornada,
-  crearActividad,
   crearJornada,
 } from "@/lib/api";
 import type { Jornada, PlanProyecto, Proyecto } from "@/lib/types";
@@ -43,22 +42,11 @@ export function PanelJornadas({
     (j) => j.id === jornadaSeleccionadaId,
   );
 
-  async function manejarCrearActividadPlan(nombre: string) {
-    try {
-      const creada = await crearActividad(token, proyectoId, { nombre });
-      await onActualizar();
-      return creada.id;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al crear actividad");
-      return null;
-    }
-  }
-
   async function manejarCrearJornada(datos: {
     fecha: string;
     veredaId: string;
     observaciones?: string;
-    actividades: { actividadId: string; subactividadId?: string }[];
+    metaId?: string;
   }) {
     setEnviando(true);
     setError(null);
@@ -68,7 +56,7 @@ export function PanelJornadas({
         fecha: datos.fecha,
         veredaId: datos.veredaId,
         observaciones: datos.observaciones,
-        actividades: datos.actividades,
+        metaId: datos.metaId,
       });
       await onActualizar();
       setJornadaSeleccionadaId(jornada.id);
@@ -98,8 +86,9 @@ export function PanelJornadas({
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-zinc-600">
-          Organiza el trabajo por <strong>jornadas</strong>; dentro de cada una
-          defines qué actividades se ejecutan en campo.
+          Registra visitas de campo contra una meta del plan. Configura primero
+          subactividades, procesos y metas en la pestaña{" "}
+          <strong>Plan del proyecto</strong>.
         </p>
         {puedeGestionar ? (
           <button
@@ -119,7 +108,6 @@ export function PanelJornadas({
             veredas={proyecto.veredas ?? []}
             actividadesPlan={plan?.actividades ?? []}
             enviando={enviando}
-            onCrearActividadPlan={manejarCrearActividadPlan}
             onSubmit={manejarCrearJornada}
           />
         </section>
@@ -176,37 +164,60 @@ export function PanelJornadas({
                   </p>
                 ) : null}
 
-                <h4 className="mb-2 mt-6 text-sm font-semibold text-zinc-800">
-                  Actividades de esta jornada
-                </h4>
-                {!jornadaSeleccionada.actividades?.length ? (
-                  <p className="text-sm text-zinc-500">
-                    Sin actividades vinculadas
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {jornadaSeleccionada.actividades.map((ja) => (
-                      <li
-                        key={ja.id}
-                        className="flex items-center justify-between rounded-xl border border-zinc-100 px-4 py-3 text-sm"
-                      >
-                        <div>
-                          <p className="font-medium text-zinc-900">
-                            {ja.actividad.nombre}
-                          </p>
-                          {ja.subactividad ? (
-                            <p className="text-xs text-zinc-500">
-                              Subactividad: {ja.subactividad.nombre}
-                            </p>
-                          ) : null}
-                        </div>
-                        <span className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs text-ruralia-teal-text">
-                          {ja.estadoEjecucion}
+                {jornadaSeleccionada.meta ? (
+                  <div className="mt-4">
+                    <h4 className="mb-2 text-sm font-semibold text-zinc-800">
+                      Meta del plan
+                    </h4>
+                    <div className="rounded-xl border border-zinc-100 px-4 py-3 text-sm">
+                      {jornadaSeleccionada.meta.actividadNombre ? (
+                        <p className="text-xs text-zinc-400">
+                          {jornadaSeleccionada.meta.actividadNombre}
+                          {jornadaSeleccionada.meta.subactividadNombre
+                            ? ` › ${jornadaSeleccionada.meta.subactividadNombre}`
+                            : ""}
+                          {jornadaSeleccionada.meta.procesoNombre
+                            ? ` › ${jornadaSeleccionada.meta.procesoNombre}`
+                            : ""}
+                        </p>
+                      ) : null}
+                      <p className="font-medium text-zinc-900">
+                        {jornadaSeleccionada.meta.nombre}
+                        <span className="ml-2 text-xs font-normal text-zinc-500">
+                          ({jornadaSeleccionada.meta.unidadMedida})
                         </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                      </p>
+                    </div>
+                  </div>
+                ) : jornadaSeleccionada.actividades?.length ? (
+                  <div className="mt-4">
+                    <h4 className="mb-2 text-sm font-semibold text-zinc-800">
+                      Actividades (legacy)
+                    </h4>
+                    <ul className="space-y-2">
+                      {jornadaSeleccionada.actividades.map((ja) => (
+                        <li
+                          key={ja.id}
+                          className="flex items-center justify-between rounded-xl border border-zinc-100 px-4 py-3 text-sm"
+                        >
+                          <div>
+                            <p className="font-medium text-zinc-900">
+                              {ja.actividad.nombre}
+                            </p>
+                            {ja.subactividad ? (
+                              <p className="text-xs text-zinc-500">
+                                Subactividad: {ja.subactividad.nombre}
+                              </p>
+                            ) : null}
+                          </div>
+                          <span className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs text-ruralia-teal-text">
+                            {ja.estadoEjecucion}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </>
             )}
           </section>

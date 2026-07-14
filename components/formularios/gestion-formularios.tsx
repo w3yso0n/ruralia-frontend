@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Alerta, Modal, Spinner } from "@/components/ui/modal";
 import {
-  asignarSubactividadesPlantilla,
+  asignarProcesosPlantilla,
   asignarUsuariosPlantilla,
   clonarPlantillaFormulario,
   listarPlantillasFormulario,
@@ -20,14 +20,14 @@ import {
 } from "@/lib/estilos-boton";
 import type { PlantillaFormulario, Proyecto, Usuario } from "@/lib/types";
 
-interface OpcionSubactividad {
+interface OpcionProceso {
   id: string;
   etiqueta: string;
 }
 
 interface GrupoProyecto {
   proyecto: Proyecto;
-  subactividades: OpcionSubactividad[];
+  procesos: OpcionProceso[];
 }
 
 export function GestionFormularios() {
@@ -42,7 +42,7 @@ export function GestionFormularios() {
     useState<PlantillaFormulario | null>(null);
   const [grupos, setGrupos] = useState<GrupoProyecto[]>([]);
   const [cargandoGrupos, setCargandoGrupos] = useState(false);
-  const [subactividadIds, setSubactividadIds] = useState<string[]>([]);
+  const [procesoIds, setProcesoIds] = useState<string[]>([]);
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
@@ -110,7 +110,7 @@ export function GestionFormularios() {
   async function abrirAsignar(plantilla: PlantillaFormulario) {
     if (!token) return;
     setPlantillaAsignando(plantilla);
-    setSubactividadIds(plantilla.subactividadIds ?? []);
+    setProcesoIds(plantilla.procesoIds ?? []);
     setUsuarioIds(plantilla.usuarioIds ?? []);
     setCargandoGrupos(true);
     setError(null);
@@ -122,17 +122,19 @@ export function GestionFormularios() {
       const gruposCargados: GrupoProyecto[] = [];
       for (const proyecto of respuestaProyectos.datos) {
         const plan = await obtenerPlanProyecto(token, proyecto.id);
-        const subactividades: OpcionSubactividad[] = [];
+        const procesos: OpcionProceso[] = [];
         for (const actividad of plan.actividades) {
           for (const sub of actividad.subactividades ?? []) {
-            subactividades.push({
-              id: sub.id,
-              etiqueta: `${actividad.nombre} — ${sub.nombre}`,
-            });
+            for (const proceso of sub.procesos ?? []) {
+              procesos.push({
+                id: proceso.id,
+                etiqueta: `${actividad.nombre} — ${sub.nombre} — ${proceso.nombre}`,
+              });
+            }
           }
         }
-        if (subactividades.length) {
-          gruposCargados.push({ proyecto, subactividades });
+        if (procesos.length) {
+          gruposCargados.push({ proyecto, procesos });
         }
       }
       setGrupos(gruposCargados);
@@ -144,9 +146,9 @@ export function GestionFormularios() {
     }
   }
 
-  function alternarSubactividad(id: string) {
-    setSubactividadIds((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+  function alternarProceso(id: string) {
+    setProcesoIds((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
     );
   }
 
@@ -162,11 +164,7 @@ export function GestionFormularios() {
     setError(null);
     try {
       await Promise.all([
-        asignarSubactividadesPlantilla(
-          token,
-          plantillaAsignando.id,
-          subactividadIds,
-        ),
+        asignarProcesosPlantilla(token, plantillaAsignando.id, procesoIds),
         asignarUsuariosPlantilla(token, plantillaAsignando.id, usuarioIds),
       ]);
       setExito("Asignación actualizada correctamente");
@@ -212,7 +210,7 @@ export function GestionFormularios() {
                   <th className="px-5 py-3 font-semibold">Nombre</th>
                   <th className="px-5 py-3 font-semibold">Versión</th>
                   <th className="px-5 py-3 font-semibold">Campos</th>
-                  <th className="px-5 py-3 font-semibold">Proyectos asignados</th>
+                  <th className="px-5 py-3 font-semibold">Procesos asignados</th>
                   <th className="px-5 py-3 font-semibold">Usuarios asignados</th>
                   <th className="px-5 py-3 font-semibold">Estado</th>
                   <th className="px-5 py-3 font-semibold">Acciones</th>
@@ -245,10 +243,10 @@ export function GestionFormularios() {
                         {plantilla.campos?.length ?? 0}
                       </td>
                       <td className="px-5 py-3 text-zinc-600">
-                        {plantilla.subactividadIds.length > 0 ? (
+                        {(plantilla.procesoIds?.length ?? 0) > 0 ? (
                           <span className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs text-ruralia-teal-text">
-                            {plantilla.subactividadIds.length} subactividad
-                            {plantilla.subactividadIds.length !== 1 ? "es" : ""}
+                            {plantilla.procesoIds.length} proceso
+                            {plantilla.procesoIds.length !== 1 ? "s" : ""}
                           </span>
                         ) : (
                           <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">
@@ -343,13 +341,14 @@ export function GestionFormularios() {
 
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Por proyecto / subactividad
+              Por proyecto / proceso
             </p>
             {cargandoGrupos ? (
               <Spinner className="py-8" />
             ) : grupos.length === 0 ? (
               <p className="text-sm text-zinc-500">
-                No hay proyectos con subactividades registradas todavía.
+                No hay proyectos con procesos definidos. Configúralos en Plan del
+                proyecto.
               </p>
             ) : (
               <div className="max-h-56 space-y-4 overflow-y-auto">
@@ -359,18 +358,18 @@ export function GestionFormularios() {
                       {grupo.proyecto.nombre}
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {grupo.subactividades.map((sub) => (
+                      {grupo.procesos.map((proceso) => (
                         <button
-                          key={sub.id}
+                          key={proceso.id}
                           type="button"
-                          onClick={() => alternarSubactividad(sub.id)}
+                          onClick={() => alternarProceso(proceso.id)}
                           className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                            subactividadIds.includes(sub.id)
+                            procesoIds.includes(proceso.id)
                               ? "bg-ruralia-teal text-white"
                               : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                           }`}
                         >
-                          {sub.etiqueta}
+                          {proceso.etiqueta}
                         </button>
                       ))}
                     </div>

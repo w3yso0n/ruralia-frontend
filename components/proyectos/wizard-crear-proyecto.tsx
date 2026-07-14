@@ -184,7 +184,7 @@ export function WizardCrearProyecto() {
 
       await activarProyecto(token, proyecto.id);
 
-      router.push(`/proyectos/${proyecto.id}?tab=jornadas`);
+      router.push(`/proyectos/${proyecto.id}?tab=plan`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear el proyecto");
     } finally {

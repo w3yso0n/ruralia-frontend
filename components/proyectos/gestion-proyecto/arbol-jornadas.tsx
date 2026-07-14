@@ -55,7 +55,25 @@ export function ArbolJornadas({
               </span>
             </button>
 
-            {activa && jornada.actividades?.length ? (
+            {activa && jornada.meta ? (
+              <div className="ml-3 mt-1 border-l-2 border-ruralia-teal-border pl-3 text-xs text-zinc-600">
+                <p className="font-medium">{jornada.meta.nombre}</p>
+                <p className="text-zinc-400">
+                  {[
+                    jornada.meta.actividadNombre,
+                    jornada.meta.subactividadNombre,
+                    jornada.meta.procesoNombre,
+                  ]
+                    .filter(Boolean)
+                    .join(" → ")}
+                  {jornada.meta.unidadMedida
+                    ? ` · ${jornada.meta.unidadMedida}`
+                    : ""}
+                </p>
+              </div>
+            ) : null}
+
+            {activa && !jornada.meta && jornada.actividades?.length ? (
               <ul className="ml-3 mt-1 space-y-1 border-l-2 border-ruralia-teal-border pl-3">
                 {jornada.actividades.map((ja) => (
                   <li key={ja.id} className="text-xs text-zinc-600">

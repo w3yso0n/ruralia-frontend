@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Alerta, Spinner } from "@/components/ui/modal";
 import { EquipoVinculos } from "@/components/proyectos/gestion-proyecto/equipo-vinculos";
 import { PanelJornadas } from "@/components/proyectos/gestion-proyecto/panel-jornadas";
+import { PanelPlan } from "@/components/proyectos/gestion-proyecto/panel-plan";
 import { ResumenAsignaciones } from "@/components/proyectos/gestion-proyecto/resumen-asignaciones";
 import {
   activarProyecto,
@@ -25,7 +26,7 @@ import type {
   Proyecto,
 } from "@/lib/types";
 
-type Tab = "resumen" | "jornadas" | "equipo";
+type Tab = "resumen" | "plan" | "jornadas" | "equipo";
 
 interface VistaGestionProyectoProps {
   proyectoId: string;
@@ -37,7 +38,7 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
   const { token } = useAuth();
   const { puede } = usePermisos();
   const [tab, setTab] = useState<Tab>(
-    tabInicial === "jornadas" || tabInicial === "equipo"
+    tabInicial === "jornadas" || tabInicial === "equipo" || tabInicial === "plan"
       ? tabInicial
       : "resumen",
   );
@@ -85,7 +86,8 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
 
   const tabs: { id: Tab; etiqueta: string }[] = [
     { id: "resumen", etiqueta: "Resumen" },
-    { id: "jornadas", etiqueta: "Jornadas y actividades" },
+    { id: "plan", etiqueta: "Plan del proyecto" },
+    { id: "jornadas", etiqueta: "Jornadas" },
     { id: "equipo", etiqueta: "Equipo y contraparte" },
   ];
 
@@ -250,6 +252,16 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
             </div>
           ) : null}
         </>
+      ) : null}
+
+      {tab === "plan" ? (
+        <PanelPlan
+          token={token}
+          proyectoId={proyectoId}
+          plan={plan}
+          puedeGestionar={puedeGestionar}
+          onActualizar={cargar}
+        />
       ) : null}
 
       {tab === "jornadas" ? (

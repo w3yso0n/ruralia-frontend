@@ -164,6 +164,37 @@ export interface CompletadaPor {
   nombreCompleto: string;
 }
 
+export interface MetaPeriodoPlan {
+  id: string;
+  anio: number;
+  mes: number;
+  cantidadPlaneada: number;
+  ejecutado: number;
+  progresoPorcentaje: number;
+}
+
+export interface MetaPlan {
+  id: string;
+  nombre: string;
+  unidadMedida: string;
+  cantidadTotal: number;
+  orden: number;
+  estaActivo: boolean;
+  ejecutadoTotal: number;
+  progresoPorcentaje: number;
+  periodos?: MetaPeriodoPlan[];
+}
+
+export interface ProcesoPlan {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  orden: number;
+  estaActivo: boolean;
+  progresoPorcentaje: number;
+  metas?: MetaPlan[];
+}
+
 export interface SubactividadPlan {
   id: string;
   nombre: string;
@@ -176,6 +207,7 @@ export interface SubactividadPlan {
   completadaEn?: string;
   completadaPor?: CompletadaPor;
   progresoPorcentaje: number;
+  procesos?: ProcesoPlan[];
 }
 
 export interface ActividadPlan {
@@ -221,12 +253,22 @@ export interface JornadaActividadItem {
   orden: number;
 }
 
+export interface MetaResumenJornada {
+  id: string;
+  nombre: string;
+  unidadMedida: string;
+  procesoNombre?: string;
+  subactividadNombre?: string;
+  actividadNombre?: string;
+}
+
 export interface Jornada {
   id: string;
   fecha: string;
   estado: EstadoJornada;
   observaciones?: string;
   proyecto?: { id: string; nombre: string };
+  meta?: MetaResumenJornada;
   vereda?: { id: string; nombre: string };
   tecnicoResponsable?: { id: string; nombre: string };
   actividades?: JornadaActividadItem[];
@@ -374,6 +416,38 @@ export interface CrearSubactividadPayload {
   orden?: number;
 }
 
+export interface CrearProcesoPayload {
+  nombre: string;
+  descripcion?: string;
+  orden?: number;
+}
+
+export interface CrearMetaPayload {
+  nombre: string;
+  unidadMedida: string;
+  cantidadTotal: number;
+  orden?: number;
+}
+
+export interface CrearMetaPeriodoPayload {
+  anio: number;
+  mes: number;
+  cantidadPlaneada: number;
+}
+
+export interface AvancePeriodo {
+  metaId: string;
+  metaNombre: string;
+  unidadMedida: string;
+  anio: number;
+  mes: number;
+  cantidadPlaneada: number;
+  ejecutado: number;
+  progresoPorcentaje: number;
+  acumuladoTotal: number;
+  progresoAcumulado: number;
+}
+
 export interface CompletarNodoPayload {
   notaCompletado?: string;
 }
@@ -387,7 +461,8 @@ export interface CrearJornadaPayload {
   fecha: string;
   observaciones?: string;
   proyectoId: string;
-  actividades: ActividadJornadaPayload[];
+  metaId?: string;
+  actividades?: ActividadJornadaPayload[];
   veredaId: string;
   tecnicoResponsableId?: string;
 }
@@ -443,6 +518,7 @@ export interface PlantillaFormulario {
   descripcion?: string;
   version: number;
   estaActivo: boolean;
+  procesoIds: string[];
   subactividadIds: string[];
   usuarioIds: string[];
   campos?: CampoFormulario[];
@@ -462,6 +538,7 @@ export interface CampoFormularioPayload {
 export interface CrearPlantillaFormularioPayload {
   nombre: string;
   descripcion?: string;
+  procesoIds?: string[];
   subactividadIds?: string[];
   usuarioIds?: string[];
   campos: CampoFormularioPayload[];
@@ -470,6 +547,7 @@ export interface CrearPlantillaFormularioPayload {
 export interface ActualizarPlantillaFormularioPayload {
   nombre?: string;
   descripcion?: string;
+  procesoIds?: string[];
   subactividadIds?: string[];
   usuarioIds?: string[];
   campos?: CampoFormularioPayload[];

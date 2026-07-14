@@ -1,23 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import type { ActividadPlan, Proyecto, VeredaResumen } from "@/lib/types";
-
-export interface LineaActividadJornada {
-  actividadId: string;
-  subactividadId?: string;
-}
+import type { ActividadPlan, ProcesoPlan, VeredaResumen } from "@/lib/types";
 
 interface FormularioJornadaProps {
   veredas: VeredaResumen[];
   actividadesPlan: ActividadPlan[];
   enviando: boolean;
-  onCrearActividadPlan: (nombre: string) => Promise<string | null>;
   onSubmit: (datos: {
     fecha: string;
     veredaId: string;
     observaciones?: string;
-    actividades: LineaActividadJornada[];
+    metaId?: string;
   }) => Promise<void>;
 }
 
@@ -25,29 +19,36 @@ export function FormularioJornada({
   veredas,
   actividadesPlan,
   enviando,
-  onCrearActividadPlan,
   onSubmit,
 }: FormularioJornadaProps) {
   const [fecha, setFecha] = useState("");
   const [veredaId, setVeredaId] = useState(veredas[0]?.id ?? "");
   const [observaciones, setObservaciones] = useState("");
-  const [seleccionadas, setSeleccionadas] = useState<
-    Record<string, { checked: boolean; subactividadId?: string }>
-  >({});
-  const [nuevaActividad, setNuevaActividad] = useState("");
+  const [actividadId, setActividadId] = useState("");
+  const [subactividadId, setSubactividadId] = useState("");
+  const [procesoId, setProcesoId] = useState("");
+  const [metaId, setMetaId] = useState("");
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
 
-  function toggleActividad(actividadId: string) {
-    setSeleccionadas((prev) => {
-      const actual = prev[actividadId];
-      return {
-        ...prev,
-        [actividadId]: {
-          checked: !actual?.checked,
-          subactividadId: actual?.subactividadId,
-        },
-      };
-    });
+  const actividadSel = actividadesPlan.find((a) => a.id === actividadId);
+  const subactividadSel = actividadSel?.subactividades?.find(
+    (s) => s.id === subactividadId,
+  );
+  const procesoSel: ProcesoPlan | undefined = subactividadSel?.procesos?.find(
+    (p) => p.id === procesoId,
+  );
+
+  function resetCascada(nivel: "actividad" | "subactividad" | "proceso") {
+    if (nivel === "actividad") {
+      setSubactividadId("");
+      setProcesoId("");
+      setMetaId("");
+    } else if (nivel === "subactividad") {
+      setProcesoId("");
+      setMetaId("");
+    } else {
+      setMetaId("");
+    }
   }
 
   async function manejarSubmit(evento: React.FormEvent) {
@@ -59,43 +60,26 @@ export function FormularioJornada({
       return;
     }
 
-    let actividades = Object.entries(seleccionadas)
-      .filter(([, v]) => v.checked)
-      .map(([actividadId, v]) => ({
-        actividadId,
-        subactividadId: v.subactividadId || undefined,
-      }));
-
-    if (nuevaActividad.trim()) {
-      const id = await onCrearActividadPlan(nuevaActividad.trim());
-      if (id) {
-        actividades = [...actividades, { actividadId: id, subactividadId: undefined }];
-      }
-    }
-
-    if (!actividades.length) {
-      setErrorLocal("Agrega al menos una actividad a la jornada");
-      return;
-    }
-
     await onSubmit({
       fecha,
       veredaId,
       observaciones: observaciones.trim() || undefined,
-      actividades,
+      metaId: metaId || undefined,
     });
 
     setFecha("");
     setObservaciones("");
-    setNuevaActividad("");
-    setSeleccionadas({});
+    setActividadId("");
+    setSubactividadId("");
+    setProcesoId("");
+    setMetaId("");
   }
 
   return (
     <form onSubmit={(e) => void manejarSubmit(e)} className="space-y-4">
       <p className="text-sm text-zinc-600">
-        Una jornada agrupa la visita de campo: elige la fecha, la vereda y las
-        actividades que se ejecutarán ese día.
+        Registra la jornada de campo seleccionando la meta del plan a la que
+        aporta esta visita (Actividad → Subactividad → Proceso → Meta).
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -134,6 +118,99 @@ export function FormularioJornada({
         </div>
       </div>
 
+      <div className="space-y-3 rounded-xl border border-zinc-100 p-4">
+        <p className="text-sm font-medium text-zinc-800">Meta del plan</p>
+
+        <div>
+          <label className="mb-1 block text-xs text-zinc-600">Actividad</label>
+          <select
+            value={actividadId}
+            onChange={(e) => {
+              setActividadId(e.target.value);
+              resetCascada("actividad");
+            }}
+            className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+          >
+            <option value="">— Seleccionar —</option>
+            {actividadesPlan.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {actividadSel && (
+          <div>
+            <label className="mb-1 block text-xs text-zinc-600">
+              Subactividad
+            </label>
+            <select
+              value={subactividadId}
+              onChange={(e) => {
+                setSubactividadId(e.target.value);
+                resetCascada("subactividad");
+              }}
+              className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+            >
+              <option value="">— Seleccionar —</option>
+              {actividadSel.subactividades?.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {subactividadSel && (subactividadSel.procesos?.length ?? 0) > 0 && (
+          <div>
+            <label className="mb-1 block text-xs text-zinc-600">Proceso</label>
+            <select
+              value={procesoId}
+              onChange={(e) => {
+                setProcesoId(e.target.value);
+                resetCascada("proceso");
+              }}
+              className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+            >
+              <option value="">— Seleccionar —</option>
+              {subactividadSel.procesos?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {procesoSel && (procesoSel.metas?.length ?? 0) > 0 && (
+          <div>
+            <label className="mb-1 block text-xs text-zinc-600">
+              Meta
+            </label>
+            <select
+              value={metaId}
+              onChange={(e) => setMetaId(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+            >
+              <option value="">— Seleccionar —</option>
+              {procesoSel.metas?.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre} ({m.unidadMedida})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {subactividadSel && (subactividadSel.procesos?.length ?? 0) === 0 && (
+          <p className="text-xs text-zinc-400">
+            Esta subactividad aún no tiene procesos definidos.
+          </p>
+        )}
+      </div>
+
       <div>
         <label className="mb-1 block text-sm font-medium text-zinc-700">
           Observaciones
@@ -144,67 +221,6 @@ export function FormularioJornada({
           onChange={(e) => setObservaciones(e.target.value)}
           className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
         />
-      </div>
-
-      <div>
-        <p className="mb-2 text-sm font-medium text-zinc-800">
-          Actividades en esta jornada *
-        </p>
-        {actividadesPlan.length === 0 ? (
-          <p className="mb-2 text-xs text-zinc-500">
-            No hay actividades en el catálogo. Crea una nueva abajo.
-          </p>
-        ) : (
-          <div className="max-h-48 space-y-2 overflow-y-auto rounded-xl border border-zinc-100 p-3">
-            {actividadesPlan.map((act) => (
-              <div
-                key={act.id}
-                className="rounded-lg border border-zinc-50 px-2 py-2"
-              >
-                <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={!!seleccionadas[act.id]?.checked}
-                    onChange={() => toggleActividad(act.id)}
-                  />
-                  <span className="text-sm font-medium">{act.nombre}</span>
-                </label>
-                {(act.subactividades?.length ?? 0) > 0 &&
-                seleccionadas[act.id]?.checked ? (
-                  <select
-                    value={seleccionadas[act.id]?.subactividadId ?? ""}
-                    onChange={(e) =>
-                      setSeleccionadas((prev) => ({
-                        ...prev,
-                        [act.id]: {
-                          checked: true,
-                          subactividadId: e.target.value || undefined,
-                        },
-                      }))
-                    }
-                    className="ml-6 mt-1 w-full max-w-xs rounded-lg border border-zinc-200 px-2 py-1 text-xs"
-                  >
-                    <option value="">Toda la actividad</option>
-                    {act.subactividades?.map((sub) => (
-                      <option key={sub.id} value={sub.id}>
-                        Sub: {sub.nombre}
-                      </option>
-                    ))}
-                  </select>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-3 flex gap-2">
-          <input
-            value={nuevaActividad}
-            onChange={(e) => setNuevaActividad(e.target.value)}
-            placeholder="O crear actividad nueva para esta jornada"
-            className="flex-1 rounded-xl border border-zinc-200 px-4 py-2 text-sm"
-          />
-        </div>
       </div>
 
       {errorLocal ? (
