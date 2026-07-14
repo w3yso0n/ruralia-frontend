@@ -7,7 +7,9 @@ import { FormularioJornada } from "@/components/proyectos/gestion-proyecto/formu
 import {
   cancelarJornada,
   crearJornada,
+  actualizarJornada,
 } from "@/lib/api";
+import { SelectorMetaPlan } from "@/components/proyectos/gestion-proyecto/selector-meta-plan";
 import type { Jornada, PlanProyecto, Proyecto } from "@/lib/types";
 
 interface PanelJornadasProps {
@@ -37,6 +39,8 @@ export function PanelJornadas({
   );
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [metaIdEdicion, setMetaIdEdicion] = useState("");
+  const [vinculandoMeta, setVinculandoMeta] = useState(false);
 
   const jornadaSeleccionada = jornadas.find(
     (j) => j.id === jornadaSeleccionadaId,
@@ -46,7 +50,7 @@ export function PanelJornadas({
     fecha: string;
     veredaId: string;
     observaciones?: string;
-    metaId?: string;
+    metaId: string;
   }) {
     setEnviando(true);
     setError(null);
@@ -77,6 +81,24 @@ export function PanelJornadas({
       setJornadaSeleccionadaId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cancelar");
+    }
+  }
+
+  async function manejarVincularMeta(jornadaId: string) {
+    if (!metaIdEdicion) {
+      setError("Selecciona la meta del plan antes de vincular");
+      return;
+    }
+    setVinculandoMeta(true);
+    setError(null);
+    try {
+      await actualizarJornada(token, jornadaId, { metaId: metaIdEdicion });
+      await onActualizar();
+      setMetaIdEdicion("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al vincular meta");
+    } finally {
+      setVinculandoMeta(false);
     }
   }
 
@@ -217,7 +239,42 @@ export function PanelJornadas({
                       ))}
                     </ul>
                   </div>
-                ) : null}
+                ) : puedeGestionar ? (
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm font-medium text-amber-900">
+                      Esta jornada no tiene meta vinculada
+                    </p>
+                    <p className="mt-1 text-xs text-amber-800">
+                      Sin meta no se pueden mostrar formularios en el celular.
+                      Vincula la meta del plan (Actividad → Subactividad →
+                      Proceso → Meta) para que aparezcan los formularios del
+                      proceso.
+                    </p>
+                    <div className="mt-3">
+                      <SelectorMetaPlan
+                        actividadesPlan={plan?.actividades ?? []}
+                        metaId={metaIdEdicion}
+                        onChange={setMetaIdEdicion}
+                        disabled={vinculandoMeta}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={vinculandoMeta || !metaIdEdicion}
+                      onClick={() =>
+                        void manejarVincularMeta(jornadaSeleccionada.id)
+                      }
+                      className="mt-3 rounded-lg bg-ruralia-teal px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      {vinculandoMeta ? "Vinculando..." : "Vincular meta"}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    Esta jornada no tiene meta vinculada; no habrá formularios
+                    disponibles en campo.
+                  </p>
+                )}
               </>
             )}
           </section>

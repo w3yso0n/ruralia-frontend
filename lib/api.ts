@@ -18,6 +18,7 @@ import type {
   CrearAsociacionPayload,
   CrearBeneficiarioPayload,
   CrearJornadaPayload,
+  ActualizarJornadaPayload,
   CrearMetaPayload,
   CrearMetaPeriodoPayload,
   CrearPlantillaFormularioPayload,
@@ -556,6 +557,17 @@ export async function crearJornada(
   });
 }
 
+export async function actualizarJornada(
+  token: string,
+  id: string,
+  payload: ActualizarJornadaPayload,
+): Promise<Jornada> {
+  return fetchConAuth<Jornada>(`/jornadas/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function cancelarJornada(
   token: string,
   id: string,
@@ -861,6 +873,16 @@ export async function listarPlantillasFormulario(
   token: string,
 ): Promise<PlantillaFormulario[]> {
   return fetchConAuth<PlantillaFormulario[]>("/formularios/plantillas", token);
+}
+
+export async function listarPlantillasPorProceso(
+  token: string,
+  procesoId: string,
+): Promise<PlantillaFormulario[]> {
+  return fetchConAuth<PlantillaFormulario[]>(
+    `/formularios/plantillas/proceso/${procesoId}`,
+    token,
+  );
 }
 
 export async function obtenerPlantillaFormulario(

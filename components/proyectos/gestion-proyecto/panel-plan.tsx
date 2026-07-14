@@ -12,6 +12,7 @@ import {
 } from "@/components/proyectos/gestion-proyecto/arbol-plan";
 import { ChevronRight, Plus } from "lucide-react";
 import { PanelAvanceGant } from "@/components/proyectos/gestion-proyecto/panel-avance-gant";
+import { SeccionFormulariosProceso } from "@/components/proyectos/gestion-proyecto/seccion-formularios-proceso";
 import {
   actualizarActividad,
   actualizarMeta,
@@ -105,7 +106,8 @@ function LeyendaJerarquia() {
       </div>
       <p className="mt-2 text-xs text-zinc-500">
         Las jornadas se registran contra una <strong>Meta</strong>. Los
-        formularios se vinculan al <strong>Proceso</strong> desde Formularios.
+        formularios se vinculan al <strong>Proceso</strong> desde el detalle
+        de cada proceso.
       </p>
     </div>
   );
@@ -678,10 +680,17 @@ export function PanelPlan({
               </button>
             </div>
           ) : null}
-          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            Las plantillas de formulario se asignan a este proceso desde{" "}
-            <strong>Formularios</strong> en el menú lateral.
-          </p>
+        </TarjetaSeccion>
+
+        <TarjetaSeccion
+          titulo="Formularios del proceso"
+          descripcion="Plantillas disponibles en jornadas de campo vinculadas a este proceso."
+        >
+          <SeccionFormulariosProceso
+            token={token}
+            procesoId={proceso.id}
+            puedeGestionar={puedeGestionar}
+          />
         </TarjetaSeccion>
 
         <ListaHijos

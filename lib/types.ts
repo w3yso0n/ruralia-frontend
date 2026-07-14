@@ -483,10 +483,17 @@ export interface CrearJornadaPayload {
   fecha: string;
   observaciones?: string;
   proyectoId: string;
-  metaId?: string;
+  metaId: string;
   actividades?: ActividadJornadaPayload[];
   veredaId: string;
   tecnicoResponsableId?: string;
+}
+
+export interface ActualizarJornadaPayload {
+  fecha?: string;
+  observaciones?: string;
+  veredaId?: string;
+  metaId?: string;
 }
 
 export interface VinculoBeneficiarioPayload {
