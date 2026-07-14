@@ -4,12 +4,13 @@ import { useState } from "react";
 import { Alerta } from "@/components/ui/modal";
 import { ArbolJornadas } from "@/components/proyectos/gestion-proyecto/arbol-jornadas";
 import { FormularioJornada } from "@/components/proyectos/gestion-proyecto/formulario-jornada";
+import { FormularioEditarJornada } from "@/components/proyectos/gestion-proyecto/formulario-editar-jornada";
 import {
+  actualizarJornada,
   cancelarJornada,
   crearJornada,
-  actualizarJornada,
+  eliminarJornada,
 } from "@/lib/api";
-import { SelectorMetaPlan } from "@/components/proyectos/gestion-proyecto/selector-meta-plan";
 import type { Jornada, PlanProyecto, Proyecto } from "@/lib/types";
 
 interface PanelJornadasProps {
@@ -37,10 +38,9 @@ export function PanelJornadas({
   const [mostrarFormulario, setMostrarFormulario] = useState(
     jornadas.length === 0 && puedeGestionar,
   );
+  const [editandoId, setEditandoId] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [metaIdEdicion, setMetaIdEdicion] = useState("");
-  const [vinculandoMeta, setVinculandoMeta] = useState(false);
 
   const jornadaSeleccionada = jornadas.find(
     (j) => j.id === jornadaSeleccionadaId,
@@ -65,6 +65,7 @@ export function PanelJornadas({
       await onActualizar();
       setJornadaSeleccionadaId(jornada.id);
       setMostrarFormulario(false);
+      setEditandoId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear jornada");
     } finally {
@@ -72,34 +73,66 @@ export function PanelJornadas({
     }
   }
 
+  async function manejarEditarJornada(
+    jornadaId: string,
+    datos: {
+      fecha: string;
+      veredaId: string;
+      observaciones?: string;
+      metaId: string;
+    },
+  ) {
+    setEnviando(true);
+    setError(null);
+    try {
+      await actualizarJornada(token, jornadaId, datos);
+      await onActualizar();
+      setEditandoId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al editar jornada");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   async function manejarCancelar() {
     if (!jornadaSeleccionadaId) return;
-    if (!confirm("¿Cancelar esta jornada?")) return;
+    if (!confirm("¿Cancelar esta jornada? Quedará marcada como CANCELADA.")) {
+      return;
+    }
+    setError(null);
     try {
       await cancelarJornada(token, jornadaSeleccionadaId);
       await onActualizar();
-      setJornadaSeleccionadaId(null);
+      setEditandoId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cancelar");
     }
   }
 
-  async function manejarVincularMeta(jornadaId: string) {
-    if (!metaIdEdicion) {
-      setError("Selecciona la meta del plan antes de vincular");
+  async function manejarEliminar() {
+    if (!jornadaSeleccionadaId) return;
+    if (
+      !confirm(
+        "¿Eliminar permanentemente esta jornada? Esta acción no se puede deshacer.",
+      )
+    ) {
       return;
     }
-    setVinculandoMeta(true);
     setError(null);
     try {
-      await actualizarJornada(token, jornadaId, { metaId: metaIdEdicion });
+      await eliminarJornada(token, jornadaSeleccionadaId);
       await onActualizar();
-      setMetaIdEdicion("");
+      setJornadaSeleccionadaId(null);
+      setEditandoId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al vincular meta");
-    } finally {
-      setVinculandoMeta(false);
+      setError(err instanceof Error ? err.message : "Error al eliminar");
     }
+  }
+
+  function seleccionarJornada(id: string) {
+    setJornadaSeleccionadaId(id);
+    setEditandoId(null);
   }
 
   return (
@@ -115,7 +148,10 @@ export function PanelJornadas({
         {puedeGestionar ? (
           <button
             type="button"
-            onClick={() => setMostrarFormulario((v) => !v)}
+            onClick={() => {
+              setMostrarFormulario((v) => !v);
+              setEditandoId(null);
+            }}
             className="rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white hover:bg-ruralia-teal-hover"
           >
             {mostrarFormulario ? "Ver jornadas" : "+ Nueva jornada"}
@@ -140,7 +176,7 @@ export function PanelJornadas({
             <ArbolJornadas
               jornadas={jornadas}
               jornadaSeleccionadaId={jornadaSeleccionadaId}
-              onSeleccionarJornada={setJornadaSeleccionadaId}
+              onSeleccionarJornada={seleccionarJornada}
             />
           </aside>
 
@@ -157,123 +193,141 @@ export function PanelJornadas({
                       Jornada del{" "}
                       {new Date(jornadaSeleccionada.fecha).toLocaleDateString(
                         "es-CO",
-                        { weekday: "long", year: "numeric", month: "long", day: "numeric" },
+                        {
+                          weekday: "long",
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        },
                       )}
                     </h3>
                     <p className="mt-1 text-sm text-zinc-500">
-                      {jornadaSeleccionada.vereda?.nombre ?? "—"} ·{" "}
+                      {jornadaSeleccionada.vereda?.nombre ?? "Sin vereda"} ·{" "}
                       {jornadaSeleccionada.tecnicoResponsable?.nombre ?? "—"} ·{" "}
                       <span className="font-medium">
                         {jornadaSeleccionada.estado}
                       </span>
                     </p>
                   </div>
-                  {puedeGestionar &&
-                  jornadaSeleccionada.estado !== "CANCELADA" ? (
-                    <button
-                      type="button"
-                      onClick={() => void manejarCancelar()}
-                      className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-600 hover:text-white"
-                    >
-                      Cancelar jornada
-                    </button>
+                  {puedeGestionar ? (
+                    <div className="flex flex-wrap gap-2">
+                      {editandoId !== jornadaSeleccionada.id ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditandoId(jornadaSeleccionada.id)
+                          }
+                          className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                        >
+                          Editar
+                        </button>
+                      ) : null}
+                      {jornadaSeleccionada.estado !== "CANCELADA" ? (
+                        <button
+                          type="button"
+                          onClick={() => void manejarCancelar()}
+                          className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-600 hover:text-white"
+                        >
+                          Cancelar jornada
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => void manejarEliminar()}
+                        className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-red-700"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   ) : null}
                 </div>
 
-                {jornadaSeleccionada.observaciones ? (
-                  <p className="mt-4 rounded-lg bg-zinc-50 p-3 text-sm text-zinc-600">
-                    {jornadaSeleccionada.observaciones}
-                  </p>
-                ) : null}
-
-                {jornadaSeleccionada.meta ? (
-                  <div className="mt-4">
-                    <h4 className="mb-2 text-sm font-semibold text-zinc-800">
-                      Meta del plan
-                    </h4>
-                    <div className="rounded-xl border border-zinc-100 px-4 py-3 text-sm">
-                      {jornadaSeleccionada.meta.actividadNombre ? (
-                        <p className="text-xs text-zinc-400">
-                          {jornadaSeleccionada.meta.actividadNombre}
-                          {jornadaSeleccionada.meta.subactividadNombre
-                            ? ` › ${jornadaSeleccionada.meta.subactividadNombre}`
-                            : ""}
-                          {jornadaSeleccionada.meta.procesoNombre
-                            ? ` › ${jornadaSeleccionada.meta.procesoNombre}`
-                            : ""}
-                        </p>
-                      ) : null}
-                      <p className="font-medium text-zinc-900">
-                        {jornadaSeleccionada.meta.nombre}
-                        <span className="ml-2 text-xs font-normal text-zinc-500">
-                          ({jornadaSeleccionada.meta.unidadMedida})
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                ) : jornadaSeleccionada.actividades?.length ? (
-                  <div className="mt-4">
-                    <h4 className="mb-2 text-sm font-semibold text-zinc-800">
-                      Actividades (legacy)
-                    </h4>
-                    <ul className="space-y-2">
-                      {jornadaSeleccionada.actividades.map((ja) => (
-                        <li
-                          key={ja.id}
-                          className="flex items-center justify-between rounded-xl border border-zinc-100 px-4 py-3 text-sm"
-                        >
-                          <div>
-                            <p className="font-medium text-zinc-900">
-                              {ja.actividad.nombre}
-                            </p>
-                            {ja.subactividad ? (
-                              <p className="text-xs text-zinc-500">
-                                Subactividad: {ja.subactividad.nombre}
-                              </p>
-                            ) : null}
-                          </div>
-                          <span className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs text-ruralia-teal-text">
-                            {ja.estadoEjecucion}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : puedeGestionar ? (
-                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-medium text-amber-900">
-                      Esta jornada no tiene meta vinculada
-                    </p>
-                    <p className="mt-1 text-xs text-amber-800">
-                      Sin meta no se pueden mostrar formularios en el celular.
-                      Vincula la meta del plan (Actividad → Subactividad →
-                      Proceso → Meta) para que aparezcan los formularios del
-                      proceso.
-                    </p>
-                    <div className="mt-3">
-                      <SelectorMetaPlan
-                        actividadesPlan={plan?.actividades ?? []}
-                        metaId={metaIdEdicion}
-                        onChange={setMetaIdEdicion}
-                        disabled={vinculandoMeta}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      disabled={vinculandoMeta || !metaIdEdicion}
-                      onClick={() =>
-                        void manejarVincularMeta(jornadaSeleccionada.id)
-                      }
-                      className="mt-3 rounded-lg bg-ruralia-teal px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                    >
-                      {vinculandoMeta ? "Vinculando..." : "Vincular meta"}
-                    </button>
-                  </div>
+                {editandoId === jornadaSeleccionada.id && puedeGestionar ? (
+                  <FormularioEditarJornada
+                    key={jornadaSeleccionada.id}
+                    jornada={jornadaSeleccionada}
+                    veredas={proyecto.veredas ?? []}
+                    actividadesPlan={plan?.actividades ?? []}
+                    enviando={enviando}
+                    onSubmit={(datos) =>
+                      manejarEditarJornada(jornadaSeleccionada.id, datos)
+                    }
+                    onCancelar={() => setEditandoId(null)}
+                  />
                 ) : (
-                  <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    Esta jornada no tiene meta vinculada; no habrá formularios
-                    disponibles en campo.
-                  </p>
+                  <>
+                    {jornadaSeleccionada.observaciones ? (
+                      <p className="mt-4 rounded-lg bg-zinc-50 p-3 text-sm text-zinc-600">
+                        {jornadaSeleccionada.observaciones}
+                      </p>
+                    ) : null}
+
+                    {jornadaSeleccionada.meta ? (
+                      <div className="mt-4">
+                        <h4 className="mb-2 text-sm font-semibold text-zinc-800">
+                          Meta del plan
+                        </h4>
+                        <div className="rounded-xl border border-zinc-100 px-4 py-3 text-sm">
+                          {jornadaSeleccionada.meta.actividadNombre ? (
+                            <p className="text-xs text-zinc-400">
+                              {jornadaSeleccionada.meta.actividadNombre}
+                              {jornadaSeleccionada.meta.subactividadNombre
+                                ? ` › ${jornadaSeleccionada.meta.subactividadNombre}`
+                                : ""}
+                              {jornadaSeleccionada.meta.procesoNombre
+                                ? ` › ${jornadaSeleccionada.meta.procesoNombre}`
+                                : ""}
+                            </p>
+                          ) : null}
+                          <p className="font-medium text-zinc-900">
+                            {jornadaSeleccionada.meta.nombre}
+                            <span className="ml-2 text-xs font-normal text-zinc-500">
+                              ({jornadaSeleccionada.meta.unidadMedida})
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    ) : jornadaSeleccionada.actividades?.length ? (
+                      <div className="mt-4">
+                        <h4 className="mb-2 text-sm font-semibold text-zinc-800">
+                          Actividades (legacy)
+                        </h4>
+                        <ul className="space-y-2">
+                          {jornadaSeleccionada.actividades.map((ja) => (
+                            <li
+                              key={ja.id}
+                              className="flex items-center justify-between rounded-xl border border-zinc-100 px-4 py-3 text-sm"
+                            >
+                              <div>
+                                <p className="font-medium text-zinc-900">
+                                  {ja.actividad.nombre}
+                                </p>
+                                {ja.subactividad ? (
+                                  <p className="text-xs text-zinc-500">
+                                    Subactividad: {ja.subactividad.nombre}
+                                  </p>
+                                ) : null}
+                              </div>
+                              <span className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs text-ruralia-teal-text">
+                                {ja.estadoEjecucion}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                        <p className="text-sm font-medium text-amber-900">
+                          Esta jornada no tiene meta vinculada
+                        </p>
+                        <p className="mt-1 text-xs text-amber-800">
+                          Sin meta no se pueden mostrar formularios en el
+                          celular. Usa <strong>Editar</strong> para vincular la
+                          meta del plan.
+                        </p>
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}

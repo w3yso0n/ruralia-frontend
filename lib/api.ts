@@ -238,11 +238,20 @@ export async function actualizarProyecto(
   });
 }
 
-export async function eliminarProyecto(
+export async function suspenderProyecto(
   token: string,
   id: string,
 ): Promise<Proyecto> {
   return fetchConAuth<Proyecto>(`/proyectos/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
+export async function eliminarProyecto(
+  token: string,
+  id: string,
+): Promise<void> {
+  return fetchConAuth<void>(`/proyectos/${id}/permanente`, token, {
     method: "DELETE",
   });
 }
@@ -573,6 +582,15 @@ export async function cancelarJornada(
   id: string,
 ): Promise<Jornada> {
   return fetchConAuth<Jornada>(`/jornadas/${id}`, token, { method: "DELETE" });
+}
+
+export async function eliminarJornada(
+  token: string,
+  id: string,
+): Promise<void> {
+  return fetchConAuth<void>(`/jornadas/${id}/permanente`, token, {
+    method: "DELETE",
+  });
 }
 
 export async function listarBeneficiarios(

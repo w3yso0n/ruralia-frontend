@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ActividadPlan, ProcesoPlan } from "@/lib/types";
 
 interface SelectorMetaPlanProps {
@@ -8,6 +8,26 @@ interface SelectorMetaPlanProps {
   metaId: string;
   onChange: (metaId: string) => void;
   disabled?: boolean;
+}
+
+function encontrarRutaMeta(actividadesPlan: ActividadPlan[], metaId: string) {
+  if (!metaId) return null;
+
+  for (const act of actividadesPlan) {
+    for (const sub of act.subactividades ?? []) {
+      for (const proc of sub.procesos ?? []) {
+        if (proc.metas?.some((m) => m.id === metaId)) {
+          return {
+            actividadId: act.id,
+            subactividadId: sub.id,
+            procesoId: proc.id,
+          };
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 export function SelectorMetaPlan({
@@ -19,6 +39,22 @@ export function SelectorMetaPlan({
   const [actividadId, setActividadId] = useState("");
   const [subactividadId, setSubactividadId] = useState("");
   const [procesoId, setProcesoId] = useState("");
+
+  useEffect(() => {
+    if (!metaId) {
+      setActividadId("");
+      setSubactividadId("");
+      setProcesoId("");
+      return;
+    }
+
+    const ruta = encontrarRutaMeta(actividadesPlan, metaId);
+    if (ruta) {
+      setActividadId(ruta.actividadId);
+      setSubactividadId(ruta.subactividadId);
+      setProcesoId(ruta.procesoId);
+    }
+  }, [metaId, actividadesPlan]);
 
   const actividadSel = actividadesPlan.find((a) => a.id === actividadId);
   const subactividadSel = actividadSel?.subactividades?.find(
