@@ -37,6 +37,9 @@ import type {
   Usuario,
   Vereda,
   ResolverVeredaPayload,
+  NodoTerritorial,
+  CrearNodoTerritorialPayload,
+  ActualizarNodoTerritorialPayload,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -553,6 +556,172 @@ export async function resolverVereda(
   return fetchConAuth<Vereda>("/territorios/veredas/resolver", token, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function listarRegiones(
+  token: string,
+  incluirInactivos = true,
+): Promise<NodoTerritorial[]> {
+  return fetchConAuth<NodoTerritorial[]>(
+    `/territorios/regiones${construirQuery({ incluirInactivos })}`,
+    token,
+  );
+}
+
+export async function crearRegion(
+  token: string,
+  payload: CrearNodoTerritorialPayload & { descripcion?: string },
+): Promise<NodoTerritorial> {
+  return fetchConAuth<NodoTerritorial>("/territorios/regiones", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actualizarRegion(
+  token: string,
+  id: string,
+  payload: ActualizarNodoTerritorialPayload & { descripcion?: string },
+): Promise<NodoTerritorial> {
+  return fetchConAuth<NodoTerritorial>(`/territorios/regiones/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function desactivarRegion(
+  token: string,
+  id: string,
+): Promise<void> {
+  await fetchConAuth<void>(`/territorios/regiones/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
+export async function listarDepartamentos(
+  token: string,
+  opts?: { regionId?: string; incluirInactivos?: boolean },
+): Promise<NodoTerritorial[]> {
+  return fetchConAuth<NodoTerritorial[]>(
+    `/territorios/departamentos${construirQuery({
+      regionId: opts?.regionId,
+      incluirInactivos: opts?.incluirInactivos ?? true,
+    })}`,
+    token,
+  );
+}
+
+export async function crearDepartamento(
+  token: string,
+  payload: CrearNodoTerritorialPayload & { regionId: string },
+): Promise<NodoTerritorial> {
+  return fetchConAuth<NodoTerritorial>("/territorios/departamentos", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actualizarDepartamento(
+  token: string,
+  id: string,
+  payload: ActualizarNodoTerritorialPayload & { regionId?: string },
+): Promise<NodoTerritorial> {
+  return fetchConAuth<NodoTerritorial>(
+    `/territorios/departamentos/${id}`,
+    token,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+}
+
+export async function desactivarDepartamento(
+  token: string,
+  id: string,
+): Promise<void> {
+  await fetchConAuth<void>(`/territorios/departamentos/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
+export async function listarMunicipios(
+  token: string,
+  departamentoId: string,
+  incluirInactivos = true,
+): Promise<NodoTerritorial[]> {
+  return fetchConAuth<NodoTerritorial[]>(
+    `/territorios/municipios${construirQuery({ departamentoId, incluirInactivos })}`,
+    token,
+  );
+}
+
+export async function crearMunicipio(
+  token: string,
+  payload: CrearNodoTerritorialPayload & { departamentoId: string },
+): Promise<NodoTerritorial> {
+  return fetchConAuth<NodoTerritorial>("/territorios/municipios", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actualizarMunicipio(
+  token: string,
+  id: string,
+  payload: ActualizarNodoTerritorialPayload,
+): Promise<NodoTerritorial> {
+  return fetchConAuth<NodoTerritorial>(`/territorios/municipios/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function desactivarMunicipio(
+  token: string,
+  id: string,
+): Promise<void> {
+  await fetchConAuth<void>(`/territorios/municipios/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
+export async function listarVeredasPorMunicipio(
+  token: string,
+  municipioId: string,
+  incluirInactivos = true,
+): Promise<NodoTerritorial[]> {
+  return fetchConAuth<NodoTerritorial[]>(
+    `/territorios/municipios/${municipioId}/veredas${construirQuery({ incluirInactivos })}`,
+    token,
+  );
+}
+
+export async function crearVeredaAdmin(
+  token: string,
+  payload: CrearNodoTerritorialPayload & { municipioId: string },
+): Promise<NodoTerritorial> {
+  return fetchConAuth<NodoTerritorial>("/territorios/veredas", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actualizarVeredaAdmin(
+  token: string,
+  id: string,
+  payload: ActualizarNodoTerritorialPayload,
+): Promise<NodoTerritorial> {
+  return fetchConAuth<NodoTerritorial>(`/territorios/veredas/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function desactivarVeredaAdmin(
+  token: string,
+  id: string,
+): Promise<void> {
+  await fetchConAuth<void>(`/territorios/veredas/${id}`, token, {
+    method: "DELETE",
   });
 }
 

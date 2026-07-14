@@ -10,6 +10,7 @@ import {
   FolderKanban,
   HeartHandshake,
   ClipboardList,
+  MapPinned,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect } from "react";
@@ -51,6 +52,12 @@ const ITEMS: {
     etiqueta: "Beneficiarios y asociaciones",
     icono: HeartHandshake,
     permiso: "contrapartes.ver",
+  },
+  {
+    href: "/territorios",
+    etiqueta: "Territorios",
+    icono: MapPinned,
+    permiso: "territorios.ver",
   },
   {
     href: "/formularios",

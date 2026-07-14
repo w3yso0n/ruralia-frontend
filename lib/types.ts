@@ -309,6 +309,28 @@ export interface Vereda {
   municipioNombre?: string;
   corregimientoNombre?: string;
   departamentoNombre?: string;
+  regionNombre?: string;
+}
+
+/** Nodo de la jerarquía territorial (admin). */
+export interface NodoTerritorial {
+  id: string;
+  nombre: string;
+  codigo: string;
+  estaActivo: boolean;
+  padreId?: string;
+  conteoHijos?: number;
+}
+
+export interface CrearNodoTerritorialPayload {
+  nombre: string;
+  codigo?: string;
+}
+
+export interface ActualizarNodoTerritorialPayload {
+  nombre?: string;
+  codigo?: string;
+  estaActivo?: boolean;
 }
 
 export interface ResolverVeredaPayload {
