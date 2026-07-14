@@ -11,13 +11,17 @@ import type {
   Asociacion,
   ActualizarAsociacionPayload,
   ActualizarBeneficiarioPayload,
+  AvancePeriodo,
   Beneficiario,
   CompletarNodoPayload,
   CrearActividadPayload,
   CrearAsociacionPayload,
   CrearBeneficiarioPayload,
   CrearJornadaPayload,
+  CrearMetaPayload,
+  CrearMetaPeriodoPayload,
   CrearPlantillaFormularioPayload,
+  CrearProcesoPayload,
   CrearProyectoPayload,
   CrearRolPayload,
   CrearSubactividadPayload,
@@ -26,9 +30,12 @@ import type {
   Jornada,
   KpisDashboard,
   ModuloPermisos,
+  MetaPeriodoPlan,
+  MetaPlan,
   OrdenProyecto,
   PlanProyecto,
   PlantillaFormulario,
+  ProcesoPlan,
   ProgresoProyecto,
   Proyecto,
   RespuestaPaginada,
@@ -418,6 +425,113 @@ export async function reabrirSubactividad(
   });
 }
 
+export async function listarProcesos(
+  token: string,
+  subactividadId: string,
+): Promise<ProcesoPlan[]> {
+  return fetchConAuth<ProcesoPlan[]>(
+    `/subactividades/${subactividadId}/procesos`,
+    token,
+  );
+}
+
+export async function crearProceso(
+  token: string,
+  subactividadId: string,
+  payload: CrearProcesoPayload,
+): Promise<ProcesoPlan> {
+  return fetchConAuth<ProcesoPlan>(
+    `/subactividades/${subactividadId}/procesos`,
+    token,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export async function actualizarProceso(
+  token: string,
+  id: string,
+  payload: Partial<CrearProcesoPayload>,
+): Promise<ProcesoPlan> {
+  return fetchConAuth<ProcesoPlan>(`/procesos/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function eliminarProceso(
+  token: string,
+  id: string,
+): Promise<void> {
+  return fetchConAuth<void>(`/procesos/${id}`, token, { method: "DELETE" });
+}
+
+export async function crearMeta(
+  token: string,
+  procesoId: string,
+  payload: CrearMetaPayload,
+): Promise<MetaPlan> {
+  return fetchConAuth<MetaPlan>(`/procesos/${procesoId}/metas`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actualizarMeta(
+  token: string,
+  id: string,
+  payload: Partial<CrearMetaPayload>,
+): Promise<MetaPlan> {
+  return fetchConAuth<MetaPlan>(`/metas/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function eliminarMeta(token: string, id: string): Promise<void> {
+  return fetchConAuth<void>(`/metas/${id}`, token, { method: "DELETE" });
+}
+
+export async function crearMetaPeriodo(
+  token: string,
+  metaId: string,
+  payload: CrearMetaPeriodoPayload,
+): Promise<MetaPeriodoPlan> {
+  return fetchConAuth<MetaPeriodoPlan>(`/metas/${metaId}/periodos`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actualizarMetaPeriodo(
+  token: string,
+  id: string,
+  cantidadPlaneada: number,
+): Promise<MetaPeriodoPlan> {
+  return fetchConAuth<MetaPeriodoPlan>(`/meta-periodos/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ cantidadPlaneada }),
+  });
+}
+
+export async function eliminarMetaPeriodo(
+  token: string,
+  id: string,
+): Promise<void> {
+  return fetchConAuth<void>(`/meta-periodos/${id}`, token, { method: "DELETE" });
+}
+
+export async function obtenerAvancePeriodo(
+  token: string,
+  proyectoId: string,
+  anio: number,
+  mes: number,
+): Promise<AvancePeriodo[]> {
+  return fetchConAuth<AvancePeriodo[]>(
+    `/proyectos/${proyectoId}/avance-periodo${construirQuery({ anio, mes })}`,
+    token,
+  );
+}
+
 export async function listarJornadas(
   token: string,
   params?: {
@@ -803,6 +917,21 @@ export async function clonarPlantillaFormulario(
     `/formularios/plantillas/${id}/clonar`,
     token,
     { method: "POST" },
+  );
+}
+
+export async function asignarProcesosPlantilla(
+  token: string,
+  id: string,
+  procesoIds: string[],
+): Promise<PlantillaFormulario> {
+  return fetchConAuth<PlantillaFormulario>(
+    `/formularios/plantillas/${id}/procesos`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ procesoIds }),
+    },
   );
 }
 
