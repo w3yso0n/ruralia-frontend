@@ -65,6 +65,13 @@ export function PanelAvanceGant({ token, proyectoId }: PanelAvanceGantProps) {
     void cargar();
   }, [cargar]);
 
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      void cargar();
+    }, 30_000);
+    return () => clearInterval(intervalo);
+  }, [cargar]);
+
   const anios = Array.from({ length: 5 }, (_, i) => ahora.getFullYear() - 2 + i);
 
   return (

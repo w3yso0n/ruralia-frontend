@@ -59,6 +59,7 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
   const [nombreEdicion, setNombreEdicion] = useState("");
   const [descripcionEdicion, setDescripcionEdicion] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [planActualizadoEn, setPlanActualizadoEn] = useState<Date | null>(null);
 
   const puedeGestionar = puede("proyectos.editar");
   const puedeEliminar = puede("proyectos.eliminar");
@@ -81,6 +82,7 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
       setProgreso(pr);
       setEstadisticas(est);
       setJornadas(jor.datos);
+      setPlanActualizadoEn(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar proyecto");
     } finally {
@@ -88,9 +90,33 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
     }
   }, [token, proyectoId]);
 
+  const recargarAvancePlan = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [pl, pr] = await Promise.all([
+        obtenerPlanProyecto(token, proyectoId),
+        obtenerProgresoProyecto(token, proyectoId),
+      ]);
+      setPlan(pl);
+      setProgreso(pr);
+      setPlanActualizadoEn(new Date());
+    } catch {
+      // Ignorar errores puntuales del polling en segundo plano
+    }
+  }, [token, proyectoId]);
+
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  useEffect(() => {
+    if (tab !== "plan") return;
+    void recargarAvancePlan();
+    const intervalo = setInterval(() => {
+      void recargarAvancePlan();
+    }, 30_000);
+    return () => clearInterval(intervalo);
+  }, [tab, recargarAvancePlan]);
 
   const tabs: { id: Tab; etiqueta: string }[] = [
     { id: "resumen", etiqueta: "Resumen" },
@@ -370,6 +396,8 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
           plan={plan}
           puedeGestionar={puedeGestionar}
           onActualizar={cargar}
+          onRecargarAvance={recargarAvancePlan}
+          planActualizadoEn={planActualizadoEn}
         />
       ) : null}
 
