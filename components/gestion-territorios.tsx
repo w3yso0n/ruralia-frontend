@@ -350,6 +350,7 @@ export function GestionTerritorios() {
           items={regiones}
           seleccionadoId={regionId}
           cargando={cargandoReg}
+          etiquetaSubnivel="departamentos"
           puedeCrear={puedeCrear}
           puedeEditar={puedeEditar}
           puedeEliminar={puedeEliminar}
@@ -365,6 +366,7 @@ export function GestionTerritorios() {
           cargando={cargandoDept}
           vacioSinPadre={!regionId}
           mensajeSinPadre="Selecciona una región"
+          etiquetaSubnivel="municipios"
           puedeCrear={puedeCrear && !!regionId}
           puedeEditar={puedeEditar}
           puedeEliminar={puedeEliminar}
@@ -382,6 +384,7 @@ export function GestionTerritorios() {
           cargando={cargandoMun}
           vacioSinPadre={!deptId}
           mensajeSinPadre="Selecciona un departamento"
+          etiquetaSubnivel="veredas"
           puedeCrear={puedeCrear && !!deptId}
           puedeEditar={puedeEditar}
           puedeEliminar={puedeEliminar}
@@ -522,6 +525,7 @@ function ColumnaNivel({
   cargando,
   vacioSinPadre,
   mensajeSinPadre,
+  etiquetaSubnivel,
   puedeCrear,
   puedeEditar,
   puedeEliminar,
@@ -536,6 +540,8 @@ function ColumnaNivel({
   cargando: boolean;
   vacioSinPadre?: boolean;
   mensajeSinPadre?: string;
+  /** Etiqueta del nivel inferior, p. ej. "departamentos" / "municipios". */
+  etiquetaSubnivel?: string;
   puedeCrear: boolean;
   puedeEditar: boolean;
   puedeEliminar: boolean;
@@ -581,6 +587,10 @@ function ColumnaNivel({
           <ul className="space-y-1">
             {items.map((item) => {
               const activo = seleccionadoId === item.id;
+              const conteo =
+                typeof item.conteoHijos === "number" && etiquetaSubnivel
+                  ? ` · ${item.conteoHijos} ${etiquetaSubnivel}`
+                  : "";
               return (
                 <li key={item.id}>
                   <div
@@ -602,9 +612,7 @@ function ColumnaNivel({
                       <p className="truncate text-xs text-zinc-400">
                         {item.codigo}
                         {!item.estaActivo ? " · inactivo" : ""}
-                        {typeof item.conteoHijos === "number"
-                          ? ` · ${item.conteoHijos} hijos`
-                          : ""}
+                        {conteo}
                       </p>
                     </button>
                     {(puedeEditar || puedeEliminar) && (
