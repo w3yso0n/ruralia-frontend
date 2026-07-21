@@ -12,6 +12,7 @@ import {
 } from "@/components/proyectos/gestion-proyecto/arbol-plan";
 import { ChevronRight, Plus } from "lucide-react";
 import { PanelAvanceGant } from "@/components/proyectos/gestion-proyecto/panel-avance-gant";
+import { SeccionFormulariosProceso } from "@/components/proyectos/gestion-proyecto/seccion-formularios-proceso";
 import {
   actualizarActividad,
   actualizarMeta,
@@ -44,6 +45,8 @@ interface PanelPlanProps {
   plan: PlanProyecto | null;
   puedeGestionar: boolean;
   onActualizar: () => Promise<void>;
+  onRecargarAvance?: () => Promise<void>;
+  planActualizadoEn?: Date | null;
 }
 
 const MESES = [
@@ -104,8 +107,10 @@ function LeyendaJerarquia() {
         })}
       </div>
       <p className="mt-2 text-xs text-zinc-500">
-        Las jornadas se registran contra una <strong>Meta</strong>. Los
-        formularios se vinculan al <strong>Proceso</strong> desde Formularios.
+        En campo, cada jornada registra cuántas unidades se ejecutaron hacia la{" "}
+        <strong>Meta</strong>. Ese avance se refleja en el plan en cuanto se guarda
+        la cantidad desde mobile. Los formularios se vinculan al{" "}
+        <strong>Proceso</strong> desde el detalle de cada proceso.
       </p>
     </div>
   );
@@ -308,13 +313,29 @@ export function PanelPlan({
   plan,
   puedeGestionar,
   onActualizar,
+  onRecargarAvance,
+  planActualizadoEn,
 }: PanelPlanProps) {
   const [subTab, setSubTab] = useState<SubTab>("estructura");
   const [seleccion, setSeleccion] = useState<SeleccionPlan | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [recargandoAvance, setRecargandoAvance] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const actividades = plan?.actividades ?? [];
+
+  async function manejarRecargarAvance() {
+    setRecargandoAvance(true);
+    try {
+      if (onRecargarAvance) {
+        await onRecargarAvance();
+      } else {
+        await onActualizar();
+      }
+    } finally {
+      setRecargandoAvance(false);
+    }
+  }
 
   async function ejecutar(accion: () => Promise<unknown>) {
     setEnviando(true);
@@ -678,10 +699,17 @@ export function PanelPlan({
               </button>
             </div>
           ) : null}
-          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            Las plantillas de formulario se asignan a este proceso desde{" "}
-            <strong>Formularios</strong> en el menú lateral.
-          </p>
+        </TarjetaSeccion>
+
+        <TarjetaSeccion
+          titulo="Formularios del proceso"
+          descripcion="Plantillas disponibles en jornadas de campo vinculadas a este proceso."
+        >
+          <SeccionFormulariosProceso
+            token={token}
+            procesoId={proceso.id}
+            puedeGestionar={puedeGestionar}
+          />
         </TarjetaSeccion>
 
         <ListaHijos
@@ -834,6 +862,11 @@ export function PanelPlan({
             <p className="mt-1 text-xs text-violet-700">
               {meta.progresoPorcentaje}% completado
             </p>
+            <p className="mt-2 text-xs text-violet-600">
+              Suma las unidades registradas en jornadas de campo (app mobile).
+              Se refleja aquí en cuanto guardes la cantidad, sin esperar a cerrar
+              la jornada.
+            </p>
           </div>
           {puedeGestionar ? (
             <div className="mt-3 flex gap-2">
@@ -867,7 +900,8 @@ export function PanelPlan({
             </div>
           ) : null}
           <p className="mt-3 text-xs text-zinc-500">
-            Cada jornada de campo registrada contra esta meta suma 1 unidad al avance.
+            Las unidades guardadas en cada jornada desde la app de campo suman al
+            avance de esta meta.
           </p>
         </TarjetaSeccion>
 
@@ -1058,6 +1092,28 @@ export function PanelPlan({
   return (
     <div className="space-y-4">
       <LeyendaJerarquia />
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5">
+        <p className="text-xs text-zinc-600">
+          Avance calculado desde jornadas de campo. Actualización automática
+          cada 30 s
+          {planActualizadoEn
+            ? ` · última sync ${planActualizadoEn.toLocaleTimeString("es-CO", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}`
+            : ""}
+          .
+        </p>
+        <button
+          type="button"
+          disabled={recargandoAvance}
+          onClick={() => void manejarRecargarAvance()}
+          className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+        >
+          {recargandoAvance ? "Actualizando..." : "Actualizar avance"}
+        </button>
+      </div>
 
       {error ? <Alerta mensaje={error} /> : null}
 

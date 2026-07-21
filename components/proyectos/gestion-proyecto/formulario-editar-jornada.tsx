@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { ActividadPlan, VeredaResumen } from "@/lib/types";
+import type { ActividadPlan, Jornada, VeredaResumen } from "@/lib/types";
 import { SelectorMetaPlan } from "./selector-meta-plan";
 
-interface FormularioJornadaProps {
+interface FormularioEditarJornadaProps {
+  jornada: Jornada;
   veredas: VeredaResumen[];
   actividadesPlan: ActividadPlan[];
   enviando: boolean;
@@ -14,18 +15,25 @@ interface FormularioJornadaProps {
     observaciones?: string;
     metaId: string;
   }) => Promise<void>;
+  onCancelar: () => void;
 }
 
-export function FormularioJornada({
+function fechaParaInput(fecha: string) {
+  return fecha.slice(0, 10);
+}
+
+export function FormularioEditarJornada({
+  jornada,
   veredas,
   actividadesPlan,
   enviando,
   onSubmit,
-}: FormularioJornadaProps) {
-  const [fecha, setFecha] = useState("");
-  const [veredaId, setVeredaId] = useState(veredas[0]?.id ?? "");
-  const [observaciones, setObservaciones] = useState("");
-  const [metaId, setMetaId] = useState("");
+  onCancelar,
+}: FormularioEditarJornadaProps) {
+  const [fecha, setFecha] = useState(fechaParaInput(jornada.fecha));
+  const [veredaId, setVeredaId] = useState(jornada.vereda?.id ?? veredas[0]?.id ?? "");
+  const [observaciones, setObservaciones] = useState(jornada.observaciones ?? "");
+  const [metaId, setMetaId] = useState(jornada.meta?.id ?? "");
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
 
   async function manejarSubmit(evento: React.FormEvent) {
@@ -50,20 +58,10 @@ export function FormularioJornada({
       observaciones: observaciones.trim() || undefined,
       metaId,
     });
-
-    setFecha("");
-    setObservaciones("");
-    setMetaId("");
   }
 
   return (
-    <form onSubmit={(e) => void manejarSubmit(e)} className="space-y-4">
-      <p className="text-sm text-zinc-600">
-        Registra la jornada de campo seleccionando la meta del plan a la que
-        aporta esta visita (Actividad → Subactividad → Proceso → Meta). La meta
-        define qué formularios estarán disponibles en el celular.
-      </p>
-
+    <form onSubmit={(e) => void manejarSubmit(e)} className="mt-4 space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium text-zinc-700">
@@ -126,13 +124,23 @@ export function FormularioJornada({
         <p className="text-sm text-red-600">{errorLocal}</p>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={enviando || !veredas.length}
-        className="w-full rounded-xl bg-ruralia-teal py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-      >
-        {enviando ? "Guardando..." : "Crear jornada"}
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="submit"
+          disabled={enviando}
+          className="rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {enviando ? "Guardando..." : "Guardar cambios"}
+        </button>
+        <button
+          type="button"
+          disabled={enviando}
+          onClick={onCancelar}
+          className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700"
+        >
+          Cancelar edición
+        </button>
+      </div>
     </form>
   );
 }

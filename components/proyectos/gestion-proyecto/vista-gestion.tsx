@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Alerta, Spinner } from "@/components/ui/modal";
 import { EquipoVinculos } from "@/components/proyectos/gestion-proyecto/equipo-vinculos";
 import { PanelJornadas } from "@/components/proyectos/gestion-proyecto/panel-jornadas";
@@ -10,6 +10,8 @@ import { PanelPlan } from "@/components/proyectos/gestion-proyecto/panel-plan";
 import { ResumenAsignaciones } from "@/components/proyectos/gestion-proyecto/resumen-asignaciones";
 import {
   activarProyecto,
+  actualizarProyecto,
+  eliminarProyecto,
   obtenerEstadisticasProyecto,
   obtenerPlanProyecto,
   obtenerProgresoProyecto,
@@ -33,6 +35,7 @@ interface VistaGestionProyectoProps {
 }
 
 export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const tabInicial = searchParams.get("tab");
   const { token } = useAuth();
@@ -52,8 +55,14 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activando, setActivando] = useState(false);
+  const [editando, setEditando] = useState(false);
+  const [nombreEdicion, setNombreEdicion] = useState("");
+  const [descripcionEdicion, setDescripcionEdicion] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [planActualizadoEn, setPlanActualizadoEn] = useState<Date | null>(null);
 
   const puedeGestionar = puede("proyectos.editar");
+  const puedeEliminar = puede("proyectos.eliminar");
 
 
   const cargar = useCallback(async () => {
@@ -73,6 +82,7 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
       setProgreso(pr);
       setEstadisticas(est);
       setJornadas(jor.datos);
+      setPlanActualizadoEn(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar proyecto");
     } finally {
@@ -80,9 +90,33 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
     }
   }, [token, proyectoId]);
 
+  const recargarAvancePlan = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [pl, pr] = await Promise.all([
+        obtenerPlanProyecto(token, proyectoId),
+        obtenerProgresoProyecto(token, proyectoId),
+      ]);
+      setPlan(pl);
+      setProgreso(pr);
+      setPlanActualizadoEn(new Date());
+    } catch {
+      // Ignorar errores puntuales del polling en segundo plano
+    }
+  }, [token, proyectoId]);
+
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  useEffect(() => {
+    if (tab !== "plan") return;
+    void recargarAvancePlan();
+    const intervalo = setInterval(() => {
+      void recargarAvancePlan();
+    }, 30_000);
+    return () => clearInterval(intervalo);
+  }, [tab, recargarAvancePlan]);
 
   const tabs: { id: Tab; etiqueta: string }[] = [
     { id: "resumen", etiqueta: "Resumen" },
@@ -119,6 +153,49 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
       setError(err instanceof Error ? err.message : "Error al activar proyecto");
     } finally {
       setActivando(false);
+    }
+  }
+
+  function iniciarEdicion() {
+    if (!proyecto) return;
+    setNombreEdicion(proyecto.nombre);
+    setDescripcionEdicion(proyecto.descripcion ?? "");
+    setEditando(true);
+  }
+
+  async function manejarGuardarEdicion() {
+    if (!token || !nombreEdicion.trim()) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      await actualizarProyecto(token, proyectoId, {
+        nombre: nombreEdicion.trim(),
+        descripcion: descripcionEdicion.trim() || undefined,
+      });
+      setEditando(false);
+      await cargar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al guardar proyecto");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function manejarEliminar() {
+    if (!token) return;
+    if (
+      !confirm(
+        "¿Eliminar permanentemente este proyecto? Se borrará el plan y la configuración. Esta acción no se puede deshacer.",
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    try {
+      await eliminarProyecto(token, proyectoId);
+      router.push("/proyectos");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al eliminar proyecto");
     }
   }
 
@@ -162,31 +239,89 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
         </div>
       ) : null}
 
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold text-zinc-900">
-            {proyecto.nombre}
-          </h2>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-zinc-600">
-            <span>{proyecto.descripcion || "—"}</span>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                proyecto.estado === "ACTIVO"
-                  ? "bg-ruralia-teal-soft text-ruralia-teal-text"
-                  : proyecto.estado === "BORRADOR"
-                    ? "bg-amber-50 text-amber-800"
-                    : "bg-zinc-100 text-zinc-600"
-              }`}
-            >
-              {proyecto.estado === "BORRADOR"
-                ? "Borrador"
-                : proyecto.estado === "ACTIVO"
-                  ? "Activo"
-                  : proyecto.estado === "COMPLETADO"
-                    ? "Completado"
-                    : "Suspendido"}
-            </span>
-          </p>
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex-1">
+          {editando && puedeGestionar ? (
+            <div className="space-y-3">
+              <input
+                value={nombreEdicion}
+                onChange={(e) => setNombreEdicion(e.target.value)}
+                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-2xl font-semibold"
+                placeholder="Nombre del proyecto"
+              />
+              <textarea
+                value={descripcionEdicion}
+                onChange={(e) => setDescripcionEdicion(e.target.value)}
+                rows={2}
+                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+                placeholder="Descripción (opcional)"
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={guardando || !nombreEdicion.trim()}
+                  onClick={() => void manejarGuardarEdicion()}
+                  className="rounded-lg bg-ruralia-teal px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  {guardando ? "Guardando..." : "Guardar"}
+                </button>
+                <button
+                  type="button"
+                  disabled={guardando}
+                  onClick={() => setEditando(false)}
+                  className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm font-semibold text-zinc-700"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-start gap-3">
+                <h2 className="text-2xl font-semibold text-zinc-900">
+                  {proyecto.nombre}
+                </h2>
+                {puedeGestionar ? (
+                  <button
+                    type="button"
+                    onClick={iniciarEdicion}
+                    className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+                  >
+                    Editar
+                  </button>
+                ) : null}
+                {puedeEliminar ? (
+                  <button
+                    type="button"
+                    onClick={() => void manejarEliminar()}
+                    className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700"
+                  >
+                    Eliminar
+                  </button>
+                ) : null}
+              </div>
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-zinc-600">
+                <span>{proyecto.descripcion || "—"}</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    proyecto.estado === "ACTIVO"
+                      ? "bg-ruralia-teal-soft text-ruralia-teal-text"
+                      : proyecto.estado === "BORRADOR"
+                        ? "bg-amber-50 text-amber-800"
+                        : "bg-zinc-100 text-zinc-600"
+                  }`}
+                >
+                  {proyecto.estado === "BORRADOR"
+                    ? "Borrador"
+                    : proyecto.estado === "ACTIVO"
+                      ? "Activo"
+                      : proyecto.estado === "COMPLETADO"
+                        ? "Completado"
+                        : "Suspendido"}
+                </span>
+              </p>
+            </>
+          )}
         </div>
         <div className="text-right">
           <p className="text-3xl font-bold text-ruralia-teal-text">
@@ -261,6 +396,8 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
           plan={plan}
           puedeGestionar={puedeGestionar}
           onActualizar={cargar}
+          onRecargarAvance={recargarAvancePlan}
+          planActualizadoEn={planActualizadoEn}
         />
       ) : null}
 

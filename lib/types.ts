@@ -257,6 +257,8 @@ export interface MetaResumenJornada {
   id: string;
   nombre: string;
   unidadMedida: string;
+  cantidadTotal?: number;
+  ejecutadoTotal?: number;
   procesoNombre?: string;
   subactividadNombre?: string;
   actividadNombre?: string;
@@ -267,6 +269,7 @@ export interface Jornada {
   fecha: string;
   estado: EstadoJornada;
   observaciones?: string;
+  cantidadEjecutada?: number;
   proyecto?: { id: string; nombre: string };
   meta?: MetaResumenJornada;
   vereda?: { id: string; nombre: string };
@@ -483,10 +486,18 @@ export interface CrearJornadaPayload {
   fecha: string;
   observaciones?: string;
   proyectoId: string;
-  metaId?: string;
+  metaId: string;
   actividades?: ActividadJornadaPayload[];
   veredaId: string;
   tecnicoResponsableId?: string;
+}
+
+export interface ActualizarJornadaPayload {
+  fecha?: string;
+  observaciones?: string;
+  veredaId?: string;
+  metaId?: string;
+  cantidadEjecutada?: number;
 }
 
 export interface VinculoBeneficiarioPayload {
