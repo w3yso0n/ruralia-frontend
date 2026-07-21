@@ -48,6 +48,9 @@ import type {
   NodoTerritorial,
   CrearNodoTerritorialPayload,
   ActualizarNodoTerritorialPayload,
+  EventoCronologia,
+  FiltrosCronologia,
+  ResumenCronologiaProyecto,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -1002,5 +1005,37 @@ export async function asignarUsuariosPlantilla(
       method: "PATCH",
       body: JSON.stringify({ usuarioIds }),
     },
+  );
+}
+
+export async function listarCronologiaActor(
+  token: string,
+  usuarioId: string,
+  params?: FiltrosCronologia,
+): Promise<RespuestaPaginada<EventoCronologia>> {
+  return fetchConAuth<RespuestaPaginada<EventoCronologia>>(
+    `/cronologia/actor/${usuarioId}${construirQuery(params)}`,
+    token,
+  );
+}
+
+export async function listarCronologiaProyecto(
+  token: string,
+  proyectoId: string,
+  params?: FiltrosCronologia,
+): Promise<RespuestaPaginada<EventoCronologia>> {
+  return fetchConAuth<RespuestaPaginada<EventoCronologia>>(
+    `/cronologia/proyecto/${proyectoId}${construirQuery(params)}`,
+    token,
+  );
+}
+
+export async function obtenerResumenCronologiaProyecto(
+  token: string,
+  proyectoId: string,
+): Promise<ResumenCronologiaProyecto> {
+  return fetchConAuth<ResumenCronologiaProyecto>(
+    `/cronologia/proyecto/${proyectoId}/resumen`,
+    token,
   );
 }

@@ -11,6 +11,7 @@ import {
   HeartHandshake,
   ClipboardList,
   MapPinned,
+  Waypoints,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect } from "react";
@@ -28,6 +29,12 @@ const ITEMS: {
     etiqueta: "Dashboard",
     icono: LayoutDashboard,
     permiso: "dashboard.ver",
+  },
+  {
+    href: "/seguimiento",
+    etiqueta: "Seguimiento",
+    icono: Waypoints,
+    puedeAlgunoDe: ["proyectos.ver", "jornadas.ver", "usuarios.ver"],
   },
   {
     href: "/usuarios",

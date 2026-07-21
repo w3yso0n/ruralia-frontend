@@ -589,3 +589,42 @@ export interface ActualizarPlantillaFormularioPayload {
 export interface AsignacionTerritoriosPayload {
   veredaIds: string[];
 }
+
+export type AccionCronologia =
+  | "JORNADA_CREADA"
+  | "JORNADA_ESTADO_CAMBIADO"
+  | "JORNADA_CANCELADA"
+  | "FORMULARIO_ENVIADO"
+  | "ACTIVIDAD_COMPLETADA"
+  | "SUBACTIVIDAD_COMPLETADA";
+
+export interface EventoCronologia {
+  id: string;
+  actorId: string;
+  actorNombre?: string;
+  proyectoId: string;
+  proyectoNombre?: string;
+  accion: AccionCronologia | string;
+  entidadTipo: string;
+  entidadId: string | null;
+  titulo: string;
+  detalle: Record<string, unknown> | null;
+  ocurridoEn: string;
+}
+
+export interface ResumenCronologiaProyecto {
+  proyectoId: string;
+  totalEventos: number;
+  ultimaActividadEn: string | null;
+  porAccion: Array<{ accion: string; total: number }>;
+  porActor: Array<{ actorId: string; actorNombre: string; total: number }>;
+}
+
+export type FiltrosCronologia = {
+  pagina?: number;
+  limite?: number;
+  actorId?: string;
+  accion?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+};

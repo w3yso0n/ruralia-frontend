@@ -70,19 +70,24 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
     setCargando(true);
     setError(null);
     try {
-      const [p, pl, pr, est, jor] = await Promise.all([
+      const [p, pl, pr, est] = await Promise.all([
         obtenerProyecto(token, proyectoId),
         obtenerPlanProyecto(token, proyectoId),
         obtenerProgresoProyecto(token, proyectoId),
         obtenerEstadisticasProyecto(token, proyectoId),
-        listarJornadas(token, { proyectoId, limite: 50 }),
       ]);
       setProyecto(p);
       setPlan(pl);
       setProgreso(pr);
       setEstadisticas(est);
-      setJornadas(jor.datos);
       setPlanActualizadoEn(new Date());
+
+      try {
+        const jor = await listarJornadas(token, { proyectoId, limite: 50 });
+        setJornadas(jor.datos);
+      } catch {
+        setJornadas([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar proyecto");
     } finally {
@@ -126,6 +131,19 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
   ];
 
   if (cargando) return <Spinner />;
+  if (error && !proyecto) {
+    return (
+      <div className="space-y-4">
+        <Alerta mensaje={error} />
+        <Link
+          href="/proyectos"
+          className="inline-block text-sm font-medium text-ruralia-teal-text underline-offset-2 hover:underline"
+        >
+          Volver a proyectos
+        </Link>
+      </div>
+    );
+  }
   if (!proyecto || !token) return <Alerta mensaje="Proyecto no encontrado" />;
 
   const tieneContraparte = !!(
