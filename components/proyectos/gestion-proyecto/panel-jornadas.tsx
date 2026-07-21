@@ -1,13 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Alerta } from "@/components/ui/modal";
 import { ArbolJornadas } from "@/components/proyectos/gestion-proyecto/arbol-jornadas";
 import { FormularioJornada } from "@/components/proyectos/gestion-proyecto/formulario-jornada";
-import {
-  cancelarJornada,
-  crearJornada,
-} from "@/lib/api";
+import { cancelarJornada, crearJornada } from "@/lib/api";
 import type { Jornada, PlanProyecto, Proyecto } from "@/lib/types";
 
 interface PanelJornadasProps {
@@ -29,14 +27,24 @@ export function PanelJornadas({
   puedeGestionar,
   onActualizar,
 }: PanelJornadasProps) {
+  const searchParams = useSearchParams();
+  const jornadaIdQuery = searchParams.get("jornadaId");
+
   const [jornadaSeleccionadaId, setJornadaSeleccionadaId] = useState<
     string | null
-  >(jornadas[0]?.id ?? null);
+  >(jornadaIdQuery ?? jornadas[0]?.id ?? null);
   const [mostrarFormulario, setMostrarFormulario] = useState(
-    jornadas.length === 0 && puedeGestionar,
+    jornadas.length === 0 && puedeGestionar && !jornadaIdQuery,
   );
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (jornadaIdQuery && jornadas.some((j) => j.id === jornadaIdQuery)) {
+      setJornadaSeleccionadaId(jornadaIdQuery);
+      setMostrarFormulario(false);
+    }
+  }, [jornadaIdQuery, jornadas]);
 
   const jornadaSeleccionada = jornadas.find(
     (j) => j.id === jornadaSeleccionadaId,
@@ -135,7 +143,12 @@ export function PanelJornadas({
                       Jornada del{" "}
                       {new Date(jornadaSeleccionada.fecha).toLocaleDateString(
                         "es-CO",
-                        { weekday: "long", year: "numeric", month: "long", day: "numeric" },
+                        {
+                          weekday: "long",
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        },
                       )}
                     </h3>
                     <p className="mt-1 text-sm text-zinc-500">
