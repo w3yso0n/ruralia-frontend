@@ -378,6 +378,21 @@ export interface ActualizarNodoTerritorialPayload {
   estaActivo?: boolean;
 }
 
+export type NivelTerritorial = "region" | "departamento" | "municipio" | "vereda";
+
+export interface ResultadoBusquedaTerritorial {
+  nivel: NivelTerritorial;
+  id: string;
+  nombre: string;
+  codigo: string;
+  estaActivo: boolean;
+  ruta: string;
+  regionId?: string;
+  departamentoId?: string;
+  municipioId?: string;
+  veredaId?: string;
+}
+
 export interface ResolverVeredaPayload {
   nombreVereda: string;
   municipio?: string;

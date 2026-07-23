@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Alerta } from "@/components/ui/modal";
+import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
+import { SelectorVeredasMultiple } from "@/components/ui/selector-veredas-multiple";
 import {
   asignarAsociacionesProyecto,
   asignarBeneficiariosProyecto,
@@ -10,7 +12,6 @@ import {
   listarAsociaciones,
   listarBeneficiarios,
   listarUsuarios,
-  listarVeredas,
 } from "@/lib/api";
 import type { Proyecto } from "@/lib/types";
 
@@ -55,9 +56,6 @@ export function EquipoVinculos({
     null,
   );
   const [contraparteId, setContraparteId] = useState("");
-  const [opcionesVeredas, setOpcionesVeredas] = useState<
-    { id: string; nombre: string }[]
-  >([]);
   const [opcionesUsuarios, setOpcionesUsuarios] = useState<
     { id: string; nombre: string }[]
   >([]);
@@ -81,12 +79,10 @@ export function EquipoVinculos({
 
   useEffect(() => {
     void Promise.all([
-      listarVeredas(token, { limite: 100 }),
       listarUsuarios(token, { limite: 100, estaActivo: true }),
       listarBeneficiarios(token, { limite: 100 }),
       listarAsociaciones(token, { limite: 100 }),
-    ]).then(([veredas, usuarios, beneficiarios, asociaciones]) => {
-      setOpcionesVeredas(veredas.datos.map((v) => ({ id: v.id, nombre: v.nombre })));
+    ]).then(([usuarios, beneficiarios, asociaciones]) => {
       setOpcionesUsuarios(
         usuarios.datos.map((u) => ({ id: u.id, nombre: u.nombreCompleto })),
       );
@@ -101,10 +97,6 @@ export function EquipoVinculos({
       );
     });
   }, [token]);
-
-  function toggle(lista: string[], id: string) {
-    return lista.includes(id) ? lista.filter((x) => x !== id) : [...lista, id];
-  }
 
   async function guardarSeccion(tipo: "territorio" | "personal" | "vinculos") {
     setEnviando(true);
@@ -164,15 +156,20 @@ export function EquipoVinculos({
       <div className="space-y-4">
         <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
           <h3 className="font-semibold text-zinc-900">Equipo interno</h3>
-          <ul className="mt-3 space-y-2 text-sm">
-            {proyecto.personal?.length ? (
-              proyecto.personal.map((p) => (
-                <li key={p.id}>{p.nombreCompleto}</li>
-              ))
-            ) : (
-              <li className="text-zinc-500">Sin personal asignado</li>
-            )}
-          </ul>
+          {proyecto.personal?.length ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {proyecto.personal.map((p) => (
+                <span
+                  key={p.id}
+                  className="inline-flex rounded-full border border-ruralia-teal-border bg-ruralia-teal-soft/50 px-3 py-1 text-sm text-zinc-800"
+                >
+                  {p.nombreCompleto}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-zinc-500">Sin personal asignado</p>
+          )}
         </section>
         <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
           <h3 className="font-semibold text-zinc-900">Contraparte</h3>
@@ -195,9 +192,21 @@ export function EquipoVinculos({
           ) : (
             <p className="mt-2 text-sm text-zinc-500">Sin contraparte asignada</p>
           )}
-          <p className="mt-2 text-sm text-zinc-600">
-            Veredas: {proyecto.veredas?.map((v) => v.nombre).join(", ") || "—"}
-          </p>
+          <p className="mt-2 text-sm text-zinc-600">Veredas asignadas</p>
+          {proyecto.veredas?.length ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {proyecto.veredas.map((v) => (
+                <span
+                  key={v.id}
+                  className="inline-flex rounded-full border border-ruralia-teal-border bg-ruralia-teal-soft/50 px-3 py-1 text-sm text-zinc-800"
+                >
+                  {v.nombre}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-zinc-500">Sin veredas asignadas</p>
+          )}
         </section>
       </div>
     );
@@ -232,18 +241,14 @@ export function EquipoVinculos({
             Guardar
           </button>
         </div>
-        <div className="max-h-48 space-y-1 overflow-y-auto">
-          {opcionesUsuarios.map((u) => (
-            <label key={u.id} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={usuarioIds.includes(u.id)}
-                onChange={() => setUsuarioIds(toggle(usuarioIds, u.id))}
-              />
-              {u.nombre}
-            </label>
-          ))}
-        </div>
+        <SelectorCatalogo
+          multiple
+          opciones={opcionesUsuarios}
+          value={usuarioIds}
+          onChange={setUsuarioIds}
+          placeholder="Buscar persona del equipo…"
+          mensajeVacio="Aún no hay personas asignadas. Haz clic para ver la lista."
+        />
       </section>
 
       <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
@@ -293,19 +298,21 @@ export function EquipoVinculos({
         </div>
 
         {tipoContraparte ? (
-          <div className="max-h-48 space-y-1 overflow-y-auto rounded-xl border border-zinc-100 p-3">
-            {opcionesContraparte.map((opcion) => (
-              <label key={opcion.id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="contraparteId"
-                  checked={contraparteId === opcion.id}
-                  onChange={() => setContraparteId(opcion.id)}
-                />
-                {opcion.nombre}
-              </label>
-            ))}
-          </div>
+          <SelectorCatalogo
+            opciones={opcionesContraparte}
+            value={contraparteId}
+            onChange={setContraparteId}
+            placeholder={
+              tipoContraparte === "beneficiario"
+                ? "Buscar beneficiario…"
+                : "Buscar asociación…"
+            }
+            mensajeVacio={
+              tipoContraparte === "beneficiario"
+                ? "Selecciona un beneficiario de la lista."
+                : "Selecciona una asociación de la lista."
+            }
+          />
         ) : (
           <p className="text-sm text-zinc-500">
             Elige si la contraparte es un beneficiario o una asociación.
@@ -315,28 +322,27 @@ export function EquipoVinculos({
 
       <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-zinc-900">Territorio (veredas)</h3>
+          <div>
+            <h3 className="font-semibold text-zinc-900">Territorio (veredas)</h3>
+            <p className="mt-1 text-sm text-zinc-500">
+              Busca y agrega las veredas donde se ejecutará el proyecto.
+            </p>
+          </div>
           <button
             type="button"
             disabled={enviando}
             onClick={() => void guardarSeccion("territorio")}
-            className="rounded-lg bg-ruralia-teal-soft px-3 py-1.5 text-sm font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal hover:text-white disabled:opacity-50"
+            className="shrink-0 rounded-lg bg-ruralia-teal-soft px-3 py-1.5 text-sm font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal hover:text-white disabled:opacity-50"
           >
             Guardar
           </button>
         </div>
-        <div className="max-h-40 space-y-1 overflow-y-auto">
-          {opcionesVeredas.map((v) => (
-            <label key={v.id} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={veredaIds.includes(v.id)}
-                onChange={() => setVeredaIds(toggle(veredaIds, v.id))}
-              />
-              {v.nombre}
-            </label>
-          ))}
-        </div>
+        <SelectorVeredasMultiple
+          token={token}
+          value={veredaIds}
+          onChange={setVeredaIds}
+          veredasIniciales={proyecto.veredas}
+        />
       </section>
     </div>
   );

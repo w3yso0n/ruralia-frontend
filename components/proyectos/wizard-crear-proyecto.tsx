@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Alerta, Spinner } from "@/components/ui/modal";
+import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
+import { SelectorVeredasMultiple } from "@/components/ui/selector-veredas-multiple";
 import {
   asignarAsociacionesProyecto,
   asignarBeneficiariosProyecto,
@@ -15,7 +17,6 @@ import {
   listarAsociaciones,
   listarBeneficiarios,
   listarUsuarios,
-  listarVeredas,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { TipoProyecto } from "@/lib/types";
@@ -59,9 +60,6 @@ export function WizardCrearProyecto() {
   const [contraparteId, setContraparteId] = useState("");
   const [actividades, setActividades] = useState<string[]>([""]);
 
-  const [opcionesVeredas, setOpcionesVeredas] = useState<
-    { id: string; nombre: string }[]
-  >([]);
   const [opcionesUsuarios, setOpcionesUsuarios] = useState<
     { id: string; nombre: string }[]
   >([]);
@@ -76,15 +74,11 @@ export function WizardCrearProyecto() {
     if (!token) return;
     setCargandoOpciones(true);
     void Promise.all([
-      listarVeredas(token, { limite: 100 }),
       listarUsuarios(token, { limite: 100, estaActivo: true }),
       listarBeneficiarios(token, { limite: 100 }),
       listarAsociaciones(token, { limite: 100 }),
     ])
-      .then(([veredas, usuarios, beneficiarios, asociaciones]) => {
-        setOpcionesVeredas(
-          veredas.datos.map((v) => ({ id: v.id, nombre: v.nombre })),
-        );
+      .then(([usuarios, beneficiarios, asociaciones]) => {
         setOpcionesUsuarios(
           usuarios.datos.map((u) => ({
             id: u.id,
@@ -106,12 +100,6 @@ export function WizardCrearProyecto() {
       })
       .finally(() => setCargandoOpciones(false));
   }, [token, usuario]);
-
-  function toggleId(lista: string[], id: string): string[] {
-    return lista.includes(id)
-      ? lista.filter((x) => x !== id)
-      : [...lista, id];
-  }
 
   function validarPasoActual(): string | null {
     switch (paso) {
@@ -312,49 +300,32 @@ export function WizardCrearProyecto() {
           </div>
         )}
 
-        {paso === 1 && (
+        {paso === 1 && token ? (
           <div>
             <p className="mb-3 text-sm text-zinc-600">
               Veredas donde se ejecutará el proyecto *
             </p>
-            <div className="max-h-64 space-y-2 overflow-y-auto">
-              {opcionesVeredas.map((v) => (
-                <label
-                  key={v.id}
-                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-zinc-100 px-3 py-2 hover:bg-zinc-50"
-                >
-                  <input
-                    type="checkbox"
-                    checked={veredaIds.includes(v.id)}
-                    onChange={() => setVeredaIds(toggleId(veredaIds, v.id))}
-                  />
-                  <span className="text-sm">{v.nombre}</span>
-                </label>
-              ))}
-            </div>
+            <SelectorVeredasMultiple
+              token={token}
+              value={veredaIds}
+              onChange={setVeredaIds}
+            />
           </div>
-        )}
+        ) : null}
 
         {paso === 2 && (
           <div>
             <p className="mb-3 text-sm text-zinc-600">
               Personas de la organización que ejecutarán el proyecto en campo *
             </p>
-            <div className="max-h-64 space-y-2 overflow-y-auto">
-              {opcionesUsuarios.map((u) => (
-                <label
-                  key={u.id}
-                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-zinc-100 px-3 py-2 hover:bg-zinc-50"
-                >
-                  <input
-                    type="checkbox"
-                    checked={usuarioIds.includes(u.id)}
-                    onChange={() => setUsuarioIds(toggleId(usuarioIds, u.id))}
-                  />
-                  <span className="text-sm">{u.nombre}</span>
-                </label>
-              ))}
-            </div>
+            <SelectorCatalogo
+              multiple
+              opciones={opcionesUsuarios}
+              value={usuarioIds}
+              onChange={setUsuarioIds}
+              placeholder="Buscar persona del equipo…"
+              mensajeVacio="Aún no hay personas asignadas. Haz clic para ver la lista."
+            />
           </div>
         )}
 
@@ -391,25 +362,25 @@ export function WizardCrearProyecto() {
               </label>
             </div>
             {tipoContraparte ? (
-              <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-zinc-100 p-3">
-                {(tipoContraparte === "beneficiario"
-                  ? opcionesBeneficiarios
-                  : opcionesAsociaciones
-                ).map((opcion) => (
-                  <label
-                    key={opcion.id}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-zinc-50"
-                  >
-                    <input
-                      type="radio"
-                      name="contraparteWizard"
-                      checked={contraparteId === opcion.id}
-                      onChange={() => setContraparteId(opcion.id)}
-                    />
-                    <span className="text-sm">{opcion.nombre}</span>
-                  </label>
-                ))}
-              </div>
+              <SelectorCatalogo
+                opciones={
+                  tipoContraparte === "beneficiario"
+                    ? opcionesBeneficiarios
+                    : opcionesAsociaciones
+                }
+                value={contraparteId}
+                onChange={setContraparteId}
+                placeholder={
+                  tipoContraparte === "beneficiario"
+                    ? "Buscar beneficiario…"
+                    : "Buscar asociación…"
+                }
+                mensajeVacio={
+                  tipoContraparte === "beneficiario"
+                    ? "Selecciona un beneficiario de la lista."
+                    : "Selecciona una asociación de la lista."
+                }
+              />
             ) : (
               <p className="text-sm text-zinc-500">
                 Elige el tipo de contraparte para ver las opciones.

@@ -46,6 +46,7 @@ import type {
   Vereda,
   ResolverVeredaPayload,
   NodoTerritorial,
+  ResultadoBusquedaTerritorial,
   CrearNodoTerritorialPayload,
   ActualizarNodoTerritorialPayload,
   EventoCronologia,
@@ -712,6 +713,20 @@ export async function listarRegiones(
 ): Promise<NodoTerritorial[]> {
   return fetchConAuth<NodoTerritorial[]>(
     `/territorios/regiones${construirQuery({ incluirInactivos })}`,
+    token,
+  );
+}
+
+export async function buscarTerritorios(
+  token: string,
+  params: { q: string; limite?: number; incluirInactivos?: boolean },
+): Promise<ResultadoBusquedaTerritorial[]> {
+  return fetchConAuth<ResultadoBusquedaTerritorial[]>(
+    `/territorios/buscar${construirQuery({
+      q: params.q,
+      limite: params.limite,
+      incluirInactivos: params.incluirInactivos ?? true,
+    })}`,
     token,
   );
 }
