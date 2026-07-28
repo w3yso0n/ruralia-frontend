@@ -229,6 +229,11 @@ export function GestionFormularios() {
                       <td className="px-5 py-3">
                         <p className="font-medium text-zinc-900">
                           {plantilla.nombre}
+                          {plantilla.tipoPlantilla === "GRUPAL" ? (
+                            <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-normal text-zinc-600">
+                              Grupal
+                            </span>
+                          ) : null}
                         </p>
                         {plantilla.descripcion ? (
                           <p className="text-xs text-zinc-500">

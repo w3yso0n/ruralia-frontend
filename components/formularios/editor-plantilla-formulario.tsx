@@ -16,6 +16,7 @@ import type {
   CampoFormularioPayload,
   Proyecto,
   TipoCampoFormulario,
+  TipoPlantillaFormulario,
   Usuario,
 } from "@/lib/types";
 
@@ -89,6 +90,8 @@ export function EditorPlantillaFormulario({
 
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [tipoPlantilla, setTipoPlantilla] =
+    useState<TipoPlantillaFormulario>("INDIVIDUAL");
   const [estaActivo, setEstaActivo] = useState(false);
 
   const [grupos, setGrupos] = useState<GrupoProyecto[]>([]);
@@ -144,6 +147,7 @@ export function EditorPlantillaFormulario({
       .then((plantilla) => {
         setNombre(plantilla.nombre);
         setDescripcion(plantilla.descripcion ?? "");
+        setTipoPlantilla(plantilla.tipoPlantilla ?? "INDIVIDUAL");
         setEstaActivo(plantilla.estaActivo);
         setProcesoIds(plantilla.procesoIds ?? []);
         setUsuarioIds(plantilla.usuarioIds ?? []);
@@ -250,6 +254,7 @@ export function EditorPlantillaFormulario({
         await actualizarPlantillaFormulario(token, plantillaId, {
           nombre,
           descripcion: descripcion || undefined,
+          tipoPlantilla,
           procesoIds,
           usuarioIds,
           campos: camposPayload,
@@ -258,6 +263,7 @@ export function EditorPlantillaFormulario({
         await crearPlantillaFormulario(token, {
           nombre,
           descripcion: descripcion || undefined,
+          tipoPlantilla,
           procesoIds,
           usuarioIds,
           campos: camposPayload,
@@ -327,6 +333,38 @@ export function EditorPlantillaFormulario({
                 rows={2}
                 className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal focus:ring-4 focus:ring-ruralia-teal/10"
               />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-zinc-700">
+                Tipo de formulario
+              </label>
+              <div className="flex flex-wrap gap-3">
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm has-[:checked]:border-ruralia-teal has-[:checked]:bg-ruralia-teal-soft/40">
+                  <input
+                    type="radio"
+                    name="tipoPlantilla"
+                    value="INDIVIDUAL"
+                    checked={tipoPlantilla === "INDIVIDUAL"}
+                    onChange={() => setTipoPlantilla("INDIVIDUAL")}
+                  />
+                  Individual (principal)
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm has-[:checked]:border-ruralia-teal has-[:checked]:bg-ruralia-teal-soft/40">
+                  <input
+                    type="radio"
+                    name="tipoPlantilla"
+                    value="GRUPAL"
+                    checked={tipoPlantilla === "GRUPAL"}
+                    onChange={() => setTipoPlantilla("GRUPAL")}
+                  />
+                  Grupal · lista de asistencia
+                </label>
+              </div>
+              <p className="mt-2 text-xs text-zinc-500">
+                {tipoPlantilla === "GRUPAL"
+                  ? "Los campos se repiten por cada asistente (N filas). Ideal: nombre, firma, etc."
+                  : "Un envío por jornada. Es el formulario principal de campo."}
+              </p>
             </div>
           </div>
         </div>

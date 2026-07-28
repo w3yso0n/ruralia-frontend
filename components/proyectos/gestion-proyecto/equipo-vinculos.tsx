@@ -325,7 +325,7 @@ export function EquipoVinculos({
           <div>
             <h3 className="font-semibold text-zinc-900">Territorio (veredas)</h3>
             <p className="mt-1 text-sm text-zinc-500">
-              Busca y agrega las veredas donde se ejecutará el proyecto.
+              Asocia veredas del catálogo DANE o desde Google Maps.
             </p>
           </div>
           <button

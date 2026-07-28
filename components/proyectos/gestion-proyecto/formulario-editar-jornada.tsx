@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ActividadPlan, Jornada, VeredaResumen } from "@/lib/types";
+import type { ActividadPlan, Jornada, TipoJornada, VeredaResumen } from "@/lib/types";
 import { SelectorMetaPlan } from "./selector-meta-plan";
 
 interface FormularioEditarJornadaProps {
@@ -14,6 +14,7 @@ interface FormularioEditarJornadaProps {
     veredaId: string;
     observaciones?: string;
     metaId: string;
+    tipo: TipoJornada;
   }) => Promise<void>;
   onCancelar: () => void;
 }
@@ -34,6 +35,7 @@ export function FormularioEditarJornada({
   const [veredaId, setVeredaId] = useState(jornada.vereda?.id ?? veredas[0]?.id ?? "");
   const [observaciones, setObservaciones] = useState(jornada.observaciones ?? "");
   const [metaId, setMetaId] = useState(jornada.meta?.id ?? "");
+  const [esGrupal, setEsGrupal] = useState(jornada.tipo === "GRUPAL");
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
 
   async function manejarSubmit(evento: React.FormEvent) {
@@ -57,6 +59,7 @@ export function FormularioEditarJornada({
       veredaId,
       observaciones: observaciones.trim() || undefined,
       metaId,
+      tipo: esGrupal ? "GRUPAL" : "INDIVIDUAL",
     });
   }
 
@@ -119,6 +122,29 @@ export function FormularioEditarJornada({
           className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
         />
       </div>
+
+      <label
+        className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 transition ${
+          esGrupal
+            ? "border-ruralia-teal bg-ruralia-teal-soft/50"
+            : "border-zinc-200 bg-zinc-50/80 hover:border-zinc-300"
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={esGrupal}
+          onChange={(e) => setEsGrupal(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-zinc-300 text-ruralia-teal focus:ring-ruralia-teal/30"
+        />
+        <span>
+          <span className="block text-sm font-semibold text-zinc-800">
+            Actividad grupal
+          </span>
+          <span className="mt-0.5 block text-xs text-zinc-500">
+            Usa el formulario grupal del proceso (campos repetibles por asistente)
+          </span>
+        </span>
+      </label>
 
       {errorLocal ? (
         <p className="text-sm text-red-600">{errorLocal}</p>

@@ -104,6 +104,8 @@ export type EstadoJornada =
   | "COMPLETADA"
   | "CANCELADA";
 
+export type TipoJornada = "INDIVIDUAL" | "GRUPAL";
+
 export type EstadoEjecucionJornada = "PENDIENTE" | "EN_PROGRESO" | "COMPLETADA";
 
 export interface BeneficiarioResumen {
@@ -264,10 +266,20 @@ export interface MetaResumenJornada {
   actividadNombre?: string;
 }
 
+export interface JornadaAsistente {
+  id: string;
+  nombreCompleto: string;
+  documento?: string | null;
+  firmaDataUrl?: string | null;
+  firmadoEn?: string | null;
+  orden: number;
+}
+
 export interface Jornada {
   id: string;
   fecha: string;
   estado: EstadoJornada;
+  tipo?: TipoJornada;
   observaciones?: string;
   cantidadEjecutada?: number;
   proyecto?: { id: string; nombre: string };
@@ -275,6 +287,7 @@ export interface Jornada {
   vereda?: { id: string; nombre: string };
   tecnicoResponsable?: { id: string; nombre: string };
   actividades?: JornadaActividadItem[];
+  asistentes?: JornadaAsistente[];
 }
 
 export interface Beneficiario {
@@ -505,6 +518,7 @@ export interface CrearJornadaPayload {
   actividades?: ActividadJornadaPayload[];
   veredaId: string;
   tecnicoResponsableId?: string;
+  tipo?: TipoJornada;
 }
 
 export interface ActualizarJornadaPayload {
@@ -513,6 +527,27 @@ export interface ActualizarJornadaPayload {
   veredaId?: string;
   metaId?: string;
   cantidadEjecutada?: number;
+  tipo?: TipoJornada;
+}
+
+export interface GuardarAsistenciaPayload {
+  asistentes: Array<{
+    id?: string;
+    nombreCompleto: string;
+    documento?: string;
+    firmaDataUrl?: string | null;
+  }>;
+}
+
+export interface CrearAsistentePayload {
+  nombreCompleto: string;
+  documento?: string;
+}
+
+export interface ActualizarAsistentePayload {
+  nombreCompleto?: string;
+  documento?: string | null;
+  firmaDataUrl?: string | null;
 }
 
 export interface VinculoBeneficiarioPayload {
@@ -549,6 +584,8 @@ export type TipoCampoFormulario =
   | "FIRMA"
   | "ARCHIVO";
 
+export type TipoPlantillaFormulario = "INDIVIDUAL" | "GRUPAL";
+
 export interface CampoFormulario {
   id: string;
   etiqueta: string;
@@ -566,10 +603,45 @@ export interface PlantillaFormulario {
   descripcion?: string;
   version: number;
   estaActivo: boolean;
+  tipoPlantilla?: TipoPlantillaFormulario;
   procesoIds: string[];
   subactividadIds: string[];
   usuarioIds: string[];
   campos?: CampoFormulario[];
+}
+
+export interface AsignacionPlantillasProceso {
+  plantillaIndividual?: PlantillaFormulario | null;
+  plantillaGrupal?: PlantillaFormulario | null;
+}
+
+export interface EnvioFormularioResumen {
+  id: string;
+  enviadoEn: string;
+  jornadaId?: string;
+  usuarioId: string;
+  plantillaFormularioId?: string;
+  indiceFila: number;
+}
+
+export interface RespuestaFormularioDetalle {
+  id: string;
+  claveCampo: string;
+  etiquetaCampo?: string;
+  tipoCampo?: TipoCampoFormulario;
+  valorTexto?: string;
+  valorNumero?: number;
+  valorFecha?: string;
+  valorBooleano?: boolean;
+  valorJson?: unknown;
+  urlArchivo?: string;
+}
+
+export interface EnviarFormularioPayload {
+  jornadaId?: string;
+  plantillaFormularioId: string;
+  indiceFila?: number;
+  respuestas: Array<{ claveCampo: string; valor: unknown }>;
 }
 
 export interface CampoFormularioPayload {
@@ -586,6 +658,7 @@ export interface CampoFormularioPayload {
 export interface CrearPlantillaFormularioPayload {
   nombre: string;
   descripcion?: string;
+  tipoPlantilla?: TipoPlantillaFormulario;
   procesoIds?: string[];
   subactividadIds?: string[];
   usuarioIds?: string[];
@@ -595,6 +668,7 @@ export interface CrearPlantillaFormularioPayload {
 export interface ActualizarPlantillaFormularioPayload {
   nombre?: string;
   descripcion?: string;
+  tipoPlantilla?: TipoPlantillaFormulario;
   procesoIds?: string[];
   subactividadIds?: string[];
   usuarioIds?: string[];

@@ -7,6 +7,7 @@ import type {
   AsignacionAsociacionesPayload,
   AsignacionBeneficiariosPayload,
   AsignacionPersonalPayload,
+  AsignacionPlantillasProceso,
   AsignacionTerritoriosPayload,
   Asociacion,
   ActualizarAsociacionPayload,
@@ -19,6 +20,10 @@ import type {
   CrearBeneficiarioPayload,
   CrearJornadaPayload,
   ActualizarJornadaPayload,
+  ActualizarAsistentePayload,
+  CrearAsistentePayload,
+  GuardarAsistenciaPayload,
+  JornadaAsistente,
   CrearMetaPayload,
   CrearMetaPeriodoPayload,
   CrearPlantillaFormularioPayload,
@@ -27,6 +32,8 @@ import type {
   CrearRolPayload,
   CrearSubactividadPayload,
   CrearUsuarioPayload,
+  EnviarFormularioPayload,
+  EnvioFormularioResumen,
   EstadisticasProyecto,
   Jornada,
   KpisDashboard,
@@ -39,6 +46,7 @@ import type {
   ProcesoPlan,
   ProgresoProyecto,
   Proyecto,
+  RespuestaFormularioDetalle,
   RespuestaPaginada,
   RolDetalle,
   SubactividadPlan,
@@ -597,6 +605,82 @@ export async function eliminarJornada(
   });
 }
 
+export async function listarAsistenciaJornada(
+  token: string,
+  jornadaId: string,
+): Promise<JornadaAsistente[]> {
+  return fetchConAuth<JornadaAsistente[]>(
+    `/jornadas/${jornadaId}/asistencia`,
+    token,
+  );
+}
+
+export async function guardarAsistenciaJornada(
+  token: string,
+  jornadaId: string,
+  payload: GuardarAsistenciaPayload,
+): Promise<JornadaAsistente[]> {
+  return fetchConAuth<JornadaAsistente[]>(
+    `/jornadas/${jornadaId}/asistencia`,
+    token,
+    { method: "PUT", body: JSON.stringify(payload) },
+  );
+}
+
+export async function agregarAsistenteJornada(
+  token: string,
+  jornadaId: string,
+  payload: CrearAsistentePayload,
+): Promise<JornadaAsistente> {
+  return fetchConAuth<JornadaAsistente>(
+    `/jornadas/${jornadaId}/asistencia`,
+    token,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export async function actualizarAsistenteJornada(
+  token: string,
+  jornadaId: string,
+  asistenteId: string,
+  payload: ActualizarAsistentePayload,
+): Promise<JornadaAsistente> {
+  return fetchConAuth<JornadaAsistente>(
+    `/jornadas/${jornadaId}/asistencia/${asistenteId}`,
+    token,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+}
+
+export async function eliminarAsistenteJornada(
+  token: string,
+  jornadaId: string,
+  asistenteId: string,
+): Promise<void> {
+  await fetchConAuth<void>(
+    `/jornadas/${jornadaId}/asistencia/${asistenteId}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
+export async function descargarPdfAsistenciaJornada(
+  token: string,
+  jornadaId: string,
+): Promise<Blob> {
+  const respuesta = await fetch(
+    `${API_URL}/jornadas/${jornadaId}/asistencia/pdf`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    throw new Error(
+      `Backend respondió ${respuesta.status}: ${cuerpo || respuesta.statusText}`,
+    );
+  }
+  return respuesta.blob();
+}
+
 export async function listarBeneficiarios(
   token: string,
   params?: { busqueda?: string; veredaId?: string; pagina?: number; limite?: number },
@@ -919,6 +1003,92 @@ export async function listarPlantillasPorProceso(
     `/formularios/plantillas/proceso/${procesoId}`,
     token,
   );
+}
+
+export async function obtenerAsignacionPlantillasProceso(
+  token: string,
+  procesoId: string,
+): Promise<AsignacionPlantillasProceso> {
+  return fetchConAuth<AsignacionPlantillasProceso>(
+    `/formularios/plantillas/proceso/${procesoId}/asignacion`,
+    token,
+  );
+}
+
+export async function asignarPlantillasProceso(
+  token: string,
+  procesoId: string,
+  payload: {
+    plantillaIndividualId?: string | null;
+    plantillaGrupalId?: string | null;
+  },
+): Promise<AsignacionPlantillasProceso> {
+  return fetchConAuth<AsignacionPlantillasProceso>(
+    `/formularios/plantillas/proceso/${procesoId}/asignacion`,
+    token,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+}
+
+export async function listarPlantillasPorJornada(
+  token: string,
+  jornadaId: string,
+): Promise<PlantillaFormulario[]> {
+  return fetchConAuth<PlantillaFormulario[]>(
+    `/formularios/plantillas/jornada/${jornadaId}`,
+    token,
+  );
+}
+
+export async function listarEnviosPorJornada(
+  token: string,
+  jornadaId: string,
+): Promise<EnvioFormularioResumen[]> {
+  return fetchConAuth<EnvioFormularioResumen[]>(
+    `/formularios/envios/jornada/${jornadaId}`,
+    token,
+  );
+}
+
+export async function obtenerRespuestasEnvio(
+  token: string,
+  envioId: string,
+): Promise<RespuestaFormularioDetalle[]> {
+  return fetchConAuth<RespuestaFormularioDetalle[]>(
+    `/formularios/envios/${envioId}/respuestas`,
+    token,
+  );
+}
+
+export async function enviarFormulario(
+  token: string,
+  payload: EnviarFormularioPayload,
+): Promise<EnvioFormularioResumen> {
+  return fetchConAuth<EnvioFormularioResumen>("/formularios/envios", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actualizarEnvioFormulario(
+  token: string,
+  envioId: string,
+  respuestas: Array<{ claveCampo: string; valor: unknown }>,
+): Promise<EnvioFormularioResumen> {
+  return fetchConAuth<EnvioFormularioResumen>(
+    `/formularios/envios/${envioId}`,
+    token,
+    { method: "PATCH", body: JSON.stringify({ respuestas }) },
+  );
+}
+
+export async function eliminarEnvioFormulario(
+  token: string,
+  envioId: string,
+): Promise<void> {
+  await fetchConAuth<void>(`/formularios/envios/${envioId}`, token, {
+    method: "DELETE",
+  });
 }
 
 export async function obtenerPlantillaFormulario(

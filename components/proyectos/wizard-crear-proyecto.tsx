@@ -303,7 +303,8 @@ export function WizardCrearProyecto() {
         {paso === 1 && token ? (
           <div>
             <p className="mb-3 text-sm text-zinc-600">
-              Veredas donde se ejecutará el proyecto *
+              Veredas donde se ejecutará el proyecto (catálogo DANE o Google
+              Maps) *
             </p>
             <SelectorVeredasMultiple
               token={token}

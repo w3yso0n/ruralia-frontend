@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ActividadPlan, VeredaResumen } from "@/lib/types";
+import type { ActividadPlan, TipoJornada, VeredaResumen } from "@/lib/types";
 import { SelectorMetaPlan } from "./selector-meta-plan";
 
 interface FormularioJornadaProps {
@@ -13,6 +13,7 @@ interface FormularioJornadaProps {
     veredaId: string;
     observaciones?: string;
     metaId: string;
+    tipo: TipoJornada;
   }) => Promise<void>;
 }
 
@@ -26,6 +27,7 @@ export function FormularioJornada({
   const [veredaId, setVeredaId] = useState(veredas[0]?.id ?? "");
   const [observaciones, setObservaciones] = useState("");
   const [metaId, setMetaId] = useState("");
+  const [esGrupal, setEsGrupal] = useState(false);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
 
   async function manejarSubmit(evento: React.FormEvent) {
@@ -49,19 +51,21 @@ export function FormularioJornada({
       veredaId,
       observaciones: observaciones.trim() || undefined,
       metaId,
+      tipo: esGrupal ? "GRUPAL" : "INDIVIDUAL",
     });
 
     setFecha("");
     setObservaciones("");
     setMetaId("");
+    setEsGrupal(false);
   }
 
   return (
     <form onSubmit={(e) => void manejarSubmit(e)} className="space-y-4">
       <p className="text-sm text-zinc-600">
-        Registra la jornada de campo seleccionando la meta del plan a la que
-        aporta esta visita (Actividad → Subactividad → Proceso → Meta). La meta
-        define qué formularios estarán disponibles en el celular.
+        {esGrupal
+          ? "Actividad grupal: usará el formulario grupal asignado al proceso de la meta (lista de asistencia con filas repetibles)."
+          : "Registra la jornada de campo seleccionando la meta del plan a la que aporta esta visita. La meta define qué formularios estarán disponibles en el celular."}
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -122,6 +126,29 @@ export function FormularioJornada({
         />
       </div>
 
+      <label
+        className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 transition ${
+          esGrupal
+            ? "border-ruralia-teal bg-ruralia-teal-soft/50"
+            : "border-zinc-200 bg-zinc-50/80 hover:border-zinc-300"
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={esGrupal}
+          onChange={(e) => setEsGrupal(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-zinc-300 text-ruralia-teal focus:ring-ruralia-teal/30"
+        />
+        <span>
+          <span className="block text-sm font-semibold text-zinc-800">
+            Actividad grupal
+          </span>
+          <span className="mt-0.5 block text-xs text-zinc-500">
+            Usa el formulario grupal del proceso (campos repetibles por asistente)
+          </span>
+        </span>
+      </label>
+
       {errorLocal ? (
         <p className="text-sm text-red-600">{errorLocal}</p>
       ) : null}
@@ -131,7 +158,11 @@ export function FormularioJornada({
         disabled={enviando || !veredas.length}
         className="w-full rounded-xl bg-ruralia-teal py-2.5 text-sm font-semibold text-white disabled:opacity-50"
       >
-        {enviando ? "Guardando..." : "Crear jornada"}
+        {enviando
+          ? "Guardando..."
+          : esGrupal
+            ? "Crear actividad grupal"
+            : "Crear jornada"}
       </button>
     </form>
   );

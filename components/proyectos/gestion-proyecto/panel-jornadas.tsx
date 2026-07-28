@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Alerta } from "@/components/ui/modal";
 import { ArbolJornadas } from "@/components/proyectos/gestion-proyecto/arbol-jornadas";
+import { ControlAsistenciaJornada } from "@/components/proyectos/gestion-proyecto/control-asistencia-jornada";
 import { FormularioJornada } from "@/components/proyectos/gestion-proyecto/formulario-jornada";
 
 import { FormularioEditarJornada } from "@/components/proyectos/gestion-proyecto/formulario-editar-jornada";
@@ -13,7 +14,7 @@ import {
   crearJornada,
   eliminarJornada,
 } from "@/lib/api";
-import type { Jornada, PlanProyecto, Proyecto } from "@/lib/types";
+import type { Jornada, PlanProyecto, Proyecto, TipoJornada } from "@/lib/types";
 
 interface PanelJornadasProps {
   token: string;
@@ -63,6 +64,7 @@ export function PanelJornadas({
     veredaId: string;
     observaciones?: string;
     metaId: string;
+    tipo: TipoJornada;
   }) {
     setEnviando(true);
     setError(null);
@@ -73,6 +75,7 @@ export function PanelJornadas({
         veredaId: datos.veredaId,
         observaciones: datos.observaciones,
         metaId: datos.metaId,
+        tipo: datos.tipo,
       });
       await onActualizar();
       setJornadaSeleccionadaId(jornada.id);
@@ -92,6 +95,7 @@ export function PanelJornadas({
       veredaId: string;
       observaciones?: string;
       metaId: string;
+      tipo: TipoJornada;
     },
   ) {
     setEnviando(true);
@@ -219,6 +223,11 @@ export function PanelJornadas({
                       <span className="font-medium">
                         {jornadaSeleccionada.estado}
                       </span>
+                      {jornadaSeleccionada.tipo === "GRUPAL" ? (
+                        <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
+                          Grupal · asistencia
+                        </span>
+                      ) : null}
                     </p>
                   </div>
                   {puedeGestionar ? (
@@ -339,6 +348,15 @@ export function PanelJornadas({
                         </p>
                       </div>
                     )}
+
+                    {jornadaSeleccionada.tipo === "GRUPAL" ? (
+                      <ControlAsistenciaJornada
+                        token={token}
+                        jornada={jornadaSeleccionada}
+                        puedeEditar={puedeGestionar}
+                        onCambio={() => void onActualizar()}
+                      />
+                    ) : null}
                   </>
                 )}
               </>

@@ -47,6 +47,15 @@ export function ArbolJornadas({
                 >
                   {jornada.vereda?.nombre ?? "Sin vereda"}
                 </span>
+                {jornada.tipo === "GRUPAL" ? (
+                  <span
+                    className={`ml-1.5 text-[10px] uppercase tracking-wide ${
+                      activa ? "text-white/70" : "text-zinc-400"
+                    }`}
+                  >
+                    · grupal
+                  </span>
+                ) : null}
               </span>
               <span
                 className={`text-xs ${activa ? "text-white/85" : cancelada ? "text-red-500" : "text-zinc-500"}`}
