@@ -277,6 +277,12 @@ export interface JornadaAsistente {
   orden: number;
 }
 
+export interface HermanoGrupoJornada {
+  id: string;
+  estado: EstadoJornada;
+  tecnicoResponsable?: { id: string; nombre: string };
+}
+
 export interface Jornada {
   id: string;
   fecha: string;
@@ -291,6 +297,13 @@ export interface Jornada {
   tecnicoResponsable?: { id: string; nombre: string };
   actividades?: JornadaActividadItem[];
   asistentes?: JornadaAsistente[];
+  grupoJornadaId?: string | null;
+  grupo?: HermanoGrupoJornada[];
+}
+
+export interface CrearJornadasResultado {
+  grupoJornadaId: string | null;
+  jornadas: Jornada[];
 }
 
 export interface Beneficiario {
@@ -524,6 +537,7 @@ export interface CrearJornadaPayload {
   actividades?: ActividadJornadaPayload[];
   veredaId: string;
   tecnicoResponsableId?: string;
+  tecnicoResponsableIds?: string[];
   tipo?: TipoJornada;
 }
 

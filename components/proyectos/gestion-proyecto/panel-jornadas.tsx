@@ -1,19 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alerta } from "@/components/ui/modal";
 import { ArbolJornadas } from "@/components/proyectos/gestion-proyecto/arbol-jornadas";
 import { ControlAsistenciaJornada } from "@/components/proyectos/gestion-proyecto/control-asistencia-jornada";
 import { FormularioJornada } from "@/components/proyectos/gestion-proyecto/formulario-jornada";
-
 import { FormularioEditarJornada } from "@/components/proyectos/gestion-proyecto/formulario-editar-jornada";
+import { ResultadosJornada } from "@/components/proyectos/gestion-proyecto/resultados-jornada";
 import {
   actualizarJornada,
   cancelarJornada,
   crearJornada,
   eliminarJornada,
+  ErrorApi,
 } from "@/lib/api";
+import {
+  confirmarEliminacionForzada,
+  confirmarEliminacionSimple,
+  mostrarErrorApi,
+} from "@/lib/swal";
 import type { Jornada, PlanProyecto, Proyecto, TipoJornada } from "@/lib/types";
 
 interface PanelJornadasProps {
@@ -24,6 +30,28 @@ interface PanelJornadasProps {
   jornadas: Jornada[];
   puedeGestionar: boolean;
   onActualizar: () => Promise<void>;
+}
+
+function jornadasDelGrupo(
+  jornadas: Jornada[],
+  jornada: Jornada | undefined,
+): Jornada[] {
+  if (!jornada?.grupoJornadaId) {
+    return jornada ? [jornada] : [];
+  }
+  return jornadas.filter((j) => j.grupoJornadaId === jornada.grupoJornadaId);
+}
+
+function sumarEjecutadoMetaLocal(jornadas: Jornada[], metaId: string): number {
+  return jornadas
+    .filter((j) => j.meta?.id === metaId && j.estado !== "CANCELADA")
+    .reduce((acc, j) => {
+      if (j.cantidadEjecutada != null) {
+        return acc + Number(j.cantidadEjecutada);
+      }
+      if (j.estado === "COMPLETADA") return acc + 1;
+      return acc;
+    }, 0);
 }
 
 export function PanelJornadas({
@@ -60,6 +88,27 @@ export function PanelJornadas({
     (j) => j.id === jornadaSeleccionadaId,
   );
 
+  const grupoActivo = useMemo(
+    () => jornadasDelGrupo(jornadas, jornadaSeleccionada),
+    [jornadas, jornadaSeleccionada],
+  );
+
+  const ejecutadoMeta =
+    jornadaSeleccionada?.meta?.ejecutadoTotal != null
+      ? Number(jornadaSeleccionada.meta.ejecutadoTotal)
+      : jornadaSeleccionada?.meta?.id
+        ? sumarEjecutadoMetaLocal(jornadas, jornadaSeleccionada.meta.id)
+        : null;
+
+  const agentes = useMemo(
+    () =>
+      (proyecto.personal ?? []).map((p) => ({
+        id: p.id,
+        nombre: p.nombreCompleto,
+      })),
+    [proyecto.personal],
+  );
+
   async function manejarCrearJornada(datos: {
     fecha: string;
     veredaId: string;
@@ -67,11 +116,12 @@ export function PanelJornadas({
     observaciones?: string;
     metaId: string;
     tipo: TipoJornada;
+    tecnicoResponsableIds: string[];
   }) {
     setEnviando(true);
     setError(null);
     try {
-      const jornada = await crearJornada(token, {
+      const resultado = await crearJornada(token, {
         proyectoId,
         fecha: datos.fecha,
         veredaId: datos.veredaId,
@@ -79,17 +129,21 @@ export function PanelJornadas({
         observaciones: datos.observaciones,
         metaId: datos.metaId,
         tipo: datos.tipo,
+        tecnicoResponsableIds: datos.tecnicoResponsableIds,
       });
+      const primera = resultado.jornadas[0];
       await onActualizar();
-      setJornadaSeleccionadaId(jornada.id);
+      if (primera) {
+        setJornadaSeleccionadaId(primera.id);
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("tab", "jornadas");
+        params.set("jornadaId", primera.id);
+        router.replace(`/proyectos/${proyectoId}?${params.toString()}`, {
+          scroll: false,
+        });
+      }
       setMostrarFormulario(false);
       setEditandoId(null);
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("tab", "jornadas");
-      params.set("jornadaId", jornada.id);
-      router.replace(`/proyectos/${proyectoId}?${params.toString()}`, {
-        scroll: false,
-      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear jornada");
     } finally {
@@ -123,9 +177,16 @@ export function PanelJornadas({
 
   async function manejarCancelar() {
     if (!jornadaSeleccionadaId) return;
-    if (!confirm("¿Cancelar esta jornada? Quedará marcada como CANCELADA.")) {
-      return;
-    }
+    const n = grupoActivo.length;
+    const confirmado = await confirmarEliminacionSimple({
+      titulo: "Cancelar jornada",
+      texto:
+        n > 1
+          ? `¿Cancelar esta jornada para los ${n} agentes del grupo? Todas quedarán marcadas como CANCELADA.`
+          : "¿Cancelar esta jornada? Quedará marcada como CANCELADA.",
+      textoConfirmar: "Sí, cancelar",
+    });
+    if (!confirmado) return;
     setError(null);
     try {
       await cancelarJornada(token, jornadaSeleccionadaId);
@@ -136,29 +197,56 @@ export function PanelJornadas({
     }
   }
 
+  async function finalizarEliminacion() {
+    if (!jornadaSeleccionadaId) return;
+    await onActualizar();
+    setJornadaSeleccionadaId(null);
+    setEditandoId(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", "jornadas");
+    params.delete("jornadaId");
+    router.replace(`/proyectos/${proyectoId}?${params.toString()}`, {
+      scroll: false,
+    });
+  }
+
   async function manejarEliminar() {
     if (!jornadaSeleccionadaId) return;
-    if (
-      !confirm(
-        "¿Eliminar permanentemente esta jornada? Esta acción no se puede deshacer.",
-      )
-    ) {
-      return;
-    }
+    const n = grupoActivo.length;
+    const confirmado = await confirmarEliminacionSimple({
+      titulo: "Eliminar jornada",
+      texto:
+        n > 1
+          ? `¿Eliminar permanentemente las ${n} jornadas del grupo? Esta acción no se puede deshacer.`
+          : "¿Eliminar permanentemente esta jornada? Esta acción no se puede deshacer.",
+    });
+    if (!confirmado) return;
+
     setError(null);
     try {
       await eliminarJornada(token, jornadaSeleccionadaId);
-      await onActualizar();
-      setJornadaSeleccionadaId(null);
-      setEditandoId(null);
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("tab", "jornadas");
-      params.delete("jornadaId");
-      router.replace(`/proyectos/${proyectoId}?${params.toString()}`, {
-        scroll: false,
-      });
+      await finalizarEliminacion();
+      return;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al eliminar");
+      if (!(err instanceof ErrorApi) || err.statusCode !== 400) {
+        setError(err instanceof Error ? err.message : "Error al eliminar");
+        return;
+      }
+
+      const forzar = await confirmarEliminacionForzada({
+        titulo: "No se puede eliminar",
+        mensajeBloqueo: err.message,
+      });
+      if (!forzar) return;
+
+      try {
+        await eliminarJornada(token, jornadaSeleccionadaId, true);
+        await finalizarEliminacion();
+      } catch (err2) {
+        const mensaje =
+          err2 instanceof Error ? err2.message : "Error al eliminar";
+        await mostrarErrorApi(mensaje);
+      }
     }
   }
 
@@ -203,6 +291,7 @@ export function PanelJornadas({
           <FormularioJornada
             veredas={proyecto.veredas ?? []}
             actividadesPlan={plan?.actividades ?? []}
+            agentes={agentes}
             enviando={enviando}
             onSubmit={manejarCrearJornada}
           />
@@ -263,6 +352,11 @@ export function PanelJornadas({
                           Grupal · asistencia
                         </span>
                       ) : null}
+                      {grupoActivo.length > 1 ? (
+                        <span className="ml-2 rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs font-medium text-ruralia-teal-text">
+                          {grupoActivo.length} agentes
+                        </span>
+                      ) : null}
                     </p>
                   </div>
                   {puedeGestionar ? (
@@ -298,6 +392,35 @@ export function PanelJornadas({
                   ) : null}
                 </div>
 
+                {grupoActivo.length > 1 ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {grupoActivo.map((hermana) => {
+                      const activa = hermana.id === jornadaSeleccionada.id;
+                      return (
+                        <button
+                          key={hermana.id}
+                          type="button"
+                          onClick={() => seleccionarJornada(hermana.id)}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                            activa
+                              ? "border-ruralia-teal bg-ruralia-teal text-white"
+                              : "border-zinc-200 bg-white text-zinc-700 hover:border-ruralia-teal-border"
+                          }`}
+                        >
+                          {hermana.tecnicoResponsable?.nombre ?? "Agente"}
+                          <span
+                            className={`ml-1.5 font-normal ${
+                              activa ? "text-white/80" : "text-zinc-400"
+                            }`}
+                          >
+                            {hermana.estado.replace(/_/g, " ")}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
                 {editandoId === jornadaSeleccionada.id && puedeGestionar ? (
                   <FormularioEditarJornada
                     key={jornadaSeleccionada.id}
@@ -305,6 +428,7 @@ export function PanelJornadas({
                     veredas={proyecto.veredas ?? []}
                     actividadesPlan={plan?.actividades ?? []}
                     enviando={enviando}
+                    tamanoGrupo={grupoActivo.length}
                     onSubmit={(datos) =>
                       manejarEditarJornada(jornadaSeleccionada.id, datos)
                     }
@@ -341,6 +465,33 @@ export function PanelJornadas({
                               ({jornadaSeleccionada.meta.unidadMedida})
                             </span>
                           </p>
+                          <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-zinc-100 pt-3">
+                            <div>
+                              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+                                Unidades en esta jornada
+                              </p>
+                              <p className="mt-0.5 text-base font-semibold text-ruralia-teal-text">
+                                {jornadaSeleccionada.cantidadEjecutada != null
+                                  ? `${Number(jornadaSeleccionada.cantidadEjecutada)} ${jornadaSeleccionada.meta.unidadMedida}`
+                                  : "Sin registrar"}
+                              </p>
+                            </div>
+                            {ejecutadoMeta != null &&
+                            jornadaSeleccionada.meta.cantidadTotal != null ? (
+                              <div>
+                                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+                                  Acumulado del plan
+                                </p>
+                                <p className="mt-0.5 text-sm font-medium text-zinc-700">
+                                  {ejecutadoMeta} /{" "}
+                                  {Number(
+                                    jornadaSeleccionada.meta.cantidadTotal,
+                                  )}{" "}
+                                  {jornadaSeleccionada.meta.unidadMedida}
+                                </p>
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                     ) : jornadaSeleccionada.actividades?.length ? (
@@ -391,7 +542,12 @@ export function PanelJornadas({
                         puedeEditar={puedeGestionar}
                         onCambio={() => void onActualizar()}
                       />
-                    ) : null}
+                    ) : (
+                      <ResultadosJornada
+                        token={token}
+                        jornada={jornadaSeleccionada}
+                      />
+                    )}
                   </>
                 )}
               </>

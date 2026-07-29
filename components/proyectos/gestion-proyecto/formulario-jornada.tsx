@@ -1,12 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 import type { ActividadPlan, TipoJornada, VeredaResumen } from "@/lib/types";
 import { SelectorMetaPlan } from "./selector-meta-plan";
+
+interface AgenteOpcion {
+  id: string;
+  nombre: string;
+}
 
 interface FormularioJornadaProps {
   veredas: VeredaResumen[];
   actividadesPlan: ActividadPlan[];
+  agentes: AgenteOpcion[];
   enviando: boolean;
   onSubmit: (datos: {
     fecha: string;
@@ -15,12 +22,14 @@ interface FormularioJornadaProps {
     observaciones?: string;
     metaId: string;
     tipo: TipoJornada;
+    tecnicoResponsableIds: string[];
   }) => Promise<void>;
 }
 
 export function FormularioJornada({
   veredas,
   actividadesPlan,
+  agentes,
   enviando,
   onSubmit,
 }: FormularioJornadaProps) {
@@ -30,6 +39,7 @@ export function FormularioJornada({
   const [observaciones, setObservaciones] = useState("");
   const [metaId, setMetaId] = useState("");
   const [esGrupal, setEsGrupal] = useState(false);
+  const [agenteIds, setAgenteIds] = useState<string[]>([]);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
 
   async function manejarSubmit(evento: React.FormEvent) {
@@ -48,6 +58,13 @@ export function FormularioJornada({
       return;
     }
 
+    if (!agenteIds.length) {
+      setErrorLocal(
+        "Debes asignar al menos un agente del equipo del proyecto",
+      );
+      return;
+    }
+
     await onSubmit({
       fecha,
       veredaId,
@@ -55,6 +72,7 @@ export function FormularioJornada({
       observaciones: observaciones.trim() || undefined,
       metaId,
       tipo: esGrupal ? "GRUPAL" : "INDIVIDUAL",
+      tecnicoResponsableIds: agenteIds,
     });
 
     setNombre("");
@@ -62,6 +80,7 @@ export function FormularioJornada({
     setObservaciones("");
     setMetaId("");
     setEsGrupal(false);
+    setAgenteIds([]);
   }
 
   return (
@@ -71,6 +90,24 @@ export function FormularioJornada({
           ? "Actividad grupal: usará el formulario grupal asignado al proceso de la meta (lista de asistencia con filas repetibles)."
           : "Registra la jornada de campo seleccionando la meta del plan a la que aporta esta visita. La meta define qué formularios estarán disponibles en el celular."}
       </p>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-zinc-700">
+          Agentes de campo *
+        </label>
+        <SelectorCatalogo
+          multiple
+          opciones={agentes}
+          value={agenteIds}
+          onChange={setAgenteIds}
+          placeholder="Buscar y asignar agentes del equipo..."
+          mensajeVacio="No hay personal asignado al proyecto. Configúralo en Equipo y contraparte."
+        />
+        <p className="mt-1 text-xs text-zinc-500">
+          Si asignas varios, se crea una jornada independiente por agente (mismo
+          plan y fecha), ligadas para editar o cancelar en conjunto.
+        </p>
+      </div>
 
       <div>
         <label className="mb-1 block text-sm font-medium text-zinc-700">
@@ -176,7 +213,7 @@ export function FormularioJornada({
 
       <button
         type="submit"
-        disabled={enviando || !veredas.length}
+        disabled={enviando || !veredas.length || !agentes.length}
         className="w-full rounded-xl bg-ruralia-teal py-2.5 text-sm font-semibold text-white disabled:opacity-50"
       >
         {enviando

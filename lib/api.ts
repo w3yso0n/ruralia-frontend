@@ -19,6 +19,7 @@ import type {
   CrearAsociacionPayload,
   CrearBeneficiarioPayload,
   CrearJornadaPayload,
+  CrearJornadasResultado,
   ActualizarJornadaPayload,
   ActualizarAsistentePayload,
   CrearAsistentePayload,
@@ -64,6 +65,16 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
+export class ErrorApi extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = "ErrorApi";
+  }
+}
+
 async function fetchConAuth<T>(
   ruta: string,
   token: string,
@@ -81,9 +92,18 @@ async function fetchConAuth<T>(
 
   if (!respuesta.ok) {
     const cuerpo = await respuesta.text();
-    throw new Error(
-      `Backend respondió ${respuesta.status}: ${cuerpo || respuesta.statusText}`,
-    );
+    let mensaje = cuerpo || respuesta.statusText;
+    try {
+      const json = JSON.parse(cuerpo) as { message?: string | string[] };
+      if (json.message) {
+        mensaje = Array.isArray(json.message)
+          ? json.message.join(" ")
+          : json.message;
+      }
+    } catch {
+      // el cuerpo no era JSON, se usa el texto crudo como mensaje
+    }
+    throw new ErrorApi(mensaje, respuesta.status);
   }
 
   if (respuesta.status === 204) {
@@ -609,8 +629,8 @@ export async function listarJornadas(
 export async function crearJornada(
   token: string,
   payload: CrearJornadaPayload,
-): Promise<Jornada> {
-  return fetchConAuth<Jornada>("/jornadas", token, {
+): Promise<CrearJornadasResultado> {
+  return fetchConAuth<CrearJornadasResultado>("/jornadas", token, {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -637,8 +657,10 @@ export async function cancelarJornada(
 export async function eliminarJornada(
   token: string,
   id: string,
+  forzar = false,
 ): Promise<void> {
-  return fetchConAuth<void>(`/jornadas/${id}/permanente`, token, {
+  const query = forzar ? "?force=true" : "";
+  return fetchConAuth<void>(`/jornadas/${id}/permanente${query}`, token, {
     method: "DELETE",
   });
 }
@@ -708,6 +730,23 @@ export async function descargarPdfAsistenciaJornada(
 ): Promise<Blob> {
   const respuesta = await fetch(
     `${API_URL}/jornadas/${jornadaId}/asistencia/pdf`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    throw new Error(
+      `Backend respondió ${respuesta.status}: ${cuerpo || respuesta.statusText}`,
+    );
+  }
+  return respuesta.blob();
+}
+
+export async function descargarPdfFormularioJornada(
+  token: string,
+  jornadaId: string,
+): Promise<Blob> {
+  const respuesta = await fetch(
+    `${API_URL}/jornadas/${jornadaId}/formulario/pdf`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
   if (!respuesta.ok) {

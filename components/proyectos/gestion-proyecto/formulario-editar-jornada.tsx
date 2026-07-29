@@ -9,6 +9,7 @@ interface FormularioEditarJornadaProps {
   veredas: VeredaResumen[];
   actividadesPlan: ActividadPlan[];
   enviando: boolean;
+  tamanoGrupo?: number;
   onSubmit: (datos: {
     fecha: string;
     veredaId: string;
@@ -29,6 +30,7 @@ export function FormularioEditarJornada({
   veredas,
   actividadesPlan,
   enviando,
+  tamanoGrupo = 1,
   onSubmit,
   onCancelar,
 }: FormularioEditarJornadaProps) {
@@ -68,6 +70,14 @@ export function FormularioEditarJornada({
 
   return (
     <form onSubmit={(e) => void manejarSubmit(e)} className="mt-4 space-y-4">
+      {tamanoGrupo > 1 ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          Esta jornada pertenece a un grupo de {tamanoGrupo} agentes. Los
+          cambios de fecha, meta, vereda, nombre, tipo y observaciones se
+          aplicarán a todos.
+        </p>
+      ) : null}
+
       <div>
         <label className="mb-1 block text-sm font-medium text-zinc-700">
           Nombre de identificación
