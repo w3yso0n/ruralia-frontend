@@ -554,6 +554,44 @@ export async function obtenerAvancePeriodo(
   );
 }
 
+/** Excel Plan/Ejec mensual del proyecto (metas, periodos y jornadas). */
+export async function descargarExcelSeguimientoProyecto(
+  token: string,
+  proyectoId: string,
+): Promise<Blob> {
+  const respuesta = await fetch(
+    `${API_URL}/reportes/proyecto/${proyectoId}/seguimiento-excel`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    throw new Error(
+      `Backend respondió ${respuesta.status}: ${cuerpo || respuesta.statusText}`,
+    );
+  }
+  return respuesta.blob();
+}
+
+/** Excel Plan/Ejec diario de un mes (avances por jornada/día). */
+export async function descargarExcelSeguimientoDiarioProyecto(
+  token: string,
+  proyectoId: string,
+  anio: number,
+  mes: number,
+): Promise<Blob> {
+  const respuesta = await fetch(
+    `${API_URL}/reportes/proyecto/${proyectoId}/seguimiento-diario-excel${construirQuery({ anio, mes })}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    throw new Error(
+      `Backend respondió ${respuesta.status}: ${cuerpo || respuesta.statusText}`,
+    );
+  }
+  return respuesta.blob();
+}
+
 export async function listarJornadas(
   token: string,
   params?: {

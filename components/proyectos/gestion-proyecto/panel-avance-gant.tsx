@@ -1,12 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { obtenerAvancePeriodo } from "@/lib/api";
+import { Download } from "lucide-react";
+import {
+  descargarExcelSeguimientoDiarioProyecto,
+  obtenerAvancePeriodo,
+} from "@/lib/api";
 import type { AvancePeriodo } from "@/lib/types";
 
 const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
 ];
 
 interface PanelAvanceGantProps {
@@ -46,6 +60,7 @@ export function PanelAvanceGant({ token, proyectoId }: PanelAvanceGantProps) {
   const [mes, setMes] = useState(ahora.getMonth() + 1);
   const [datos, setDatos] = useState<AvancePeriodo[]>([]);
   const [cargando, setCargando] = useState(false);
+  const [descargando, setDescargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
@@ -71,6 +86,33 @@ export function PanelAvanceGant({ token, proyectoId }: PanelAvanceGantProps) {
     }, 30_000);
     return () => clearInterval(intervalo);
   }, [cargar]);
+
+  async function manejarDescargarDiario() {
+    setDescargando(true);
+    setError(null);
+    try {
+      const blob = await descargarExcelSeguimientoDiarioProyecto(
+        token,
+        proyectoId,
+        anio,
+        mes,
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `seguimiento-diario-${anio}-${String(mes).padStart(2, "0")}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Error al descargar el Excel diario",
+      );
+    } finally {
+      setDescargando(false);
+    }
+  }
 
   const anios = Array.from({ length: 5 }, (_, i) => ahora.getFullYear() - 2 + i);
 
@@ -105,7 +147,21 @@ export function PanelAvanceGant({ token, proyectoId }: PanelAvanceGantProps) {
             ))}
           </select>
         </div>
+        <button
+          type="button"
+          disabled={descargando}
+          onClick={() => void manejarDescargarDiario()}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+        >
+          <Download className="h-3.5 w-3.5" />
+          {descargando ? "Generando…" : "Excel diario"}
+        </button>
       </div>
+
+      <p className="text-xs text-zinc-500">
+        El Excel diario muestra, para el mes seleccionado, en qué días se
+        registraron avances de cada meta según las jornadas.
+      </p>
 
       {error ? (
         <p className="rounded-xl bg-red-50 p-3 text-sm text-red-600">{error}</p>

@@ -10,7 +10,7 @@ import {
   type SeleccionPlan,
   type TipoNivelPlan,
 } from "@/components/proyectos/gestion-proyecto/arbol-plan";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Download, Plus } from "lucide-react";
 import { PanelAvanceGant } from "@/components/proyectos/gestion-proyecto/panel-avance-gant";
 import { SeccionFormulariosProceso } from "@/components/proyectos/gestion-proyecto/seccion-formularios-proceso";
 import {
@@ -23,6 +23,7 @@ import {
   crearMetaPeriodo,
   crearProceso,
   crearSubactividad,
+  descargarExcelSeguimientoProyecto,
   eliminarActividad,
   eliminarMeta,
   eliminarMetaPeriodo,
@@ -320,6 +321,7 @@ export function PanelPlan({
   const [seleccion, setSeleccion] = useState<SeleccionPlan | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [recargandoAvance, setRecargandoAvance] = useState(false);
+  const [descargandoExcel, setDescargandoExcel] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const actividades = plan?.actividades ?? [];
@@ -334,6 +336,26 @@ export function PanelPlan({
       }
     } finally {
       setRecargandoAvance(false);
+    }
+  }
+
+  async function manejarDescargarExcel() {
+    setDescargandoExcel(true);
+    setError(null);
+    try {
+      const blob = await descargarExcelSeguimientoProyecto(token, proyectoId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `seguimiento-${proyectoId.slice(0, 8)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Error al descargar el Excel",
+      );
+    } finally {
+      setDescargandoExcel(false);
     }
   }
 
@@ -1105,14 +1127,25 @@ export function PanelPlan({
             : ""}
           .
         </p>
-        <button
-          type="button"
-          disabled={recargandoAvance}
-          onClick={() => void manejarRecargarAvance()}
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
-        >
-          {recargandoAvance ? "Actualizando..." : "Actualizar avance"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={descargandoExcel}
+            onClick={() => void manejarDescargarExcel()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+          >
+            <Download className="h-3.5 w-3.5" />
+            {descargandoExcel ? "Generando…" : "Excel mensual"}
+          </button>
+          <button
+            type="button"
+            disabled={recargandoAvance}
+            onClick={() => void manejarRecargarAvance()}
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+          >
+            {recargandoAvance ? "Actualizando..." : "Actualizar avance"}
+          </button>
+        </div>
       </div>
 
       {error ? <Alerta mensaje={error} /> : null}
