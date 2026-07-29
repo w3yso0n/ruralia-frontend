@@ -292,6 +292,8 @@ export function PanelJornadas({
             veredas={proyecto.veredas ?? []}
             actividadesPlan={plan?.actividades ?? []}
             agentes={agentes}
+            fechaInicioProyecto={proyecto.fechaInicio}
+            fechaFinProyecto={proyecto.fechaFin}
             enviando={enviando}
             onSubmit={manejarCrearJornada}
           />
@@ -427,6 +429,8 @@ export function PanelJornadas({
                     jornada={jornadaSeleccionada}
                     veredas={proyecto.veredas ?? []}
                     actividadesPlan={plan?.actividades ?? []}
+                    fechaInicioProyecto={proyecto.fechaInicio}
+                    fechaFinProyecto={proyecto.fechaFin}
                     enviando={enviando}
                     tamanoGrupo={grupoActivo.length}
                     onSubmit={(datos) =>

@@ -93,8 +93,8 @@ function ListaOpciones({
           <button
             type="button"
             onClick={() => onElegir(opcion)}
-            className={`w-full px-3 py-2 text-left text-sm hover:bg-ruralia-teal-soft ${
-              seleccionadoId === opcion.id ? "bg-ruralia-teal-soft/60" : ""
+            className={`w-full px-3.5 py-2.5 text-left text-sm transition hover:bg-ruralia-teal-soft ${
+              seleccionadoId === opcion.id ? "bg-ruralia-teal-soft/70" : ""
             }`}
           >
             <span className="font-medium text-zinc-900">{opcion.nombre}</span>
@@ -188,11 +188,11 @@ export function SelectorCatalogo(props: SelectorCatalogoProps) {
             }}
             onFocus={() => setMostrarLista(true)}
             placeholder={placeholder}
-            className="w-full rounded-xl border border-zinc-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-ruralia-teal focus:ring-4 focus:ring-ruralia-teal/10"
+            className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition hover:border-ruralia-teal-border focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
           />
 
           {mostrarLista ? (
-            <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-zinc-200 bg-white py-1 shadow-lg">
+            <ul className="absolute z-20 mt-2 max-h-56 w-full overflow-y-auto rounded-2xl border border-ruralia-teal-border bg-white py-1.5 shadow-lg shadow-zinc-900/10">
               <ListaOpciones opciones={disponibles} onElegir={agregar} />
             </ul>
           ) : null}
@@ -234,11 +234,11 @@ export function SelectorCatalogo(props: SelectorCatalogoProps) {
           }}
           onFocus={() => setMostrarLista(true)}
           placeholder={placeholder}
-          className="w-full rounded-xl border border-zinc-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-ruralia-teal focus:ring-4 focus:ring-ruralia-teal/10"
+          className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition hover:border-ruralia-teal-border focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
         />
 
         {mostrarLista ? (
-          <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-zinc-200 bg-white py-1 shadow-lg">
+          <ul className="absolute z-20 mt-2 max-h-56 w-full overflow-y-auto rounded-2xl border border-ruralia-teal-border bg-white py-1.5 shadow-lg shadow-zinc-900/10">
             <ListaOpciones
               opciones={opcionesFiltradas}
               onElegir={elegir}

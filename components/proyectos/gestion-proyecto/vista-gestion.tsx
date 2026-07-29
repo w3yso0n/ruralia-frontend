@@ -8,6 +8,7 @@ import { EquipoVinculos } from "@/components/proyectos/gestion-proyecto/equipo-v
 import { PanelJornadas } from "@/components/proyectos/gestion-proyecto/panel-jornadas";
 import { PanelPlan } from "@/components/proyectos/gestion-proyecto/panel-plan";
 import { ResumenAsignaciones } from "@/components/proyectos/gestion-proyecto/resumen-asignaciones";
+import { ResumenInformacionBasica } from "@/components/proyectos/gestion-proyecto/resumen-informacion-basica";
 import {
   activarProyecto,
   actualizarProyecto,
@@ -398,6 +399,12 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
 
       {tab === "resumen" ? (
         <>
+          <ResumenInformacionBasica
+            token={token}
+            proyecto={proyecto}
+            puedeGestionar={puedeGestionar}
+            onActualizar={cargar}
+          />
           <ResumenAsignaciones
             proyecto={proyecto}
             puedeGestionar={puedeGestionar}

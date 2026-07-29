@@ -1,6 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { MapPin } from "lucide-react";
+import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
+import {
+  fechaFueraDeProyecto,
+  SelectorFechaJornada,
+} from "@/components/ui/selector-fecha-jornada";
 import type { ActividadPlan, Jornada, TipoJornada, VeredaResumen } from "@/lib/types";
 import { SelectorMetaPlan } from "./selector-meta-plan";
 
@@ -8,6 +14,8 @@ interface FormularioEditarJornadaProps {
   jornada: Jornada;
   veredas: VeredaResumen[];
   actividadesPlan: ActividadPlan[];
+  fechaInicioProyecto?: string;
+  fechaFinProyecto?: string;
   enviando: boolean;
   tamanoGrupo?: number;
   onSubmit: (datos: {
@@ -29,6 +37,8 @@ export function FormularioEditarJornada({
   jornada,
   veredas,
   actividadesPlan,
+  fechaInicioProyecto,
+  fechaFinProyecto,
   enviando,
   tamanoGrupo = 1,
   onSubmit,
@@ -48,6 +58,16 @@ export function FormularioEditarJornada({
 
     if (!fecha || !veredaId) {
       setErrorLocal("Fecha y vereda son obligatorias");
+      return;
+    }
+
+    const errorFecha = fechaFueraDeProyecto(
+      fecha,
+      fechaInicioProyecto,
+      fechaFinProyecto,
+    );
+    if (errorFecha) {
+      setErrorLocal(errorFecha);
       return;
     }
 
@@ -88,50 +108,44 @@ export function FormularioEditarJornada({
           onChange={(e) => setNombre(e.target.value)}
           maxLength={200}
           placeholder="Ej: Jornada 1"
-          className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+          className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm outline-none transition hover:border-ruralia-teal-border focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
         />
         <p className="mt-1 text-xs text-zinc-500">
           Opcional. Déjalo vacío para quitar el nombre.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-zinc-700">
-            Fecha *
-          </label>
-          <input
-            type="date"
-            required
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-zinc-700">
-            Vereda *
-          </label>
-          <select
-            required
-            value={veredaId}
-            onChange={(e) => setVeredaId(e.target.value)}
-            className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
-          >
-            {veredas.length === 0 ? (
-              <option value="">Sin veredas asignadas al proyecto</option>
-            ) : (
-              veredas.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.nombre}
-                </option>
-              ))
-            )}
-          </select>
-        </div>
+      <div>
+        <label className="mb-1 block text-sm font-medium text-zinc-700">
+          Fecha *
+        </label>
+        <SelectorFechaJornada
+          required
+          value={fecha}
+          onChange={setFecha}
+          fechaInicioProyecto={fechaInicioProyecto}
+          fechaFinProyecto={fechaFinProyecto}
+          disabled={enviando}
+        />
       </div>
 
-      <div className="space-y-3 rounded-xl border border-zinc-100 p-4">
+      <div>
+        <label className="mb-1 block text-sm font-medium text-zinc-700">
+          Vereda *
+        </label>
+        <SelectorDesplegable
+          required
+          value={veredaId}
+          onChange={setVeredaId}
+          opciones={veredas.map((v) => ({ id: v.id, nombre: v.nombre }))}
+          placeholder="Seleccionar vereda"
+          mensajeSinOpciones="Sin veredas asignadas al proyecto"
+          icono={MapPin}
+          disabled={enviando}
+        />
+      </div>
+
+      <div className="space-y-3 rounded-2xl border border-ruralia-teal-border bg-white p-4">
         <p className="text-sm font-medium text-zinc-800">Meta del plan *</p>
         <SelectorMetaPlan
           actividadesPlan={actividadesPlan}
@@ -149,7 +163,7 @@ export function FormularioEditarJornada({
           rows={2}
           value={observaciones}
           onChange={(e) => setObservaciones(e.target.value)}
-          className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+          className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm outline-none transition hover:border-ruralia-teal-border focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
         />
       </div>
 
@@ -157,7 +171,7 @@ export function FormularioEditarJornada({
         className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 transition ${
           esGrupal
             ? "border-ruralia-teal bg-ruralia-teal-soft/50"
-            : "border-zinc-200 bg-zinc-50/80 hover:border-zinc-300"
+            : "border-zinc-200 bg-white hover:border-ruralia-teal-border"
         }`}
       >
         <input

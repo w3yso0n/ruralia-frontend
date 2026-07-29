@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  GitBranch,
+  Layers,
+  ListTree,
+  Target,
+} from "lucide-react";
+import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
 import type { ActividadPlan, ProcesoPlan } from "@/lib/types";
 
 interface SelectorMetaPlanProps {
@@ -64,6 +71,39 @@ export function SelectorMetaPlan({
     (p) => p.id === procesoId,
   );
 
+  const opcionesActividad = useMemo(
+    () => actividadesPlan.map((a) => ({ id: a.id, nombre: a.nombre })),
+    [actividadesPlan],
+  );
+
+  const opcionesSubactividad = useMemo(
+    () =>
+      (actividadSel?.subactividades ?? []).map((s) => ({
+        id: s.id,
+        nombre: s.nombre,
+      })),
+    [actividadSel],
+  );
+
+  const opcionesProceso = useMemo(
+    () =>
+      (subactividadSel?.procesos ?? []).map((p) => ({
+        id: p.id,
+        nombre: p.nombre,
+      })),
+    [subactividadSel],
+  );
+
+  const opcionesMeta = useMemo(
+    () =>
+      (procesoSel?.metas ?? []).map((m) => ({
+        id: m.id,
+        nombre: m.nombre,
+        subtitulo: m.unidadMedida,
+      })),
+    [procesoSel],
+  );
+
   function resetCascada(nivel: "actividad" | "subactividad" | "proceso") {
     onChange("");
     if (nivel === "actividad") {
@@ -77,93 +117,92 @@ export function SelectorMetaPlan({
   return (
     <div className="space-y-3">
       <div>
-        <label className="mb-1 block text-xs text-zinc-600">Actividad</label>
-        <select
+        <label className="mb-1 block text-xs font-medium text-zinc-600">
+          Actividad
+        </label>
+        <SelectorDesplegable
           value={actividadId}
           disabled={disabled}
-          onChange={(e) => {
-            setActividadId(e.target.value);
+          opciones={opcionesActividad}
+          placeholder="Seleccionar actividad"
+          permitirVacio
+          etiquetaVacio="Seleccionar actividad"
+          mensajeSinOpciones="Sin actividades en el plan"
+          icono={Layers}
+          onChange={(id) => {
+            setActividadId(id);
             resetCascada("actividad");
           }}
-          className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm disabled:opacity-50"
-        >
-          <option value="">— Seleccionar —</option>
-          {actividadesPlan.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nombre}
-            </option>
-          ))}
-        </select>
+        />
       </div>
 
-      {actividadSel && (
+      {actividadSel ? (
         <div>
-          <label className="mb-1 block text-xs text-zinc-600">Subactividad</label>
-          <select
+          <label className="mb-1 block text-xs font-medium text-zinc-600">
+            Subactividad
+          </label>
+          <SelectorDesplegable
             value={subactividadId}
             disabled={disabled}
-            onChange={(e) => {
-              setSubactividadId(e.target.value);
+            opciones={opcionesSubactividad}
+            placeholder="Seleccionar subactividad"
+            permitirVacio
+            etiquetaVacio="Seleccionar subactividad"
+            mensajeSinOpciones="Sin subactividades"
+            icono={ListTree}
+            onChange={(id) => {
+              setSubactividadId(id);
               resetCascada("subactividad");
             }}
-            className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm disabled:opacity-50"
-          >
-            <option value="">— Seleccionar —</option>
-            {actividadSel.subactividades?.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nombre}
-              </option>
-            ))}
-          </select>
+          />
         </div>
-      )}
+      ) : null}
 
-      {subactividadSel && (subactividadSel.procesos?.length ?? 0) > 0 && (
+      {subactividadSel && (subactividadSel.procesos?.length ?? 0) > 0 ? (
         <div>
-          <label className="mb-1 block text-xs text-zinc-600">Proceso</label>
-          <select
+          <label className="mb-1 block text-xs font-medium text-zinc-600">
+            Proceso
+          </label>
+          <SelectorDesplegable
             value={procesoId}
             disabled={disabled}
-            onChange={(e) => {
-              setProcesoId(e.target.value);
+            opciones={opcionesProceso}
+            placeholder="Seleccionar proceso"
+            permitirVacio
+            etiquetaVacio="Seleccionar proceso"
+            icono={GitBranch}
+            onChange={(id) => {
+              setProcesoId(id);
               resetCascada("proceso");
             }}
-            className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm disabled:opacity-50"
-          >
-            <option value="">— Seleccionar —</option>
-            {subactividadSel.procesos?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre}
-              </option>
-            ))}
-          </select>
+          />
         </div>
-      )}
+      ) : null}
 
-      {procesoSel && (procesoSel.metas?.length ?? 0) > 0 && (
+      {procesoSel && (procesoSel.metas?.length ?? 0) > 0 ? (
         <div>
-          <label className="mb-1 block text-xs text-zinc-600">Meta *</label>
-          <select
+          <label className="mb-1 block text-xs font-medium text-zinc-600">
+            Meta *
+          </label>
+          <SelectorDesplegable
             value={metaId}
             disabled={disabled}
-            onChange={(e) => onChange(e.target.value)}
-            className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm disabled:opacity-50"
-          >
-            <option value="">— Seleccionar —</option>
-            {procesoSel.metas?.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.nombre} ({m.unidadMedida})
-              </option>
-            ))}
-          </select>
+            required
+            opciones={opcionesMeta}
+            placeholder="Seleccionar meta"
+            permitirVacio
+            etiquetaVacio="Seleccionar meta"
+            icono={Target}
+            onChange={onChange}
+          />
         </div>
-      )}
+      ) : null}
 
-      {subactividadSel && (subactividadSel.procesos?.length ?? 0) === 0 && (
+      {subactividadSel && (subactividadSel.procesos?.length ?? 0) === 0 ? (
         <p className="text-xs text-zinc-400">
           Esta subactividad aún no tiene procesos definidos.
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
