@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Alerta } from "@/components/ui/modal";
 import { ArbolJornadas } from "@/components/proyectos/gestion-proyecto/arbol-jornadas";
 import { ControlAsistenciaJornada } from "@/components/proyectos/gestion-proyecto/control-asistencia-jornada";
@@ -35,6 +35,7 @@ export function PanelJornadas({
   puedeGestionar,
   onActualizar,
 }: PanelJornadasProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const jornadaIdQuery = searchParams.get("jornadaId");
 
@@ -62,6 +63,7 @@ export function PanelJornadas({
   async function manejarCrearJornada(datos: {
     fecha: string;
     veredaId: string;
+    nombre?: string;
     observaciones?: string;
     metaId: string;
     tipo: TipoJornada;
@@ -73,6 +75,7 @@ export function PanelJornadas({
         proyectoId,
         fecha: datos.fecha,
         veredaId: datos.veredaId,
+        nombre: datos.nombre,
         observaciones: datos.observaciones,
         metaId: datos.metaId,
         tipo: datos.tipo,
@@ -81,6 +84,12 @@ export function PanelJornadas({
       setJornadaSeleccionadaId(jornada.id);
       setMostrarFormulario(false);
       setEditandoId(null);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", "jornadas");
+      params.set("jornadaId", jornada.id);
+      router.replace(`/proyectos/${proyectoId}?${params.toString()}`, {
+        scroll: false,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear jornada");
     } finally {
@@ -93,6 +102,7 @@ export function PanelJornadas({
     datos: {
       fecha: string;
       veredaId: string;
+      nombre?: string;
       observaciones?: string;
       metaId: string;
       tipo: TipoJornada;
@@ -141,6 +151,12 @@ export function PanelJornadas({
       await onActualizar();
       setJornadaSeleccionadaId(null);
       setEditandoId(null);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", "jornadas");
+      params.delete("jornadaId");
+      router.replace(`/proyectos/${proyectoId}?${params.toString()}`, {
+        scroll: false,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al eliminar");
     }
@@ -149,6 +165,12 @@ export function PanelJornadas({
   function seleccionarJornada(id: string) {
     setJornadaSeleccionadaId(id);
     setEditandoId(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", "jornadas");
+    params.set("jornadaId", id);
+    router.replace(`/proyectos/${proyectoId}?${params.toString()}`, {
+      scroll: false,
+    });
   }
 
   return (
@@ -206,17 +228,30 @@ export function PanelJornadas({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="text-lg font-semibold text-zinc-900">
-                      Jornada del{" "}
-                      {new Date(jornadaSeleccionada.fecha).toLocaleDateString(
-                        "es-CO",
-                        {
-                          weekday: "long",
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        },
-                      )}
+                      {jornadaSeleccionada.nombre?.trim()
+                        ? jornadaSeleccionada.nombre
+                        : `Jornada del ${new Date(
+                            jornadaSeleccionada.fecha,
+                          ).toLocaleDateString("es-CO", {
+                            weekday: "long",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}`}
                     </h3>
+                    {jornadaSeleccionada.nombre?.trim() ? (
+                      <p className="mt-0.5 text-sm text-zinc-500">
+                        {new Date(jornadaSeleccionada.fecha).toLocaleDateString(
+                          "es-CO",
+                          {
+                            weekday: "long",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          },
+                        )}
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-sm text-zinc-500">
                       {jornadaSeleccionada.vereda?.nombre ?? "Sin vereda"} ·{" "}
                       {jornadaSeleccionada.tecnicoResponsable?.nombre ?? "—"} ·{" "}

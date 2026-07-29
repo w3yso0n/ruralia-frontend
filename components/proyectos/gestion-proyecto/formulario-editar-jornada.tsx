@@ -12,6 +12,7 @@ interface FormularioEditarJornadaProps {
   onSubmit: (datos: {
     fecha: string;
     veredaId: string;
+    nombre?: string;
     observaciones?: string;
     metaId: string;
     tipo: TipoJornada;
@@ -31,6 +32,7 @@ export function FormularioEditarJornada({
   onSubmit,
   onCancelar,
 }: FormularioEditarJornadaProps) {
+  const [nombre, setNombre] = useState(jornada.nombre ?? "");
   const [fecha, setFecha] = useState(fechaParaInput(jornada.fecha));
   const [veredaId, setVeredaId] = useState(jornada.vereda?.id ?? veredas[0]?.id ?? "");
   const [observaciones, setObservaciones] = useState(jornada.observaciones ?? "");
@@ -57,6 +59,7 @@ export function FormularioEditarJornada({
     await onSubmit({
       fecha,
       veredaId,
+      nombre: nombre.trim(),
       observaciones: observaciones.trim() || undefined,
       metaId,
       tipo: esGrupal ? "GRUPAL" : "INDIVIDUAL",
@@ -65,6 +68,23 @@ export function FormularioEditarJornada({
 
   return (
     <form onSubmit={(e) => void manejarSubmit(e)} className="mt-4 space-y-4">
+      <div>
+        <label className="mb-1 block text-sm font-medium text-zinc-700">
+          Nombre de identificación
+        </label>
+        <input
+          type="text"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          maxLength={200}
+          placeholder="Ej: Jornada 1"
+          className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+        />
+        <p className="mt-1 text-xs text-zinc-500">
+          Opcional. Déjalo vacío para quitar el nombre.
+        </p>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium text-zinc-700">

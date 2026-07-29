@@ -123,6 +123,8 @@ export interface VeredaResumen {
   id: string;
   nombre: string;
   codigo?: string;
+  latitud?: number;
+  longitud?: number;
 }
 
 export interface Proyecto {
@@ -280,6 +282,7 @@ export interface Jornada {
   fecha: string;
   estado: EstadoJornada;
   tipo?: TipoJornada;
+  nombre?: string | null;
   observaciones?: string;
   cantidadEjecutada?: number;
   proyecto?: { id: string; nombre: string };
@@ -368,6 +371,8 @@ export interface Vereda {
   corregimientoNombre?: string;
   departamentoNombre?: string;
   regionNombre?: string;
+  latitud?: number;
+  longitud?: number;
 }
 
 /** Nodo de la jerarquía territorial (admin). */
@@ -512,6 +517,7 @@ export interface ActividadJornadaPayload {
 
 export interface CrearJornadaPayload {
   fecha: string;
+  nombre?: string;
   observaciones?: string;
   proyectoId: string;
   metaId: string;
@@ -523,6 +529,7 @@ export interface CrearJornadaPayload {
 
 export interface ActualizarJornadaPayload {
   fecha?: string;
+  nombre?: string;
   observaciones?: string;
   veredaId?: string;
   metaId?: string;
@@ -582,7 +589,24 @@ export type TipoCampoFormulario =
   | "GPS"
   | "FOTO"
   | "FIRMA"
-  | "ARCHIVO";
+  | "ARCHIVO"
+  | "TABLA";
+
+export type TipoCampoColumnaTabla =
+  | "TEXTO"
+  | "NUMERO"
+  | "FECHA"
+  | "SI_NO"
+  | "SELECCION_UNICA"
+  | "FIRMA";
+
+export interface ColumnaCampoTabla {
+  clave: string;
+  etiqueta: string;
+  tipoCampo: TipoCampoColumnaTabla;
+  esObligatorio?: boolean;
+  opciones?: { valores?: string[] };
+}
 
 export type TipoPlantillaFormulario = "INDIVIDUAL" | "GRUPAL";
 
@@ -593,7 +617,10 @@ export interface CampoFormulario {
   tipoCampo: TipoCampoFormulario;
   esObligatorio: boolean;
   orden: number;
-  opciones?: { valores?: string[] } | Record<string, unknown>;
+  opciones?:
+    | { valores?: string[] }
+    | { columnas?: ColumnaCampoTabla[] }
+    | Record<string, unknown>;
   reglasValidacion?: Record<string, unknown>;
 }
 

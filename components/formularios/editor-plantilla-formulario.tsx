@@ -14,7 +14,9 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import type {
   CampoFormularioPayload,
+  ColumnaCampoTabla,
   Proyecto,
+  TipoCampoColumnaTabla,
   TipoCampoFormulario,
   TipoPlantillaFormulario,
   Usuario,
@@ -34,11 +36,16 @@ interface GrupoProyecto {
   procesos: OpcionProceso[];
 }
 
-interface CampoEnEdicion extends CampoFormularioPayload {
+interface ColumnaEnEdicion extends ColumnaCampoTabla {
   claveOpciones: string;
 }
 
-const TIPOS_CAMPO: { valor: TipoCampoFormulario; etiqueta: string }[] = [
+interface CampoEnEdicion extends CampoFormularioPayload {
+  claveOpciones: string;
+  columnas: ColumnaEnEdicion[];
+}
+
+const TIPOS_CAMPO_BASE: { valor: TipoCampoFormulario; etiqueta: string }[] = [
   { valor: "TEXTO", etiqueta: "Texto corto" },
   { valor: "NUMERO", etiqueta: "Número" },
   { valor: "FECHA", etiqueta: "Fecha" },
@@ -51,10 +58,37 @@ const TIPOS_CAMPO: { valor: TipoCampoFormulario; etiqueta: string }[] = [
   { valor: "ARCHIVO", etiqueta: "Archivo adjunto" },
 ];
 
+const TIPOS_CAMPO_GRUPAL: { valor: TipoCampoFormulario; etiqueta: string }[] = [
+  ...TIPOS_CAMPO_BASE,
+  { valor: "TABLA", etiqueta: "Tabla / lista de asistencia" },
+];
+
+const TIPOS_COLUMNA_TABLA: {
+  valor: TipoCampoColumnaTabla;
+  etiqueta: string;
+}[] = [
+  { valor: "TEXTO", etiqueta: "Texto" },
+  { valor: "NUMERO", etiqueta: "Número" },
+  { valor: "FECHA", etiqueta: "Fecha" },
+  { valor: "SI_NO", etiqueta: "Sí / No" },
+  { valor: "SELECCION_UNICA", etiqueta: "Selección única" },
+  { valor: "FIRMA", etiqueta: "Firma" },
+];
+
 const TIPOS_CON_OPCIONES: TipoCampoFormulario[] = [
   "SELECCION_UNICA",
   "SELECCION_MULTIPLE",
 ];
+
+function columnaVacia(): ColumnaEnEdicion {
+  return {
+    etiqueta: "",
+    clave: "",
+    tipoCampo: "TEXTO",
+    esObligatorio: false,
+    claveOpciones: "",
+  };
+}
 
 function campoVacio(orden: number): CampoEnEdicion {
   return {
@@ -64,6 +98,7 @@ function campoVacio(orden: number): CampoEnEdicion {
     esObligatorio: false,
     orden,
     claveOpciones: "",
+    columnas: [],
   };
 }
 
@@ -72,9 +107,45 @@ function generarClave(etiqueta: string): string {
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
+}
+
+/** Genera claves únicas a partir de etiquetas (evita colisiones tipo "f"/"f"). */
+function clavesUnicasDesdeEtiquetas(etiquetas: string[]): string[] {
+  const usadas = new Set<string>();
+  return etiquetas.map((etiqueta, indice) => {
+    const base = generarClave(etiqueta) || `col_${indice + 1}`;
+    let clave = base;
+    let n = 2;
+    while (usadas.has(clave)) {
+      clave = `${base}_${n}`;
+      n += 1;
+    }
+    usadas.add(clave);
+    return clave;
+  });
+}
+
+function parsearColumnas(
+  opciones: CampoFormularioPayload["opciones"],
+): ColumnaEnEdicion[] {
+  const columnas = (opciones as { columnas?: ColumnaCampoTabla[] } | undefined)
+    ?.columnas;
+  if (!Array.isArray(columnas)) return [columnaVacia()];
+  const claves = clavesUnicasDesdeEtiquetas(
+    columnas.map((col) => col.etiqueta || col.clave || ""),
+  );
+  return columnas.map((col, i) => ({
+    clave: claves[i],
+    etiqueta: col.etiqueta,
+    tipoCampo: col.tipoCampo,
+    esObligatorio: col.esObligatorio ?? false,
+    claveOpciones: Array.isArray(col.opciones?.valores)
+      ? col.opciones.valores.join("\n")
+      : "",
+  }));
 }
 
 export function EditorPlantillaFormulario({
@@ -171,6 +242,10 @@ export function EditorPlantillaFormulario({
                     "\n",
                   )
                 : "",
+              columnas:
+                campo.tipoCampo === "TABLA"
+                  ? parsearColumnas(campo.opciones)
+                  : [],
             })),
         );
       })
@@ -194,8 +269,75 @@ export function EditorPlantillaFormulario({
 
   function actualizarCampo(indice: number, cambios: Partial<CampoEnEdicion>) {
     setCampos((prev) =>
-      prev.map((campo, i) => (i === indice ? { ...campo, ...cambios } : campo)),
+      prev.map((campo, i) => {
+        if (i !== indice) return campo;
+        const siguiente = { ...campo, ...cambios };
+        if (
+          cambios.tipoCampo === "TABLA" &&
+          (!siguiente.columnas || siguiente.columnas.length === 0)
+        ) {
+          siguiente.columnas = [columnaVacia()];
+        }
+        if (cambios.tipoCampo && cambios.tipoCampo !== "TABLA") {
+          siguiente.columnas = [];
+        }
+        return siguiente;
+      }),
     );
+  }
+
+  function actualizarColumna(
+    indiceCampo: number,
+    indiceColumna: number,
+    cambios: Partial<ColumnaEnEdicion>,
+  ) {
+    setCampos((prev) =>
+      prev.map((campo, i) => {
+        if (i !== indiceCampo) return campo;
+        return {
+          ...campo,
+          columnas: campo.columnas.map((col, j) =>
+            j === indiceColumna ? { ...col, ...cambios } : col,
+          ),
+        };
+      }),
+    );
+  }
+
+  function agregarColumna(indiceCampo: number) {
+    setCampos((prev) =>
+      prev.map((campo, i) =>
+        i === indiceCampo
+          ? { ...campo, columnas: [...campo.columnas, columnaVacia()] }
+          : campo,
+      ),
+    );
+  }
+
+  function eliminarColumna(indiceCampo: number, indiceColumna: number) {
+    setCampos((prev) =>
+      prev.map((campo, i) => {
+        if (i !== indiceCampo) return campo;
+        if (campo.columnas.length <= 1) return campo;
+        return {
+          ...campo,
+          columnas: campo.columnas.filter((_, j) => j !== indiceColumna),
+        };
+      }),
+    );
+  }
+
+  function cambiarTipoPlantilla(tipo: TipoPlantillaFormulario) {
+    setTipoPlantilla(tipo);
+    if (tipo === "INDIVIDUAL") {
+      setCampos((prev) =>
+        prev.map((campo) =>
+          campo.tipoCampo === "TABLA"
+            ? { ...campo, tipoCampo: "TEXTO", columnas: [] }
+            : campo,
+        ),
+      );
+    }
   }
 
   function agregarCampo() {
@@ -229,14 +371,39 @@ export function EditorPlantillaFormulario({
     try {
       const camposPayload: CampoFormularioPayload[] = campos.map(
         (campo, indice) => {
-          const opciones = TIPOS_CON_OPCIONES.includes(campo.tipoCampo)
-            ? {
-                valores: campo.claveOpciones
-                  .split("\n")
-                  .map((v) => v.trim())
-                  .filter(Boolean),
-              }
-            : undefined;
+          let opciones: Record<string, unknown> | undefined;
+
+          if (campo.tipoCampo === "TABLA") {
+            const claves = clavesUnicasDesdeEtiquetas(
+              campo.columnas.map((col) => col.etiqueta),
+            );
+            opciones = {
+              columnas: campo.columnas.map((col, iCol) => {
+                const base: ColumnaCampoTabla = {
+                  clave: claves[iCol],
+                  etiqueta: col.etiqueta,
+                  tipoCampo: col.tipoCampo,
+                  esObligatorio: col.esObligatorio ?? false,
+                };
+                if (col.tipoCampo === "SELECCION_UNICA") {
+                  base.opciones = {
+                    valores: col.claveOpciones
+                      .split("\n")
+                      .map((v) => v.trim())
+                      .filter(Boolean),
+                  };
+                }
+                return base;
+              }),
+            };
+          } else if (TIPOS_CON_OPCIONES.includes(campo.tipoCampo)) {
+            opciones = {
+              valores: campo.claveOpciones
+                .split("\n")
+                .map((v) => v.trim())
+                .filter(Boolean),
+            };
+          }
 
           return {
             id: campo.id,
@@ -276,6 +443,9 @@ export function EditorPlantillaFormulario({
       setGuardando(false);
     }
   }
+
+  const tiposDisponibles =
+    tipoPlantilla === "GRUPAL" ? TIPOS_CAMPO_GRUPAL : TIPOS_CAMPO_BASE;
 
   if (cargando) return <Spinner />;
 
@@ -345,7 +515,7 @@ export function EditorPlantillaFormulario({
                     name="tipoPlantilla"
                     value="INDIVIDUAL"
                     checked={tipoPlantilla === "INDIVIDUAL"}
-                    onChange={() => setTipoPlantilla("INDIVIDUAL")}
+                    onChange={() => cambiarTipoPlantilla("INDIVIDUAL")}
                   />
                   Individual (principal)
                 </label>
@@ -355,14 +525,14 @@ export function EditorPlantillaFormulario({
                     name="tipoPlantilla"
                     value="GRUPAL"
                     checked={tipoPlantilla === "GRUPAL"}
-                    onChange={() => setTipoPlantilla("GRUPAL")}
+                    onChange={() => cambiarTipoPlantilla("GRUPAL")}
                   />
                   Grupal · lista de asistencia
                 </label>
               </div>
               <p className="mt-2 text-xs text-zinc-500">
                 {tipoPlantilla === "GRUPAL"
-                  ? "Los campos se repiten por cada asistente (N filas). Ideal: nombre, firma, etc."
+                  ? "Combina datos del evento (fecha, lugar, actividad…) con una o más tablas de asistencia de columnas flexibles."
                   : "Un envío por jornada. Es el formulario principal de campo."}
               </p>
             </div>
@@ -448,9 +618,18 @@ export function EditorPlantillaFormulario({
 
         <div className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-900">
-              Campos del formulario
-            </h3>
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-900">
+                Campos del formulario
+              </h3>
+              {tipoPlantilla === "GRUPAL" ? (
+                <p className="mt-1 text-xs text-zinc-500">
+                  Campos normales = datos del evento (una sola vez). Tipo{" "}
+                  <strong>Tabla</strong> = lista de asistencia con columnas
+                  configurables.
+                </p>
+              ) : null}
+            </div>
             <button
               type="button"
               onClick={agregarCampo}
@@ -468,7 +647,9 @@ export function EditorPlantillaFormulario({
               >
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                    Campo {indice + 1}
+                    {campo.tipoCampo === "TABLA"
+                      ? `Tabla ${indice + 1}`
+                      : `Campo ${indice + 1}`}
                   </span>
                   <div className="flex items-center gap-1">
                     <button
@@ -504,7 +685,9 @@ export function EditorPlantillaFormulario({
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-zinc-600">
-                      Etiqueta
+                      {campo.tipoCampo === "TABLA"
+                        ? "Nombre de la lista"
+                        : "Etiqueta"}
                     </label>
                     <input
                       required
@@ -512,11 +695,14 @@ export function EditorPlantillaFormulario({
                       onChange={(e) =>
                         actualizarCampo(indice, {
                           etiqueta: e.target.value,
-                          clave:
-                            campo.clave || generarClave(e.target.value),
+                          clave: generarClave(e.target.value),
                         })
                       }
-                      placeholder="Ej: ¿Cuántas hectáreas se sembraron?"
+                      placeholder={
+                        campo.tipoCampo === "TABLA"
+                          ? "Ej: Listado de asistencia"
+                          : "Ej: ¿Cuántas hectáreas se sembraron?"
+                      }
                       className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
                     />
                   </div>
@@ -533,7 +719,7 @@ export function EditorPlantillaFormulario({
                       }
                       className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
                     >
-                      {TIPOS_CAMPO.map((tipo) => (
+                      {tiposDisponibles.map((tipo) => (
                         <option key={tipo.valor} value={tipo.valor}>
                           {tipo.etiqueta}
                         </option>
@@ -561,6 +747,113 @@ export function EditorPlantillaFormulario({
                   </div>
                 ) : null}
 
+                {campo.tipoCampo === "TABLA" ? (
+                  <div className="mt-4 space-y-3 rounded-lg border border-dashed border-zinc-200 bg-zinc-50/60 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                        Columnas de la tabla
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => agregarColumna(indice)}
+                        className="rounded-lg border border-ruralia-teal-border px-2.5 py-1 text-xs font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft"
+                      >
+                        + Columna
+                      </button>
+                    </div>
+                    {campo.columnas.map((columna, indiceCol) => (
+                      <div
+                        key={indiceCol}
+                        className="rounded-lg border border-zinc-200 bg-white p-3"
+                      >
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-xs text-zinc-400">
+                            Columna {indiceCol + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => eliminarColumna(indice, indiceCol)}
+                            disabled={campo.columnas.length <= 1}
+                            className="rounded px-2 py-0.5 text-xs text-red-500 hover:bg-red-50 disabled:opacity-30"
+                          >
+                            Quitar
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-zinc-600">
+                              Etiqueta
+                            </label>
+                            <input
+                              required
+                              value={columna.etiqueta}
+                              onChange={(e) =>
+                                actualizarColumna(indice, indiceCol, {
+                                  etiqueta: e.target.value,
+                                  clave: generarClave(e.target.value),
+                                })
+                              }
+                              placeholder="Ej: Nombre"
+                              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-zinc-600">
+                              Tipo
+                            </label>
+                            <select
+                              value={columna.tipoCampo}
+                              onChange={(e) =>
+                                actualizarColumna(indice, indiceCol, {
+                                  tipoCampo: e.target
+                                    .value as TipoCampoColumnaTabla,
+                                })
+                              }
+                              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
+                            >
+                              {TIPOS_COLUMNA_TABLA.map((tipo) => (
+                                <option key={tipo.valor} value={tipo.valor}>
+                                  {tipo.etiqueta}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        {columna.tipoCampo === "SELECCION_UNICA" ? (
+                          <div className="mt-2">
+                            <label className="mb-1 block text-xs font-medium text-zinc-600">
+                              Opciones (una por línea)
+                            </label>
+                            <textarea
+                              value={columna.claveOpciones}
+                              onChange={(e) =>
+                                actualizarColumna(indice, indiceCol, {
+                                  claveOpciones: e.target.value,
+                                })
+                              }
+                              rows={2}
+                              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
+                            />
+                          </div>
+                        ) : null}
+                        <label className="mt-2 flex items-center gap-2 text-xs text-zinc-700">
+                          <input
+                            type="checkbox"
+                            checked={columna.esObligatorio ?? false}
+                            onChange={(e) =>
+                              actualizarColumna(indice, indiceCol, {
+                                esObligatorio: e.target.checked,
+                              })
+                            }
+                            className="rounded border-zinc-300"
+                          />
+                          Columna obligatoria
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
                 <label className="mt-3 flex items-center gap-2 text-sm text-zinc-700">
                   <input
                     type="checkbox"
@@ -572,7 +865,9 @@ export function EditorPlantillaFormulario({
                     }
                     className="rounded border-zinc-300"
                   />
-                  Campo obligatorio
+                  {campo.tipoCampo === "TABLA"
+                    ? "Tabla obligatoria (al menos una fila)"
+                    : "Campo obligatorio"}
                 </label>
               </div>
             ))}

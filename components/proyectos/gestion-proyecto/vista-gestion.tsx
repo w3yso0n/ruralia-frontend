@@ -30,6 +30,15 @@ import type {
 
 type Tab = "resumen" | "plan" | "jornadas" | "equipo";
 
+const TABS_VALIDOS: Tab[] = ["resumen", "plan", "jornadas", "equipo"];
+
+function tabDesdeParam(valor: string | null): Tab {
+  if (valor && TABS_VALIDOS.includes(valor as Tab)) {
+    return valor as Tab;
+  }
+  return "resumen";
+}
+
 interface VistaGestionProyectoProps {
   proyectoId: string;
 }
@@ -37,13 +46,10 @@ interface VistaGestionProyectoProps {
 export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tabInicial = searchParams.get("tab");
   const { token } = useAuth();
   const { puede } = usePermisos();
-  const [tab, setTab] = useState<Tab>(
-    tabInicial === "jornadas" || tabInicial === "equipo" || tabInicial === "plan"
-      ? tabInicial
-      : "resumen",
+  const [tab, setTab] = useState<Tab>(() =>
+    tabDesdeParam(searchParams.get("tab")),
   );
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [plan, setPlan] = useState<PlanProyecto | null>(null);
@@ -113,6 +119,28 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  useEffect(() => {
+    setTab(tabDesdeParam(searchParams.get("tab")));
+  }, [searchParams]);
+
+  function cambiarTab(nueva: Tab) {
+    setTab(nueva);
+    const params = new URLSearchParams(searchParams.toString());
+    if (nueva === "resumen") {
+      params.delete("tab");
+    } else {
+      params.set("tab", nueva);
+    }
+    if (nueva !== "jornadas") {
+      params.delete("jornadaId");
+    }
+    const qs = params.toString();
+    router.replace(
+      qs ? `/proyectos/${proyectoId}?${qs}` : `/proyectos/${proyectoId}`,
+      { scroll: false },
+    );
+  }
 
   useEffect(() => {
     if (tab !== "plan") return;
@@ -356,7 +384,7 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
           <button
             key={t.id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => cambiarTab(t.id)}
             className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium ${
               tab === t.id
                 ? "border-ruralia-teal text-ruralia-teal-text"
@@ -373,7 +401,7 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
           <ResumenAsignaciones
             proyecto={proyecto}
             puedeGestionar={puedeGestionar}
-            onIrAEquipo={() => setTab("equipo")}
+            onIrAEquipo={() => cambiarTab("equipo")}
           />
           {estadisticas ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

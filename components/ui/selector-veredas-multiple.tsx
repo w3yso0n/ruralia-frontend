@@ -9,7 +9,16 @@ import {
   listarVeredasPorMunicipio,
   resolverVereda,
 } from "@/lib/api";
-import { cargarGoogleMaps, parseGooglePlace } from "@/lib/google-maps";
+import {
+  CENTRO_COLOMBIA,
+  GOOGLE_MAP_ID,
+  cargarGoogleMaps,
+  cargarGoogleMapsDashboard,
+  crearContenidoMarcadorPin,
+  geocodificarInverso,
+  parseGooglePlace,
+  type DatosLugarGoogle,
+} from "@/lib/google-maps";
 import type { NodoTerritorial, Vereda, VeredaResumen } from "@/lib/types";
 
 type ModoSeleccion = "maps" | "dane";
@@ -19,6 +28,8 @@ interface VeredaOpcion {
   nombre: string;
   municipioNombre?: string;
   departamentoNombre?: string;
+  latitud?: number;
+  longitud?: number;
 }
 
 interface SelectorVeredasMultipleProps {
@@ -43,7 +54,18 @@ function aOpcion(v: Vereda | VeredaResumen): VeredaOpcion {
     municipioNombre: "municipioNombre" in v ? v.municipioNombre : undefined,
     departamentoNombre:
       "departamentoNombre" in v ? v.departamentoNombre : undefined,
+    latitud: v.latitud ?? undefined,
+    longitud: v.longitud ?? undefined,
   };
+}
+
+function tieneUbicacion(v: VeredaOpcion): boolean {
+  return (
+    v.latitud != null &&
+    v.longitud != null &&
+    Number.isFinite(v.latitud) &&
+    Number.isFinite(v.longitud)
+  );
 }
 
 export function SelectorVeredasMultiple({
@@ -55,7 +77,16 @@ export function SelectorVeredasMultiple({
 }: SelectorVeredasMultipleProps) {
   const contenedorRef = useRef<HTMLDivElement>(null);
   const inputMapsRef = useRef<HTMLInputElement>(null);
+  const mapaContenedorRef = useRef<HTMLDivElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const mapaRef = useRef<google.maps.Map | null>(null);
+  const marcadorRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(
+    null,
+  );
+  const advancedMarkerCtorRef = useRef<
+    typeof google.maps.marker.AdvancedMarkerElement | null
+  >(null);
+  const listenersMapaRef = useRef<google.maps.MapsEventListener[]>([]);
   const valueRef = useRef(value);
   valueRef.current = value;
 
@@ -66,8 +97,17 @@ export function SelectorVeredasMultiple({
   const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [resolviendo, setResolviendo] = useState(false);
+  const [geocodificando, setGeocodificando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [googleDisponible, setGoogleDisponible] = useState(false);
+  const [mapaListo, setMapaListo] = useState(false);
+  const [ubicacionPendiente, setUbicacionPendiente] =
+    useState<DatosLugarGoogle | null>(null);
+  const [enfoqueMapa, setEnfoqueMapa] = useState<{
+    lat: number;
+    lng: number;
+    nombre: string;
+  } | null>(null);
   const [catalogo, setCatalogo] = useState<Map<string, VeredaOpcion>>(
     () => new Map(veredasIniciales.map((v) => [v.id, aOpcion(v)])),
   );
@@ -89,9 +129,23 @@ export function SelectorVeredasMultiple({
     setCatalogo((prev) => {
       const siguiente = new Map(prev);
       for (const v of veredasIniciales) {
-        if (!siguiente.has(v.id)) {
-          siguiente.set(v.id, aOpcion(v));
-        }
+        const opcion = aOpcion(v);
+        const previa = siguiente.get(v.id);
+        siguiente.set(
+          v.id,
+          previa
+            ? {
+                ...previa,
+                ...opcion,
+                latitud: opcion.latitud ?? previa.latitud,
+                longitud: opcion.longitud ?? previa.longitud,
+                municipioNombre:
+                  opcion.municipioNombre ?? previa.municipioNombre,
+                departamentoNombre:
+                  opcion.departamentoNombre ?? previa.departamentoNombre,
+              }
+            : opcion,
+        );
       }
       return siguiente;
     });
@@ -126,21 +180,22 @@ export function SelectorVeredasMultiple({
   );
 
   const registrarDesdeMaps = useCallback(
-    async (payload: {
-      nombreVereda: string;
-      municipio?: string;
-      departamento?: string;
-      corregimiento?: string;
-      placeId?: string;
-      latitud?: number;
-      longitud?: number;
-    }) => {
+    async (payload: DatosLugarGoogle) => {
       setResolviendo(true);
       setError(null);
       try {
-        const vereda = await resolverVereda(token, payload);
+        const vereda = await resolverVereda(token, {
+          nombreVereda: payload.nombreVereda,
+          municipio: payload.municipio,
+          departamento: payload.departamento,
+          corregimiento: payload.corregimiento,
+          placeId: payload.placeId,
+          latitud: payload.latitud,
+          longitud: payload.longitud,
+        });
         agregarVereda(aOpcion(vereda));
         setBusquedaMaps("");
+        setUbicacionPendiente(null);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "No se pudo registrar la vereda",
@@ -152,14 +207,86 @@ export function SelectorVeredasMultiple({
     [token, agregarVereda],
   );
 
+  const resolverClickMapa = useCallback(
+    async (latitud: number, longitud: number) => {
+      setGeocodificando(true);
+      setError(null);
+      try {
+        const datos = await geocodificarInverso(latitud, longitud);
+        if (!datos) {
+          setError("No se pudo identificar la ubicación en el mapa");
+          return;
+        }
+        setUbicacionPendiente(datos);
+        setBusquedaMaps(datos.direccion ?? datos.nombreVereda);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo geocodificar la ubicación",
+        );
+      } finally {
+        setGeocodificando(false);
+      }
+    },
+    [],
+  );
+
+  const resolverClickMapaRef = useRef(resolverClickMapa);
+  resolverClickMapaRef.current = resolverClickMapa;
+
+  const colocarPin = useCallback(
+    (
+      AdvancedMarkerElement: typeof google.maps.marker.AdvancedMarkerElement,
+      posicion: google.maps.LatLngLiteral,
+    ) => {
+      if (!mapaRef.current) return;
+
+      if (marcadorRef.current) {
+        marcadorRef.current.position = posicion;
+        return;
+      }
+
+      const marcador = new AdvancedMarkerElement({
+        map: mapaRef.current,
+        position: posicion,
+        gmpDraggable: true,
+        title: "Ubicación seleccionada",
+        content: crearContenidoMarcadorPin("#42827A"),
+      });
+
+      marcador.addListener("dragend", () => {
+        const pos = marcador.position;
+        if (!pos) return;
+        const lat =
+          typeof pos.lat === "function"
+            ? pos.lat()
+            : (pos as google.maps.LatLngLiteral).lat;
+        const lng =
+          typeof pos.lng === "function"
+            ? pos.lng()
+            : (pos as google.maps.LatLngLiteral).lng;
+        void resolverClickMapaRef.current(lat, lng);
+      });
+
+      marcadorRef.current = marcador;
+    },
+    [],
+  );
+
+  const colocarPinRef = useRef(colocarPin);
+  colocarPinRef.current = colocarPin;
+
   useEffect(() => {
     if (modo !== "maps" || !tieneGoogle || !inputMapsRef.current) return;
 
     let cancelado = false;
 
-    void cargarGoogleMaps()
-      .then((google) => {
-        if (cancelado || !inputMapsRef.current) return;
+    void Promise.all([cargarGoogleMaps(), cargarGoogleMapsDashboard()])
+      .then(([google, libs]) => {
+        if (cancelado || !inputMapsRef.current || !mapaContenedorRef.current) {
+          return;
+        }
         setGoogleDisponible(true);
 
         if (autocompleteRef.current) {
@@ -183,16 +310,61 @@ export function SelectorVeredasMultiple({
         autocomplete.addListener("place_changed", () => {
           const place = autocomplete.getPlace();
           if (!place.place_id) return;
-          void registrarDesdeMaps(parseGooglePlace(place));
+          const datos = parseGooglePlace(place);
+          if (
+            datos.latitud != null &&
+            datos.longitud != null &&
+            mapaRef.current
+          ) {
+            const posicion = { lat: datos.latitud, lng: datos.longitud };
+            colocarPinRef.current(libs.AdvancedMarkerElement, posicion);
+            mapaRef.current.panTo(posicion);
+            mapaRef.current.setZoom(
+              Math.max(mapaRef.current.getZoom() ?? 12, 14),
+            );
+          }
+          void registrarDesdeMaps(datos);
         });
 
         autocompleteRef.current = autocomplete;
+
+        if (!mapaRef.current) {
+          const mapa = new libs.Map(mapaContenedorRef.current, {
+            center: CENTRO_COLOMBIA,
+            zoom: 6,
+            mapId: GOOGLE_MAP_ID,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: true,
+            clickableIcons: false,
+          });
+
+          const clickListener = mapa.addListener(
+            "click",
+            (evento: google.maps.MapMouseEvent) => {
+              const latLng = evento.latLng;
+              if (!latLng) return;
+              const posicion = { lat: latLng.lat(), lng: latLng.lng() };
+              colocarPinRef.current(libs.AdvancedMarkerElement, posicion);
+              void resolverClickMapaRef.current(posicion.lat, posicion.lng);
+            },
+          );
+
+          listenersMapaRef.current = [clickListener];
+          mapaRef.current = mapa;
+        }
+
+        advancedMarkerCtorRef.current = libs.AdvancedMarkerElement;
+        setMapaListo(true);
       })
       .catch(() => {
-        setGoogleDisponible(false);
-        setError(
-          "No se pudo cargar Google Maps. Usa el catálogo DANE o recarga la página.",
-        );
+        if (!cancelado) {
+          setGoogleDisponible(false);
+          setMapaListo(false);
+          setError(
+            "No se pudo cargar Google Maps. Usa el catálogo DANE o recarga la página.",
+          );
+        }
       });
 
     return () => {
@@ -205,6 +377,51 @@ export function SelectorVeredasMultiple({
       }
     };
   }, [modo, tieneGoogle, registrarDesdeMaps]);
+
+  useEffect(() => {
+    if (modo === "maps") return;
+
+    listenersMapaRef.current.forEach((listener) => listener.remove());
+    listenersMapaRef.current = [];
+    if (marcadorRef.current) {
+      marcadorRef.current.map = null;
+      marcadorRef.current = null;
+    }
+    mapaRef.current = null;
+    advancedMarkerCtorRef.current = null;
+    setMapaListo(false);
+    setUbicacionPendiente(null);
+    setEnfoqueMapa(null);
+  }, [modo]);
+
+  useEffect(() => {
+    if (!mapaListo || !enfoqueMapa || !mapaRef.current) return;
+    const ctor = advancedMarkerCtorRef.current;
+    if (!ctor) return;
+
+    const posicion = { lat: enfoqueMapa.lat, lng: enfoqueMapa.lng };
+    colocarPin(ctor, posicion);
+    mapaRef.current.panTo(posicion);
+    mapaRef.current.setZoom(15);
+    setUbicacionPendiente(null);
+    setBusquedaMaps(enfoqueMapa.nombre);
+  }, [mapaListo, enfoqueMapa, colocarPin]);
+
+  function enfocarVeredaEnMapa(vereda: VeredaOpcion) {
+    if (!tieneUbicacion(vereda)) {
+      setError(
+        "Esta vereda no tiene ubicación exacta guardada. Agrégala desde Google Maps.",
+      );
+      return;
+    }
+    setError(null);
+    setEnfoqueMapa({
+      lat: vereda.latitud!,
+      lng: vereda.longitud!,
+      nombre: etiquetaVereda(vereda),
+    });
+    setModo("maps");
+  }
 
   useEffect(() => {
     if (modo !== "dane") return;
@@ -343,14 +560,38 @@ export function SelectorVeredasMultiple({
         <div className="flex flex-wrap gap-2">
           {value.map((id) => {
             const vereda = catalogo.get(id);
+            const georreferenciada = vereda ? tieneUbicacion(vereda) : false;
             return (
               <span
                 key={id}
-                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-ruralia-teal-border bg-ruralia-teal-soft/50 py-1 pl-3 pr-1.5 text-sm text-zinc-800"
+                className={`inline-flex max-w-full items-center gap-1.5 rounded-full border py-1 pl-3 pr-1.5 text-sm text-zinc-800 ${
+                  georreferenciada
+                    ? "border-ruralia-teal-border bg-ruralia-teal-soft/50"
+                    : "border-zinc-200 bg-zinc-50"
+                }`}
               >
-                <span className="truncate">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!vereda) return;
+                    enfocarVeredaEnMapa(vereda);
+                  }}
+                  title={
+                    georreferenciada
+                      ? "Ver ubicación exacta en el mapa"
+                      : "Sin ubicación exacta guardada"
+                  }
+                  className={`truncate text-left transition ${
+                    georreferenciada
+                      ? "hover:text-ruralia-teal-text"
+                      : "cursor-default"
+                  }`}
+                >
+                  {georreferenciada ? (
+                    <MapPin className="mr-1 inline h-3.5 w-3.5 text-ruralia-teal-text" />
+                  ) : null}
                   {vereda ? etiquetaVereda(vereda) : "Vereda seleccionada"}
-                </span>
+                </button>
                 <button
                   type="button"
                   onClick={() => quitar(id)}
@@ -572,8 +813,8 @@ export function SelectorVeredasMultiple({
             <>
               <p className="text-xs text-zinc-500">
                 {googleDisponible
-                  ? "Busca una vereda, corregimiento o localidad rural en Colombia y se agregará al proyecto."
-                  : "Cargando búsqueda con Google Maps…"}
+                  ? "Busca un lugar o haz clic en el mapa para colocar un pin y elegir la ubicación exacta."
+                  : "Cargando mapa y búsqueda con Google Maps…"}
               </p>
               <div className="relative">
                 <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
@@ -587,6 +828,73 @@ export function SelectorVeredasMultiple({
                   className="w-full rounded-xl border border-zinc-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-ruralia-teal focus:ring-4 focus:ring-ruralia-teal/10 disabled:opacity-60"
                 />
               </div>
+
+              <div className="relative overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">
+                <div
+                  ref={mapaContenedorRef}
+                  className="h-64 w-full sm:h-72"
+                  aria-label="Mapa para seleccionar ubicación"
+                />
+                {!mapaListo ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-zinc-100/80 text-sm text-zinc-500">
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Cargando mapa…
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              {geocodificando ? (
+                <p className="flex items-center gap-2 text-xs text-zinc-500">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Identificando ubicación…
+                </p>
+              ) : null}
+
+              {ubicacionPendiente && !resolviendo ? (
+                <div className="flex flex-col gap-3 rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft/30 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-zinc-900">
+                      {ubicacionPendiente.nombreVereda}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-zinc-600">
+                      {[
+                        ubicacionPendiente.municipio,
+                        ubicacionPendiente.departamento,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") ||
+                        ubicacionPendiente.direccion ||
+                        "Ubicación en el mapa"}
+                    </p>
+                    {ubicacionPendiente.latitud != null &&
+                    ubicacionPendiente.longitud != null ? (
+                      <p className="mt-0.5 text-[11px] text-zinc-400">
+                        {ubicacionPendiente.latitud.toFixed(5)},{" "}
+                        {ubicacionPendiente.longitud.toFixed(5)}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setUbicacionPendiente(null)}
+                      className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-white"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void registrarDesdeMaps(ubicacionPendiente)}
+                      className="rounded-lg bg-ruralia-teal px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-ruralia-teal/90"
+                    >
+                      Agregar ubicación
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               {resolviendo ? (
                 <p className="flex items-center gap-2 text-xs text-zinc-500">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

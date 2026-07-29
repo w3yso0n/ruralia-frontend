@@ -40,8 +40,17 @@ export function ArbolJornadas({
             >
               <span>
                 <span className="font-medium">
-                  {new Date(jornada.fecha).toLocaleDateString("es-CO")}
+                  {jornada.nombre?.trim()
+                    ? jornada.nombre
+                    : new Date(jornada.fecha).toLocaleDateString("es-CO")}
                 </span>
+                {jornada.nombre?.trim() ? (
+                  <span
+                    className={`ml-2 text-xs ${activa ? "text-white/85" : "text-zinc-400"}`}
+                  >
+                    {new Date(jornada.fecha).toLocaleDateString("es-CO")}
+                  </span>
+                ) : null}
                 <span
                   className={`ml-2 text-xs ${activa ? "text-white/85" : "text-zinc-400"}`}
                 >

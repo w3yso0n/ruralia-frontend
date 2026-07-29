@@ -220,9 +220,24 @@ export function crearContenidoMarcadorCircular(
   return el;
 }
 
-export function parseGooglePlace(
-  place: google.maps.places.PlaceResult,
-): {
+/** Pin clásico (punta abajo) para selección exacta en el mapa. */
+export function crearContenidoMarcadorPin(
+  color = "#42827A",
+): HTMLDivElement {
+  const el = document.createElement("div");
+  el.style.width = "28px";
+  el.style.height = "40px";
+  el.style.transform = "translateY(-100%)";
+  el.style.cursor = "grab";
+  el.style.filter = "drop-shadow(0 2px 4px rgba(0,0,0,0.35))";
+  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="40" viewBox="0 0 28 40" aria-hidden="true">
+    <path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.268 21.732 0 14 0z" fill="${color}"/>
+    <circle cx="14" cy="14" r="5.5" fill="#ffffff"/>
+  </svg>`;
+  return el;
+}
+
+export type DatosLugarGoogle = {
   nombreVereda: string;
   municipio?: string;
   departamento?: string;
@@ -230,7 +245,32 @@ export function parseGooglePlace(
   placeId?: string;
   latitud?: number;
   longitud?: number;
-} {
+  direccion?: string;
+};
+
+type LugarParseable = {
+  address_components?: google.maps.GeocoderAddressComponent[];
+  geometry?: {
+    location?: google.maps.LatLng | google.maps.LatLngLiteral | null;
+  } | null;
+  name?: string;
+  place_id?: string;
+  formatted_address?: string;
+};
+
+function latLngDeGeometry(
+  location?: google.maps.LatLng | google.maps.LatLngLiteral | null,
+): { lat?: number; lng?: number } {
+  if (!location) return {};
+  if (typeof (location as google.maps.LatLng).lat === "function") {
+    const latLng = location as google.maps.LatLng;
+    return { lat: latLng.lat(), lng: latLng.lng() };
+  }
+  const literal = location as google.maps.LatLngLiteral;
+  return { lat: literal.lat, lng: literal.lng };
+}
+
+export function parseGooglePlace(place: LugarParseable): DatosLugarGoogle {
   const componentes = place.address_components ?? [];
   const obtener = (tipo: string) =>
     componentes.find((c) => c.types.includes(tipo))?.long_name;
@@ -254,9 +294,12 @@ export function parseGooglePlace(
 
   let nombreVereda = (place.name ?? "").trim();
   if (!nombreVereda || nombreVereda.toLowerCase() === municipio?.toLowerCase()) {
-    nombreVereda = localidad || corregimiento || place.name || "Localidad rural";
+    nombreVereda =
+      localidad || corregimiento || place.name || "Localidad rural";
   }
   nombreVereda = nombreVereda.replace(/^vereda\s+/i, "").trim();
+
+  const { lat, lng } = latLngDeGeometry(place.geometry?.location);
 
   return {
     nombreVereda,
@@ -265,7 +308,42 @@ export function parseGooglePlace(
     corregimiento:
       corregimiento && corregimiento !== municipio ? corregimiento : undefined,
     placeId: place.place_id,
-    latitud: place.geometry?.location?.lat(),
-    longitud: place.geometry?.location?.lng(),
+    latitud: lat,
+    longitud: lng,
+    direccion: place.formatted_address,
+  };
+}
+
+/** Centro aproximado de Colombia para mapas de selección. */
+export const CENTRO_COLOMBIA = { lat: 4.570868, lng: -74.297333 } as const;
+
+export async function geocodificarInverso(
+  latitud: number,
+  longitud: number,
+): Promise<DatosLugarGoogle | null> {
+  await asegurarGoogleMapsBootstrap();
+  if (!mapsTieneImportLibrary()) {
+    throw new Error("Google Maps no expuso importLibrary tras la carga");
+  }
+
+  const { Geocoder } = (await google.maps.importLibrary(
+    "geocoding",
+  )) as google.maps.GeocodingLibrary;
+
+  const geocoder = new Geocoder();
+  const respuesta = await geocoder.geocode({
+    location: { lat: latitud, lng: longitud },
+    language: "es",
+    region: "CO",
+  });
+
+  const resultado = respuesta.results?.[0];
+  if (!resultado) return null;
+
+  const datos = parseGooglePlace(resultado);
+  return {
+    ...datos,
+    latitud,
+    longitud,
   };
 }

@@ -11,6 +11,7 @@ interface FormularioJornadaProps {
   onSubmit: (datos: {
     fecha: string;
     veredaId: string;
+    nombre?: string;
     observaciones?: string;
     metaId: string;
     tipo: TipoJornada;
@@ -23,6 +24,7 @@ export function FormularioJornada({
   enviando,
   onSubmit,
 }: FormularioJornadaProps) {
+  const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState("");
   const [veredaId, setVeredaId] = useState(veredas[0]?.id ?? "");
   const [observaciones, setObservaciones] = useState("");
@@ -49,11 +51,13 @@ export function FormularioJornada({
     await onSubmit({
       fecha,
       veredaId,
+      nombre: nombre.trim() || undefined,
       observaciones: observaciones.trim() || undefined,
       metaId,
       tipo: esGrupal ? "GRUPAL" : "INDIVIDUAL",
     });
 
+    setNombre("");
     setFecha("");
     setObservaciones("");
     setMetaId("");
@@ -67,6 +71,23 @@ export function FormularioJornada({
           ? "Actividad grupal: usará el formulario grupal asignado al proceso de la meta (lista de asistencia con filas repetibles)."
           : "Registra la jornada de campo seleccionando la meta del plan a la que aporta esta visita. La meta define qué formularios estarán disponibles en el celular."}
       </p>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-zinc-700">
+          Nombre de identificación
+        </label>
+        <input
+          type="text"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          maxLength={200}
+          placeholder="Ej: Jornada 1"
+          className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+        />
+        <p className="mt-1 text-xs text-zinc-500">
+          Opcional. Ayuda a distinguir esta jornada en el panel y en la app.
+        </p>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
