@@ -104,7 +104,43 @@ export type EstadoJornada =
   | "COMPLETADA"
   | "CANCELADA";
 
+export type EstadoFuncional =
+  | "BORRADOR"
+  | "CAPTURADO"
+  | "SINCRONIZADO"
+  | "EN_REVISION"
+  | "APROBADO"
+  | "RECHAZADO"
+  | "EN_CORRECCION";
+
 export type TipoJornada = "INDIVIDUAL" | "GRUPAL";
+
+export type CategoriaRechazo =
+  | "INFORMACION_INCOMPLETA"
+  | "DOCUMENTO_INCORRECTO"
+  | "FIRMA_FALTANTE"
+  | "EVIDENCIA_FALTANTE"
+  | "FOTOGRAFIA_INVALIDA"
+  | "FOTOGRAFIA_BORROSA"
+  | "UBICACION_INCORRECTA"
+  | "BENEFICIARIO_INCORRECTO"
+  | "ASOCIACION_INCORRECTA"
+  | "INCONSISTENCIA_FORMULARIO_DOCUMENTO"
+  | "OTRO";
+
+export type EntidadRevisable = "JORNADA" | "DOCUMENTO" | "EVIDENCIA";
+
+export type AccionAuditoria =
+  | "CREATE"
+  | "UPDATE"
+  | "DELETE_LOGICAL"
+  | "SUBMIT_FOR_REVIEW"
+  | "APPROVE"
+  | "REJECT"
+  | "RESUBMIT"
+  | "GENERATE_DOCUMENT"
+  | "CREATE_VERSION"
+  | "SYNC";
 
 export type EstadoEjecucionJornada = "PENDIENTE" | "EN_PROGRESO" | "COMPLETADA";
 
@@ -287,6 +323,7 @@ export interface Jornada {
   id: string;
   fecha: string;
   estado: EstadoJornada;
+  estadoFuncional?: EstadoFuncional;
   tipo?: TipoJornada;
   nombre?: string | null;
   observaciones?: string;
@@ -299,6 +336,86 @@ export interface Jornada {
   asistentes?: JornadaAsistente[];
   grupoJornadaId?: string | null;
   grupo?: HermanoGrupoJornada[];
+}
+
+export interface ContadoresAprobacion {
+  borradores: number;
+  enRevision: number;
+  rechazadas: number;
+  enCorreccion: number;
+  aprobadas: number;
+  pendientesRevision: number;
+}
+
+export interface RechazoAbiertoBandeja {
+  id: string;
+  entityType: EntidadRevisable;
+  category: CategoriaRechazo;
+  reason: string;
+  requestedCorrection: string;
+  rejectedAt: string;
+  rejectedBy: string | null;
+}
+
+export interface ItemBandejaAprobacion {
+  id: string;
+  fecha: string;
+  nombre?: string | null;
+  tipo?: TipoJornada;
+  estado: EstadoJornada;
+  estadoFuncional: EstadoFuncional;
+  proyecto: { id: string; nombre: string } | null;
+  tecnicoResponsable: { id: string; nombre: string } | null;
+  meta: { id: string; nombre: string } | null;
+  vereda: { id: string; nombre: string } | null;
+  editable: boolean;
+  rechazosAbiertos: RechazoAbiertoBandeja[];
+}
+
+export interface BandejaAprobacion {
+  vista: "tecnico" | "supervisor" | "coordinacion";
+  contadores: ContadoresAprobacion;
+  items: ItemBandejaAprobacion[];
+}
+
+export interface AuditLogItem {
+  id: string;
+  entityType: string;
+  entityId: string;
+  field?: string | null;
+  previousValue?: unknown;
+  newValue?: unknown;
+  reason?: string | null;
+  action: AccionAuditoria;
+  userId: string;
+  userRole: string;
+  createdAt: string;
+  projectId: string;
+  jornadaId?: string | null;
+  documentId?: string | null;
+  documentVersionId?: string | null;
+  source?: string | null;
+}
+
+export interface DocumentoVersion {
+  id: string;
+  versionNumber: number;
+  status: string;
+  changeReason?: string | null;
+  filePath?: string | null;
+  previousVersionId?: string | null;
+  createdAt: string;
+  snapshot?: Record<string, unknown> | null;
+}
+
+export interface DocumentoJornada {
+  id: string;
+  tipo: string;
+  titulo: string;
+  estadoFuncional: EstadoFuncional;
+  versionVigenteId?: string | null;
+  versiones?: DocumentoVersion[];
+  creadoEn: string;
 }
 
 export interface CrearJornadasResultado {

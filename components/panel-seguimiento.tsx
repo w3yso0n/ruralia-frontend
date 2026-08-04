@@ -5,18 +5,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alerta, Spinner } from "@/components/ui/modal";
 import {
+  listarActoresCronologia,
   listarCronologiaActor,
   listarCronologiaProyecto,
   listarProyectos,
-  listarUsuarios,
   obtenerResumenCronologiaProyecto,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { usePermisos } from "@/lib/use-permisos";
 import type {
   EventoCronologia,
   Proyecto,
   ResumenCronologiaProyecto,
-  Usuario,
 } from "@/lib/types";
 
 type ModoSeguimiento = "persona" | "proyecto";
@@ -24,9 +24,11 @@ type PeriodoFiltro = "7" | "30" | "90" | "todo";
 
 const LIMITE_PAGINA = 30;
 
-function esAgenteCampo(usuario: Usuario): boolean {
-  return (usuario.roles ?? []).some((rol) => rol.nombre === "CAMPO");
-}
+type ActorSeguimiento = {
+  id: string;
+  nombreCompleto: string;
+  correo: string;
+};
 
 function etiquetaAccion(accion: string): string {
   switch (accion) {
@@ -42,6 +44,16 @@ function etiquetaAccion(accion: string): string {
       return "Actividad";
     case "SUBACTIVIDAD_COMPLETADA":
       return "Subactividad";
+    case "JORNADA_ENVIADA_REVISION":
+      return "Enviada a revisión";
+    case "JORNADA_REENVIADA_REVISION":
+      return "Reenviada a revisión";
+    case "JORNADA_APROBADA":
+      return "Aprobada";
+    case "JORNADA_RECHAZADA":
+      return "Rechazada";
+    case "DOCUMENTO_VERSION_CREADA":
+      return "Nueva versión doc.";
     default:
       return accion;
   }
@@ -166,16 +178,19 @@ function ItemEvento({
 
 export function PanelSeguimiento() {
   const { token } = useAuth();
+  const { puede } = usePermisos();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const modoInicial =
-    searchParams.get("modo") === "proyecto" ? "proyecto" : "persona";
+  const puedeSeguimiento = puede("proyectos.ver") || puede("jornadas.ver");
+
+  const modoInicial: ModoSeguimiento =
+    searchParams.get("modo") === "persona" ? "persona" : "proyecto";
   const idInicial = searchParams.get("id") ?? "";
 
   const [modo, setModo] = useState<ModoSeguimiento>(modoInicial);
   const [seleccionId, setSeleccionId] = useState(idInicial);
-  const [agentes, setAgentes] = useState<Usuario[]>([]);
+  const [agentes, setAgentes] = useState<ActorSeguimiento[]>([]);
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -208,15 +223,15 @@ export function PanelSeguimiento() {
   );
 
   const cargarOpciones = useCallback(async () => {
-    if (!token) return;
+    if (!token || !puedeSeguimiento) return;
     setCargando(true);
     setError(null);
     try {
-      const [usuariosRes, proyectosRes] = await Promise.all([
-        listarUsuarios(token, { estaActivo: true, limite: 100 }),
+      const [actoresRes, proyectosRes] = await Promise.all([
+        listarActoresCronologia(token),
         listarProyectos(token, { limite: 100 }),
       ]);
-      setAgentes(usuariosRes.datos.filter(esAgenteCampo));
+      setAgentes(actoresRes);
       setProyectos(proyectosRes.datos);
     } catch (err) {
       setError(
@@ -225,7 +240,7 @@ export function PanelSeguimiento() {
     } finally {
       setCargando(false);
     }
-  }, [token]);
+  }, [token, puedeSeguimiento]);
 
   useEffect(() => {
     void cargarOpciones();
@@ -348,6 +363,15 @@ export function PanelSeguimiento() {
   const grupos = useMemo(() => agruparPorDia(eventos), [eventos]);
   const hayMas = pagina < totalPaginas;
   const filtrosProyectoActivos = Boolean(filtroAccion || filtroActorId);
+
+  if (!puedeSeguimiento) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+        No tienes permisos para ver Seguimiento. Se requiere acceso a proyectos
+        o jornadas.
+      </div>
+    );
+  }
 
   if (cargando) return <Spinner />;
 

@@ -12,9 +12,12 @@ import type {
   Asociacion,
   ActualizarAsociacionPayload,
   ActualizarBeneficiarioPayload,
+  AuditLogItem,
   AvancePeriodo,
+  BandejaAprobacion,
   Beneficiario,
   CompletarNodoPayload,
+  ContadoresAprobacion,
   CrearActividadPayload,
   CrearAsociacionPayload,
   CrearBeneficiarioPayload,
@@ -33,8 +36,11 @@ import type {
   CrearRolPayload,
   CrearSubactividadPayload,
   CrearUsuarioPayload,
+  CategoriaRechazo,
+  DocumentoJornada,
   EnviarFormularioPayload,
   EnvioFormularioResumen,
+  EntidadRevisable,
   EstadisticasProyecto,
   Jornada,
   KpisDashboard,
@@ -1270,6 +1276,15 @@ export async function asignarUsuariosPlantilla(
   );
 }
 
+export async function listarActoresCronologia(
+  token: string,
+): Promise<Array<{ id: string; nombreCompleto: string; correo: string }>> {
+  return fetchConAuth(
+    `/cronologia/actores`,
+    token,
+  );
+}
+
 export async function listarCronologiaActor(
   token: string,
   usuarioId: string,
@@ -1298,6 +1313,151 @@ export async function obtenerResumenCronologiaProyecto(
 ): Promise<ResumenCronologiaProyecto> {
   return fetchConAuth<ResumenCronologiaProyecto>(
     `/cronologia/proyecto/${proyectoId}/resumen`,
+    token,
+  );
+}
+
+/* ─── RF-18 / RF-19: aprobación, auditoría, documentos ─── */
+
+export async function obtenerBandejaAprobaciones(
+  token: string,
+  params?: {
+    vista?: "tecnico" | "supervisor" | "coordinacion";
+    estadoFuncional?: string;
+    proyectoId?: string;
+  },
+): Promise<BandejaAprobacion> {
+  return fetchConAuth<BandejaAprobacion>(
+    `/aprobaciones/bandeja${construirQuery(params)}`,
+    token,
+  );
+}
+
+export async function obtenerContadoresAprobacion(
+  token: string,
+): Promise<ContadoresAprobacion> {
+  return fetchConAuth<ContadoresAprobacion>(
+    `/aprobaciones/contadores`,
+    token,
+  );
+}
+
+export async function enviarJornadaARevision(
+  token: string,
+  jornadaId: string,
+  notas?: string,
+): Promise<unknown> {
+  return fetchConAuth(`/jornadas/${jornadaId}/enviar-revision`, token, {
+    method: "POST",
+    body: JSON.stringify({ notas }),
+  });
+}
+
+export async function reenviarJornadaARevision(
+  token: string,
+  jornadaId: string,
+  changeReason: string,
+): Promise<unknown> {
+  return fetchConAuth(`/jornadas/${jornadaId}/reenviar-revision`, token, {
+    method: "POST",
+    body: JSON.stringify({ changeReason }),
+  });
+}
+
+export async function aprobarEntidad(
+  token: string,
+  payload: {
+    entityType: EntidadRevisable;
+    entityId: string;
+    documentVersionId?: string;
+    notes?: string;
+  },
+): Promise<unknown> {
+  return fetchConAuth(`/aprobaciones/aprobar`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function rechazarEntidad(
+  token: string,
+  payload: {
+    entityType: EntidadRevisable;
+    entityId: string;
+    category: CategoriaRechazo;
+    reason: string;
+    requestedCorrection: string;
+    documentId?: string;
+    evidenceId?: string;
+  },
+): Promise<unknown> {
+  return fetchConAuth(`/aprobaciones/rechazar`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listarDocumentosJornada(
+  token: string,
+  jornadaId: string,
+): Promise<DocumentoJornada[]> {
+  return fetchConAuth<DocumentoJornada[]>(
+    `/documentos/jornada/${jornadaId}`,
+    token,
+  );
+}
+
+export async function listarAuditoria(
+  token: string,
+  params?: {
+    projectId?: string;
+    jornadaId?: string;
+    entityId?: string;
+    entityType?: string;
+    action?: string;
+    pagina?: number;
+    limite?: number;
+  },
+): Promise<RespuestaPaginada<AuditLogItem>> {
+  return fetchConAuth<RespuestaPaginada<AuditLogItem>>(
+    `/auditoria${construirQuery(params)}`,
+    token,
+  );
+}
+
+export async function compararVersionesDocumento(
+  token: string,
+  documentoId: string,
+  a: string,
+  b: string,
+): Promise<{
+  documentoId: string;
+  titulo?: string;
+  campos: Array<{
+    clave: string;
+    etiqueta: string;
+    tipo: string;
+    versionAnterior: unknown;
+    versionNueva: unknown;
+    cambio: boolean;
+  }>;
+  versionA: {
+    id: string;
+    versionNumber: number;
+    status: string;
+    createdAt: string;
+    changeReason?: string | null;
+  };
+  versionB: {
+    id: string;
+    versionNumber: number;
+    status: string;
+    createdAt: string;
+    changeReason?: string | null;
+  };
+}> {
+  return fetchConAuth(
+    `/documentos/${documentoId}/versiones/comparar?a=${a}&b=${b}`,
     token,
   );
 }

@@ -12,9 +12,12 @@ import {
   ClipboardList,
   MapPinned,
   Waypoints,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { obtenerContadoresAprobacion } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { usePermisos } from "@/lib/use-permisos";
 
 const ITEMS: {
@@ -23,6 +26,7 @@ const ITEMS: {
   icono: LucideIcon;
   permiso?: string;
   puedeAlgunoDe?: string[];
+  badgeKey?: "revision";
 }[] = [
   {
     href: "/dashboard",
@@ -31,10 +35,21 @@ const ITEMS: {
     permiso: "dashboard.ver",
   },
   {
+    href: "/revision",
+    etiqueta: "Revisión",
+    icono: Inbox,
+    puedeAlgunoDe: [
+      "jornadas.ver",
+      "jornadas.aprobar",
+      "jornadas.enviar_revision",
+    ],
+    badgeKey: "revision",
+  },
+  {
     href: "/seguimiento",
     etiqueta: "Seguimiento",
     icono: Waypoints,
-    puedeAlgunoDe: ["proyectos.ver", "jornadas.ver", "usuarios.ver"],
+    puedeAlgunoDe: ["proyectos.ver", "jornadas.ver"],
   },
   {
     href: "/usuarios",
@@ -92,7 +107,9 @@ function itemPermitido(
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { token } = useAuth();
   const { puede, puedeAlguno } = usePermisos();
+  const [badgeRevision, setBadgeRevision] = useState(0);
 
   const items = ITEMS.filter((item) => itemPermitido(item, puede, puedeAlguno));
 
@@ -106,6 +123,30 @@ export function Sidebar() {
       router.replace("/dashboard");
     }
   }, [pathname, puede, puedeAlguno, router]);
+
+  useEffect(() => {
+    if (!token || !puede("jornadas.ver")) return;
+    let vivo = true;
+    const cargar = async () => {
+      try {
+        const c = await obtenerContadoresAprobacion(token);
+        if (!vivo) return;
+        const n =
+          (puede("jornadas.aprobar")
+            ? c.pendientesRevision
+            : c.rechazadas + c.enCorreccion) || 0;
+        setBadgeRevision(n);
+      } catch {
+        if (vivo) setBadgeRevision(0);
+      }
+    };
+    void cargar();
+    const id = window.setInterval(() => void cargar(), 60_000);
+    return () => {
+      vivo = false;
+      window.clearInterval(id);
+    };
+  }, [token, puede]);
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-ruralia-teal-border bg-white">
@@ -125,33 +166,39 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex flex-1 flex-col gap-1 p-3">
         {items.map((item) => {
           const activo =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
-          const mostrarSeparador = item.href === "/usuarios";
+          const Icon = item.icono;
+          const badge =
+            item.badgeKey === "revision" && badgeRevision > 0
+              ? badgeRevision
+              : 0;
           return (
-            <div key={item.href}>
-              {mostrarSeparador ? (
-                <div className="mb-2 mt-6 flex items-center gap-2 px-4">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                    Configuraciones
-                  </span>
-                  <div className="h-px flex-1 bg-ruralia-teal-border" />
-                </div>
-              ) : null}
-              <Link
-                href={item.href}
-                className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition ${
-                  activo
-                    ? "bg-ruralia-teal-soft text-ruralia-teal-text"
-                    : "text-zinc-600 hover:bg-zinc-50"
-                }`}
-              >
-                <item.icono className="h-5 w-5 shrink-0" />
-                {item.etiqueta}
-              </Link>
-            </div>
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                activo
+                  ? "bg-ruralia-teal text-white"
+                  : "text-zinc-700 hover:bg-zinc-50"
+              }`}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="flex-1">{item.etiqueta}</span>
+              {badge > 0 && (
+                <span
+                  className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold ${
+                    activo
+                      ? "bg-white/20 text-white"
+                      : "bg-rose-500 text-white"
+                  }`}
+                >
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              )}
+            </Link>
           );
         })}
       </nav>
