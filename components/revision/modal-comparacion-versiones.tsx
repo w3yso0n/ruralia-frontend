@@ -35,12 +35,43 @@ type ResultadoComparacion = {
   campos: CampoDiff[];
 };
 
+function esDataUrlImagen(valor: unknown): valor is string {
+  return (
+    typeof valor === "string" &&
+    /^data:image\/[\w+.-]+(;base64)?,/i.test(valor.trim())
+  );
+}
+
+function esUrlHttp(valor: unknown): valor is string {
+  return (
+    typeof valor === "string" &&
+    (/^https?:\/\//i.test(valor) || valor.startsWith("/"))
+  );
+}
+
 function formatearValorCampo(valor: unknown, tipo?: string): string {
   if (valor == null || valor === "") return "Sin dato";
+  if (
+    tipo === "FIRMA" ||
+    esDataUrlImagen(valor) ||
+    (typeof valor === "object" &&
+      valor !== null &&
+      "firma" in (valor as object))
+  ) {
+    if (
+      typeof valor === "object" &&
+      valor !== null &&
+      (valor as { presente?: boolean }).presente
+    ) {
+      return "Firma capturada";
+    }
+    if (esDataUrlImagen(valor) || esUrlHttp(valor)) return "Firma capturada";
+    return "Sin firma";
+  }
   if (typeof valor === "boolean") {
     return valor ? "Sí" : "No";
   }
-  if (tipo === "SI_NO" || typeof valor === "boolean") {
+  if (tipo === "SI_NO") {
     if (valor === true || valor === "true" || valor === "Sí" || valor === "si")
       return "Sí";
     if (valor === false || valor === "false" || valor === "No") return "No";
@@ -49,6 +80,7 @@ function formatearValorCampo(valor: unknown, tipo?: string): string {
     return Number(valor).toLocaleString("es-CO");
   }
   if (typeof valor === "string") {
+    if (esDataUrlImagen(valor)) return "Firma capturada";
     const fecha = Date.parse(valor);
     if (
       (tipo === "FECHA" || /^\d{4}-\d{2}-\d{2}/.test(valor)) &&
@@ -68,11 +100,161 @@ function formatearValorCampo(valor: unknown, tipo?: string): string {
   if (typeof valor === "object") {
     const obj = valor as Record<string, unknown>;
     if (Array.isArray(obj.filas)) {
-      return `${obj.filas.length} fila(s)`;
+      return obj.filas.length === 0
+        ? "Sin registros"
+        : `${obj.filas.length} registro(s)`;
     }
-    return JSON.stringify(valor);
+    return "Dato estructurado";
   }
   return String(valor);
+}
+
+function MiniFirma({
+  src,
+  variante,
+}: {
+  src: string;
+  variante: "anterior" | "nuevo" | "igual";
+}) {
+  return (
+    <div
+      className={`inline-flex min-h-[56px] min-w-[96px] items-center justify-center rounded-lg border border-dashed px-2 py-1.5 ${
+        variante === "anterior"
+          ? "border-rose-200 bg-rose-50/50"
+          : variante === "nuevo"
+            ? "border-emerald-200 bg-emerald-50/40"
+            : "border-zinc-200 bg-zinc-50"
+      }`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt="Firma"
+        className={`max-h-16 max-w-[140px] object-contain ${
+          variante === "anterior" ? "opacity-70" : ""
+        }`}
+      />
+    </div>
+  );
+}
+
+function VistaTablaDiff({
+  valor,
+  variante,
+}: {
+  valor: unknown;
+  variante: "anterior" | "nuevo" | "igual";
+}) {
+  const filas =
+    valor &&
+    typeof valor === "object" &&
+    Array.isArray((valor as { filas?: unknown }).filas)
+      ? ((valor as { filas: Record<string, unknown>[] }).filas ?? [])
+      : [];
+
+  if (filas.length === 0) {
+    return (
+      <p
+        className={
+          variante === "anterior"
+            ? "text-sm text-rose-700/90 line-through"
+            : variante === "nuevo"
+              ? "text-base font-semibold text-emerald-700"
+              : "text-sm font-medium text-stone-800"
+        }
+      >
+        Sin registros
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {filas.map((fila, indice) => (
+        <div
+          key={indice}
+          className={`rounded-xl border px-3 py-2 ${
+            variante === "anterior"
+              ? "border-rose-100 bg-rose-50/40"
+              : variante === "nuevo"
+                ? "border-emerald-100 bg-emerald-50/30"
+                : "border-zinc-100 bg-zinc-50/50"
+          }`}
+        >
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+            Registro {indice + 1}
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {Object.entries(fila).map(([clave, celda]) => {
+              const etiqueta = clave.replaceAll("_", " ");
+              return (
+                <div key={clave} className="min-w-0">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+                    {etiqueta}
+                  </p>
+                  {esDataUrlImagen(celda) || esUrlHttp(celda) ? (
+                    <div className="mt-1">
+                      <MiniFirma src={String(celda)} variante={variante} />
+                    </div>
+                  ) : (
+                    <p
+                      className={`mt-0.5 break-words text-sm ${
+                        variante === "anterior"
+                          ? "text-rose-800 line-through"
+                          : "font-medium text-zinc-900"
+                      }`}
+                    >
+                      {formatearValorCampo(celda)}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function VistaValorDiff({
+  valor,
+  tipo,
+  variante,
+}: {
+  valor: unknown;
+  tipo?: string;
+  variante: "anterior" | "nuevo" | "igual";
+}) {
+  const esTabla =
+    tipo === "TABLA" ||
+    (valor != null &&
+      typeof valor === "object" &&
+      Array.isArray((valor as { filas?: unknown }).filas));
+
+  if (esTabla) {
+    return <VistaTablaDiff valor={valor} variante={variante} />;
+  }
+
+  const esFirma =
+    tipo === "FIRMA" || esDataUrlImagen(valor) || esUrlHttp(valor);
+  const texto = formatearValorCampo(valor, tipo);
+  const claseTexto =
+    variante === "anterior"
+      ? "text-sm text-rose-700/90 line-through decoration-rose-400/80 decoration-2"
+      : variante === "nuevo"
+        ? "text-base font-semibold text-emerald-700"
+        : "text-sm font-medium text-stone-800";
+
+  if (esFirma && (esDataUrlImagen(valor) || esUrlHttp(valor))) {
+    return <MiniFirma src={String(valor)} variante={variante} />;
+  }
+
+  if (esFirma) {
+    return <p className={claseTexto}>{texto}</p>;
+  }
+
+  return <p className={`${claseTexto} break-words`}>{texto}</p>;
 }
 
 interface ModalComparacionVersionesProps {
@@ -291,9 +473,6 @@ export function ModalComparacionVersiones({
 }
 
 function CampoDiffVista({ campo }: { campo: CampoDiff }) {
-  const anterior = formatearValorCampo(campo.versionAnterior, campo.tipo);
-  const nuevo = formatearValorCampo(campo.versionNueva, campo.tipo);
-
   return (
     <div
       className={`rounded-2xl border px-4 py-3 transition ${
@@ -318,14 +497,34 @@ function CampoDiffVista({ campo }: { campo: CampoDiff }) {
       </div>
 
       {campo.cambio ? (
-        <div className="space-y-2">
-          <p className="text-sm text-rose-700/90 line-through decoration-rose-400/80 decoration-2">
-            {anterior}
-          </p>
-          <p className="text-base font-semibold text-emerald-700">{nuevo}</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-rose-600/80">
+              Antes
+            </p>
+            <VistaValorDiff
+              valor={campo.versionAnterior}
+              tipo={campo.tipo}
+              variante="anterior"
+            />
+          </div>
+          <div>
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700/80">
+              Después
+            </p>
+            <VistaValorDiff
+              valor={campo.versionNueva}
+              tipo={campo.tipo}
+              variante="nuevo"
+            />
+          </div>
         </div>
       ) : (
-        <p className="text-sm font-medium text-stone-800">{nuevo}</p>
+        <VistaValorDiff
+          valor={campo.versionNueva}
+          tipo={campo.tipo}
+          variante="igual"
+        />
       )}
     </div>
   );

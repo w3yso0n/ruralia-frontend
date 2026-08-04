@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alerta, Modal, Spinner } from "@/components/ui/modal";
 import {
   actualizarRol,
+  clonarRol,
   crearRol,
   eliminarRol,
   listarPermisos,
@@ -235,6 +236,23 @@ export function GestionRoles() {
     }
   }
 
+  async function manejarClonar(rol: RolDetalle) {
+    if (!token) return;
+    setEnviando(true);
+    setError(null);
+    setExito(null);
+    try {
+      const clon = await clonarRol(token, rol.id);
+      setExito(`Rol clonado como ${clon.nombre}`);
+      await cargar();
+      await abrirEditar(clon.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al clonar rol");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   // Forzar críticos en matriz admin
   useEffect(() => {
     if (!esCuantivaEditando) return;
@@ -336,6 +354,16 @@ export function GestionRoles() {
                             Ver
                           </button>
                         )}
+                        {puede("roles.crear") ? (
+                          <button
+                            type="button"
+                            disabled={enviando}
+                            onClick={() => void manejarClonar(rol)}
+                            className={btnAccionSecundaria}
+                          >
+                            Clonar
+                          </button>
+                        ) : null}
                         {!rol.esSistema && puede("roles.eliminar") ? (
                           <button
                             type="button"

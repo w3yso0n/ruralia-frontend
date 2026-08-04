@@ -1,24 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   ClipboardCheck,
+  Eye,
+  FolderKanban,
+  GitCompareArrows,
   RotateCcw,
   Send,
   XCircle,
 } from "lucide-react";
-import { Alerta, Spinner } from "@/components/ui/modal";
+import { Alerta, Modal, Spinner } from "@/components/ui/modal";
+import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
 import {
   BotonCompararVersiones,
   ModalComparacionVersiones,
+  versionesOrdenadas,
 } from "@/components/revision/modal-comparacion-versiones";
+import { ModalDetalleJornadaRevision } from "@/components/revision/modal-detalle-jornada-revision";
 import {
   aprobarEntidad,
   enviarJornadaARevision,
   listarAuditoria,
   listarDocumentosJornada,
+  listarProyectos,
   obtenerBandejaAprobaciones,
   rechazarEntidad,
   reenviarJornadaARevision,
@@ -33,6 +41,41 @@ import type {
   EstadoFuncional,
   ItemBandejaAprobacion,
 } from "@/lib/types";
+
+const ESTADOS_FILTRO: Array<EstadoFuncional | "TODOS"> = [
+  "TODOS",
+  "BORRADOR",
+  "CAPTURADO",
+  "SINCRONIZADO",
+  "EN_REVISION",
+  "RECHAZADO",
+  "EN_CORRECCION",
+  "APROBADO",
+];
+
+function parseFiltroEstado(
+  valor: string | null,
+): EstadoFuncional | "TODOS" {
+  if (valor && ESTADOS_FILTRO.includes(valor as EstadoFuncional | "TODOS")) {
+    return valor as EstadoFuncional | "TODOS";
+  }
+  return "TODOS";
+}
+
+function construirUrlRevision(opts: {
+  proyectoId?: string;
+  filtro?: EstadoFuncional | "TODOS";
+  jornadaId?: string | null;
+}): string {
+  const params = new URLSearchParams();
+  if (opts.proyectoId) params.set("proyectoId", opts.proyectoId);
+  if (opts.filtro && opts.filtro !== "TODOS") {
+    params.set("estado", opts.filtro);
+  }
+  if (opts.jornadaId) params.set("jornadaId", opts.jornadaId);
+  const qs = params.toString();
+  return qs ? `/revision?${qs}` : "/revision";
+}
 
 const CATEGORIAS: { value: CategoriaRechazo; label: string }[] = [
   { value: "INFORMACION_INCOMPLETA", label: "Información incompleta" },
@@ -160,6 +203,9 @@ function formatearValorAuditoria(valor: unknown): string {
   }
   if (typeof valor === "object") {
     const obj = valor as Record<string, unknown>;
+    if (obj.firma === true || obj.presente === true) {
+      return "Firma capturada";
+    }
     if ("versionNumber" in obj) {
       return `Versión ${obj.versionNumber}`;
     }
@@ -167,20 +213,50 @@ function formatearValorAuditoria(valor: unknown): string {
       return `Versión ${obj.versionNumber} (${etiquetaEstado(String(obj.status))})`;
     }
     return Object.entries(obj)
+      .filter(([k]) => !["cambios", "filePath", "previousVersionId", "versionId"].includes(k))
       .map(([k, v]) => `${etiquetaCampo(k)}: ${formatearValorAuditoria(v)}`)
       .join(" · ");
   }
   return String(valor);
 }
 
+function extraerCambiosAuditoria(
+  valor: unknown,
+): Array<{ etiqueta: string; tipo: string; anterior: unknown; nuevo: unknown }> {
+  if (!valor || typeof valor !== "object") return [];
+  const cambios = (valor as { cambios?: unknown }).cambios;
+  if (!Array.isArray(cambios)) return [];
+  return cambios
+    .filter((c): c is Record<string, unknown> => !!c && typeof c === "object")
+    .map((c) => ({
+      etiqueta: String(c.etiqueta ?? c.clave ?? "Campo"),
+      tipo: String(c.tipo ?? "TEXTO"),
+      anterior: c.anterior,
+      nuevo: c.nuevo,
+    }));
+}
+
 export function PanelRevision() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { token } = useAuth();
   const { puede } = usePermisos();
   const [bandeja, setBandeja] = useState<BandejaAprobacion | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filtro, setFiltro] = useState<EstadoFuncional | "TODOS">("TODOS");
+  const [filtro, setFiltro] = useState<EstadoFuncional | "TODOS">(() =>
+    parseFiltroEstado(searchParams.get("estado")),
+  );
+  const [proyectoId, setProyectoId] = useState(
+    () => searchParams.get("proyectoId") ?? "",
+  );
+  const [opcionesProyecto, setOpcionesProyecto] = useState<
+    { id: string; nombre: string }[]
+  >([]);
   const [seleccion, setSeleccion] = useState<ItemBandejaAprobacion | null>(null);
+  const [jornadaIdPendiente, setJornadaIdPendiente] = useState<string | null>(
+    () => searchParams.get("jornadaId"),
+  );
   const [docs, setDocs] = useState<DocumentoJornada[]>([]);
   const [audit, setAudit] = useState<AuditLogItem[]>([]);
   const [motivoRechazo, setMotivoRechazo] = useState("");
@@ -190,8 +266,46 @@ export function PanelRevision() {
   const [motivoReenvio, setMotivoReenvio] = useState("");
   const [accionando, setAccionando] = useState(false);
   const [docComparar, setDocComparar] = useState<DocumentoJornada | null>(null);
+  const [versionesComparar, setVersionesComparar] = useState<{
+    a?: string;
+    b?: string;
+  } | null>(null);
+  const [mostrarDetalle, setMostrarDetalle] = useState(false);
+  const [mostrarFormularioRechazo, setMostrarFormularioRechazo] =
+    useState(false);
+  const [confirmarAprobar, setConfirmarAprobar] = useState(false);
 
   const esSupervisor = puede("jornadas.aprobar") || puede("jornadas.rechazar");
+  const jornadaIdPendienteRef = useRef(jornadaIdPendiente);
+  jornadaIdPendienteRef.current = jornadaIdPendiente;
+
+  const urlRetornoRevision = useMemo(
+    () =>
+      construirUrlRevision({
+        proyectoId,
+        filtro,
+        jornadaId: seleccion?.id ?? jornadaIdPendiente,
+      }),
+    [proyectoId, filtro, seleccion?.id, jornadaIdPendiente],
+  );
+
+  useEffect(() => {
+    if (!token) return;
+    void (async () => {
+      try {
+        const res = await listarProyectos(token, {
+          estado: "ACTIVO",
+          limite: 100,
+          orden: "nombre_asc",
+        });
+        setOpcionesProyecto(
+          (res.datos ?? []).map((p) => ({ id: p.id, nombre: p.nombre })),
+        );
+      } catch {
+        setOpcionesProyecto([]);
+      }
+    })();
+  }, [token]);
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -201,23 +315,45 @@ export function PanelRevision() {
       const data = await obtenerBandejaAprobaciones(token, {
         vista: esSupervisor ? "supervisor" : "tecnico",
         estadoFuncional: filtro === "TODOS" ? undefined : filtro,
+        proyectoId: proyectoId || undefined,
       });
       setBandeja(data);
-      if (seleccion) {
-        const actualizado = data.items.find((i) => i.id === seleccion.id);
-        setSeleccion(actualizado ?? null);
-      }
+      setSeleccion((prev) => {
+        const idObjetivo = prev?.id ?? jornadaIdPendienteRef.current;
+        if (!idObjetivo) return null;
+        return data.items.find((i) => i.id === idObjetivo) ?? null;
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar la bandeja");
     } finally {
       setCargando(false);
     }
-  }, [token, esSupervisor, filtro, seleccion?.id]);
+  }, [token, esSupervisor, filtro, proyectoId]);
 
   useEffect(() => {
     void cargar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, esSupervisor, filtro]);
+  }, [cargar]);
+
+  useEffect(() => {
+    const url = construirUrlRevision({
+      proyectoId,
+      filtro,
+      jornadaId: seleccion?.id ?? jornadaIdPendiente,
+    });
+    const actual = `${window.location.pathname}${window.location.search}`;
+    if (actual !== url) {
+      router.replace(url, { scroll: false });
+    }
+  }, [proyectoId, filtro, seleccion?.id, jornadaIdPendiente, router]);
+
+  useEffect(() => {
+    setMostrarFormularioRechazo(false);
+    setMotivoRechazo("");
+    setCorreccion("");
+    setCategoria("INFORMACION_INCOMPLETA");
+    setMostrarDetalle(false);
+    setConfirmarAprobar(false);
+  }, [seleccion?.id]);
 
   useEffect(() => {
     if (!token || !seleccion) {
@@ -259,11 +395,81 @@ export function PanelRevision() {
       setMotivoRechazo("");
       setCorreccion("");
       setMotivoReenvio("");
+      setMostrarFormularioRechazo(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Acción fallida");
     } finally {
       setAccionando(false);
     }
+  }
+
+  function abrirComparacionDocumento(doc: DocumentoJornada) {
+    setVersionesComparar(null);
+    setDocComparar(doc);
+  }
+
+  function abrirComparacionDesdeAuditoria(entrada: AuditLogItem) {
+    const doc =
+      docs.find((d) => d.id === entrada.documentId) ??
+      (docs.length === 1 ? docs[0] : null);
+    if (!doc) {
+      setError(
+        "No se encontró el documento asociado para comparar versiones.",
+      );
+      return;
+    }
+
+    const versiones = versionesOrdenadas(doc);
+    if (versiones.length < 2) {
+      setError(
+        "Aún no hay dos versiones guardadas para comparar. Si acabas de reenviar, vuelve a rechazar y reenviar tras reiniciar el backend (se corrigió un bug que borraba la versión nueva).",
+      );
+      return;
+    }
+
+    const nuevo = entrada.newValue as
+      | { versionNumber?: number; previousVersionId?: string }
+      | undefined;
+    const previo = entrada.previousValue as
+      | { versionNumber?: number; versionId?: string }
+      | undefined;
+
+    const versionB =
+      (entrada.documentVersionId
+        ? versiones.find((v) => v.id === entrada.documentVersionId)
+        : undefined) ??
+      (nuevo?.versionNumber != null
+        ? versiones.find((v) => v.versionNumber === nuevo.versionNumber)
+        : undefined) ??
+      versiones[versiones.length - 1];
+
+    const versionA =
+      (versionB?.previousVersionId
+        ? versiones.find((v) => v.id === versionB.previousVersionId)
+        : undefined) ??
+      (nuevo?.previousVersionId
+        ? versiones.find((v) => v.id === nuevo.previousVersionId)
+        : undefined) ??
+      (previo?.versionId
+        ? versiones.find((v) => v.id === previo.versionId)
+        : undefined) ??
+      (previo?.versionNumber != null
+        ? versiones.find((v) => v.versionNumber === previo.versionNumber)
+        : undefined) ??
+      (versionB
+        ? versiones.find((v) => v.versionNumber === versionB.versionNumber - 1)
+        : undefined);
+
+    if (!versionA || !versionB || versionA.id === versionB.id) {
+      setError(
+        "No se pudieron resolver las dos versiones de este cambio. Prueba «Comparar versiones» en el documento.",
+      );
+      return;
+    }
+
+    setError(null);
+    setVersionesComparar({ a: versionA.id, b: versionB.id });
+    setDocComparar(doc);
   }
 
   return (
@@ -274,7 +480,7 @@ export function PanelRevision() {
             Revisión y aprobación
           </h1>
           <p className="mt-1 text-sm text-stone-600">
-            Flujo RF-18 / RF-19: trazabilidad, versiones y bandejas por rol.
+            Trazabilidad, versiones y bandejas por rol.
           </p>
         </div>
         {contadores && (
@@ -295,21 +501,50 @@ export function PanelRevision() {
         )}
       </header>
 
-      <div className="flex flex-wrap gap-2">
-        {filtros.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setFiltro(f.key)}
-            className={`rounded-full px-3 py-1.5 text-sm transition ${
-              filtro === f.key
-                ? "bg-ruralia-teal text-white"
-                : "bg-stone-100 text-stone-700 hover:bg-stone-200"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="flex flex-col gap-3 rounded-2xl border border-ruralia-teal-border bg-white p-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="w-full sm:max-w-sm">
+          <label className="mb-1 block text-sm font-medium text-zinc-700">
+            Proyecto
+          </label>
+          <SelectorDesplegable
+            value={proyectoId}
+            onChange={(id) => {
+              setProyectoId(id);
+              setSeleccion(null);
+              setJornadaIdPendiente(null);
+            }}
+            opciones={opcionesProyecto}
+            placeholder="Todos los proyectos"
+            permitirVacio
+            etiquetaVacio="Todos los proyectos"
+            mensajeSinOpciones="No hay proyectos activos"
+            icono={FolderKanban}
+          />
+          <p className="mt-1 text-xs text-zinc-500">
+            Filtra la bandeja por un proyecto o deja todos visibles.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {filtros.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => {
+                setFiltro(f.key);
+                setSeleccion(null);
+                setJornadaIdPendiente(null);
+              }}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
+                filtro === f.key
+                  ? "bg-ruralia-teal text-white"
+                  : "bg-ruralia-teal-soft text-ruralia-teal-text hover:bg-ruralia-teal-soft/80"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error && <Alerta tipo="error" mensaje={error} />}
@@ -326,7 +561,10 @@ export function PanelRevision() {
                 <li key={item.id}>
                   <button
                     type="button"
-                    onClick={() => setSeleccion(item)}
+                    onClick={() => {
+                      setSeleccion(item);
+                      setJornadaIdPendiente(item.id);
+                    }}
                     className={`w-full px-4 py-3 text-left transition hover:bg-stone-50 ${
                       seleccion?.id === item.id ? "bg-teal-50/60" : ""
                     }`}
@@ -359,7 +597,9 @@ export function PanelRevision() {
               ))}
               {!bandeja?.items.length && (
                 <li className="p-8 text-center text-sm text-stone-500">
-                  No hay elementos en esta bandeja.
+                  {proyectoId
+                    ? "No hay jornadas de este proyecto en la bandeja."
+                    : "No hay elementos en esta bandeja."}
                 </li>
               )}
             </ul>
@@ -388,14 +628,24 @@ export function PanelRevision() {
                     {etiquetaEstado(seleccion.estadoFuncional)}
                   </span>
                 </div>
-                {seleccion.proyecto && (
-                  <Link
-                    href={`/proyectos/${seleccion.proyecto.id}?tab=jornadas&jornadaId=${seleccion.id}`}
-                    className="text-sm font-medium text-ruralia-teal hover:underline"
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMostrarDetalle(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-ruralia-teal-border bg-white px-3 py-2 text-sm font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal-soft"
                   >
-                    Abrir en proyecto →
-                  </Link>
-                )}
+                    <Eye className="h-4 w-4" />
+                    Ver captura
+                  </button>
+                  {seleccion.proyecto ? (
+                    <Link
+                      href={`/proyectos/${seleccion.proyecto.id}?tab=jornadas&jornadaId=${seleccion.id}&desde=revision&retorno=${encodeURIComponent(urlRetornoRevision)}`}
+                      className="inline-flex items-center rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+                    >
+                      Abrir en proyecto
+                    </Link>
+                  ) : null}
+                </div>
               </div>
 
               {seleccion.rechazosAbiertos.length > 0 && (
@@ -445,7 +695,7 @@ export function PanelRevision() {
                             </div>
                             <BotonCompararVersiones
                               deshabilitado={nVersiones < 2}
-                              onClick={() => setDocComparar(d)}
+                              onClick={() => abrirComparacionDocumento(d)}
                             />
                           </div>
                         </li>
@@ -460,50 +710,85 @@ export function PanelRevision() {
                   <h3 className="mb-2 text-sm font-semibold text-stone-800">
                     Historial de auditoría
                   </h3>
-                  <ul className="max-h-56 space-y-2 overflow-y-auto">
-                    {audit.map((a) => (
-                      <li
-                        key={a.id}
-                        className="rounded-xl border border-stone-100 bg-stone-50 px-3 py-2.5 text-sm"
-                      >
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                          <span className="font-semibold text-stone-900">
-                            {etiquetaAccionAuditoria(a.action)}
-                          </span>
-                          {a.field ? (
-                            <span className="text-stone-500">
-                              · {etiquetaCampo(a.field)}
-                            </span>
-                          ) : null}
-                        </div>
-                        {a.reason ? (
-                          <p className="mt-0.5 text-stone-700">{a.reason}</p>
-                        ) : null}
-                        <p className="mt-1 text-xs text-stone-500">
-                          {etiquetaRol(a.userRole)} ·{" "}
-                          {new Date(a.createdAt).toLocaleString("es-CO")}
-                        </p>
-                        {(a.previousValue != null || a.newValue != null) && (
-                          <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-xs">
-                            <div className="rounded-lg bg-white px-2 py-1.5 text-stone-600 ring-1 ring-stone-200">
-                              <span className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-stone-400">
-                                Antes
-                              </span>
-                              {formatearValorAuditoria(a.previousValue)}
+                  <ul className="max-h-80 space-y-2 overflow-y-auto">
+                    {audit.map((a) => {
+                      const cambios = extraerCambiosAuditoria(a.newValue);
+                      const esVersion =
+                        a.action === "CREATE_VERSION" ||
+                        a.action === "GENERATE_DOCUMENT";
+                      // Mostrar siempre en cards de versión; al click se resuelve
+                      // si hay pares comparables o se explica el error.
+                      const mostrarBotonDiff = esVersion && docs.length > 0;
+
+                      return (
+                        <li
+                          key={a.id}
+                          className="rounded-xl border border-stone-100 bg-stone-50 px-3 py-2.5 text-sm"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                <span className="font-semibold text-stone-900">
+                                  {etiquetaAccionAuditoria(a.action)}
+                                </span>
+                                {a.field ? (
+                                  <span className="text-stone-500">
+                                    · {etiquetaCampo(a.field)}
+                                  </span>
+                                ) : null}
+                                {cambios.length > 0 ? (
+                                  <span className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-[10px] font-semibold text-ruralia-teal-text">
+                                    {cambios.length} cambio
+                                    {cambios.length === 1 ? "" : "s"}
+                                  </span>
+                                ) : null}
+                              </div>
+                              {a.reason ? (
+                                <p className="mt-0.5 text-stone-700">
+                                  {a.reason}
+                                </p>
+                              ) : null}
+                              <p className="mt-1 text-xs text-stone-500">
+                                {etiquetaRol(a.userRole)} ·{" "}
+                                {new Date(a.createdAt).toLocaleString("es-CO")}
+                              </p>
                             </div>
-                            <span className="text-stone-400" aria-hidden>
-                              →
-                            </span>
-                            <div className="rounded-lg bg-white px-2 py-1.5 font-medium text-stone-800 ring-1 ring-stone-200">
-                              <span className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-stone-400">
-                                Después
-                              </span>
-                              {formatearValorAuditoria(a.newValue)}
-                            </div>
+                            {mostrarBotonDiff ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  abrirComparacionDesdeAuditoria(a)
+                                }
+                                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-ruralia-teal-border bg-white px-2.5 py-1.5 text-[11px] font-semibold text-ruralia-teal transition hover:bg-ruralia-teal-soft"
+                              >
+                                <GitCompareArrows className="h-3.5 w-3.5" />
+                                Ver diferencias
+                              </button>
+                            ) : null}
                           </div>
-                        )}
-                      </li>
-                    ))}
+
+                          {(a.previousValue != null || a.newValue != null) && (
+                            <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-xs">
+                              <div className="rounded-lg bg-white px-2 py-1.5 text-stone-600 ring-1 ring-stone-200">
+                                <span className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-stone-400">
+                                  Antes
+                                </span>
+                                {formatearValorAuditoria(a.previousValue)}
+                              </div>
+                              <span className="text-stone-400" aria-hidden>
+                                →
+                              </span>
+                              <div className="rounded-lg bg-white px-2 py-1.5 font-medium text-stone-800 ring-1 ring-stone-200">
+                                <span className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-stone-400">
+                                  Después
+                                </span>
+                                {formatearValorAuditoria(a.newValue)}
+                              </div>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
@@ -565,33 +850,53 @@ export function PanelRevision() {
                     <button
                       type="button"
                       disabled={accionando}
-                      onClick={() =>
-                        void ejecutar(() =>
-                          aprobarEntidad(token!, {
-                            entityType: "JORNADA",
-                            entityId: seleccion.id,
-                          }),
-                        )
-                      }
+                      onClick={() => setConfirmarAprobar(true)}
                       className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                     >
                       <CheckCircle2 className="h-4 w-4" /> Aprobar
                     </button>
                   )}
+
+                {puede("jornadas.rechazar") &&
+                  seleccion.estadoFuncional === "EN_REVISION" &&
+                  !mostrarFormularioRechazo && (
+                    <button
+                      type="button"
+                      disabled={accionando}
+                      onClick={() => setMostrarFormularioRechazo(true)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                    >
+                      <XCircle className="h-4 w-4" /> Rechazar
+                    </button>
+                  )}
               </div>
 
               {puede("jornadas.rechazar") &&
-                seleccion.estadoFuncional === "EN_REVISION" && (
-                  <div className="space-y-2 rounded-xl border border-rose-200 bg-rose-50/50 p-4">
-                    <p className="text-sm font-semibold text-rose-900">
-                      Rechazar jornada
-                    </p>
+                seleccion.estadoFuncional === "EN_REVISION" &&
+                mostrarFormularioRechazo && (
+                  <div className="space-y-2 rounded-xl border border-red-200 bg-red-50/50 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-red-900">
+                        Rechazar jornada
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMostrarFormularioRechazo(false);
+                          setMotivoRechazo("");
+                          setCorreccion("");
+                        }}
+                        className="rounded-lg px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
                     <select
                       value={categoria}
                       onChange={(e) =>
                         setCategoria(e.target.value as CategoriaRechazo)
                       }
-                      className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
                     >
                       {CATEGORIAS.map((c) => (
                         <option key={c.value} value={c.value}>
@@ -603,14 +908,14 @@ export function PanelRevision() {
                       value={motivoRechazo}
                       onChange={(e) => setMotivoRechazo(e.target.value)}
                       placeholder="Motivo del rechazo"
-                      className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
                     />
                     <textarea
                       value={correccion}
                       onChange={(e) => setCorreccion(e.target.value)}
                       placeholder="Corrección solicitada (obligatoria)"
                       rows={3}
-                      className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
                     />
                     <button
                       type="button"
@@ -630,9 +935,9 @@ export function PanelRevision() {
                           }),
                         )
                       }
-                      className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                      className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                     >
-                      <XCircle className="h-4 w-4" /> Rechazar
+                      <XCircle className="h-4 w-4" /> Confirmar rechazo
                     </button>
                   </div>
                 )}
@@ -641,12 +946,73 @@ export function PanelRevision() {
         </section>
       </div>
 
+      {mostrarDetalle && token && seleccion && (
+        <ModalDetalleJornadaRevision
+          abierto={mostrarDetalle}
+          onCerrar={() => setMostrarDetalle(false)}
+          token={token}
+          jornadaId={seleccion.id}
+          estadoFuncional={seleccion.estadoFuncional}
+        />
+      )}
+
+      <Modal
+        titulo="Confirmar aprobación"
+        abierto={confirmarAprobar && seleccion !== null}
+        onCerrar={() => setConfirmarAprobar(false)}
+      >
+        <p className="text-sm text-zinc-600">
+          ¿Seguro que quieres aprobar{" "}
+          <strong className="text-zinc-900">
+            {seleccion?.nombre || seleccion?.meta?.nombre || "esta jornada"}
+          </strong>
+          {seleccion?.proyecto?.nombre
+            ? ` del proyecto ${seleccion.proyecto.nombre}`
+            : ""}
+          ? Una vez aprobada, contará para el avance de la meta y no se podrá
+          editar directamente.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setConfirmarAprobar(false)}
+            disabled={accionando}
+            className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={accionando || !seleccion || !token}
+            onClick={() => {
+              if (!seleccion || !token) return;
+              setConfirmarAprobar(false);
+              void ejecutar(() =>
+                aprobarEntidad(token, {
+                  entityType: "JORNADA",
+                  entityId: seleccion.id,
+                }),
+              );
+            }}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            {accionando ? "Aprobando..." : "Sí, aprobar"}
+          </button>
+        </div>
+      </Modal>
+
       {docComparar && token && (
         <ModalComparacionVersiones
           abierto={Boolean(docComparar)}
-          onCerrar={() => setDocComparar(null)}
+          onCerrar={() => {
+            setDocComparar(null);
+            setVersionesComparar(null);
+          }}
           token={token}
           documento={docComparar}
+          versionAIdInicial={versionesComparar?.a}
+          versionBIdInicial={versionesComparar?.b}
         />
       )}
     </div>

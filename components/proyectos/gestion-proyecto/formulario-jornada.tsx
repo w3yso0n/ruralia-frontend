@@ -31,6 +31,7 @@ interface FormularioJornadaProps {
     metaId: string;
     tipo: TipoJornada;
     tecnicoResponsableIds: string[];
+    requiereRevision: boolean;
   }) => Promise<void>;
 }
 
@@ -49,6 +50,7 @@ export function FormularioJornada({
   const [observaciones, setObservaciones] = useState("");
   const [metaId, setMetaId] = useState("");
   const [esGrupal, setEsGrupal] = useState(false);
+  const [requiereRevision, setRequiereRevision] = useState(true);
   const [agenteIds, setAgenteIds] = useState<string[]>([]);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
 
@@ -93,6 +95,7 @@ export function FormularioJornada({
       metaId,
       tipo: esGrupal ? "GRUPAL" : "INDIVIDUAL",
       tecnicoResponsableIds: agenteIds,
+      requiereRevision,
     });
 
     setNombre("");
@@ -100,6 +103,7 @@ export function FormularioJornada({
     setObservaciones("");
     setMetaId("");
     setEsGrupal(false);
+    setRequiereRevision(true);
     setAgenteIds([]);
   }
 
@@ -217,6 +221,31 @@ export function FormularioJornada({
           </span>
           <span className="mt-0.5 block text-xs text-zinc-500">
             Usa el formulario grupal del proceso (campos repetibles por asistente)
+          </span>
+        </span>
+      </label>
+
+      <label
+        className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 transition ${
+          requiereRevision
+            ? "border-ruralia-teal bg-ruralia-teal-soft/50"
+            : "border-zinc-200 bg-white hover:border-ruralia-teal-border"
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={requiereRevision}
+          onChange={(e) => setRequiereRevision(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-zinc-300 text-ruralia-teal focus:ring-ruralia-teal/30"
+        />
+        <span>
+          <span className="block text-sm font-semibold text-zinc-800">
+            Requiere revisión
+          </span>
+          <span className="mt-0.5 block text-xs text-zinc-500">
+            {requiereRevision
+              ? "El técnico envía a revisión y el avance solo cuenta cuando un supervisor aprueba"
+              : "El técnico sube al proyecto y el avance cuenta al confirmarse, sin paso por revisión"}
           </span>
         </span>
       </label>

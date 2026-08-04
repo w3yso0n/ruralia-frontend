@@ -324,6 +324,7 @@ export interface Jornada {
   fecha: string;
   estado: EstadoJornada;
   estadoFuncional?: EstadoFuncional;
+  requiereRevision?: boolean;
   tipo?: TipoJornada;
   nombre?: string | null;
   observaciones?: string;
@@ -656,6 +657,7 @@ export interface CrearJornadaPayload {
   tecnicoResponsableId?: string;
   tecnicoResponsableIds?: string[];
   tipo?: TipoJornada;
+  requiereRevision?: boolean;
 }
 
 export interface ActualizarJornadaPayload {

@@ -223,6 +223,15 @@ export async function eliminarRol(token: string, id: string): Promise<void> {
   return fetchConAuth<void>(`/roles/${id}`, token, { method: "DELETE" });
 }
 
+export async function clonarRol(
+  token: string,
+  id: string,
+): Promise<RolDetalle> {
+  return fetchConAuth<RolDetalle>(`/roles/${id}/clonar`, token, {
+    method: "POST",
+  });
+}
+
 export async function listarPermisos(
   token: string,
 ): Promise<ModuloPermisos[]> {
@@ -640,6 +649,13 @@ export async function crearJornada(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function obtenerJornada(
+  token: string,
+  id: string,
+): Promise<Jornada> {
+  return fetchConAuth<Jornada>(`/jornadas/${id}`, token);
 }
 
 export async function actualizarJornada(
@@ -1348,6 +1364,17 @@ export async function enviarJornadaARevision(
   notas?: string,
 ): Promise<unknown> {
   return fetchConAuth(`/jornadas/${jornadaId}/enviar-revision`, token, {
+    method: "POST",
+    body: JSON.stringify({ notas }),
+  });
+}
+
+export async function subirJornadaAProyecto(
+  token: string,
+  jornadaId: string,
+  notas?: string,
+): Promise<unknown> {
+  return fetchConAuth(`/jornadas/${jornadaId}/subir-proyecto`, token, {
     method: "POST",
     body: JSON.stringify({ notas }),
   });

@@ -57,7 +57,12 @@ function parsearLista(valor: unknown): string[] {
 }
 
 function esDataUrlImagen(valor: string | null | undefined): boolean {
-  return Boolean(valor && /^data:image\/\w+;base64,/i.test(valor.trim()));
+  if (!valor) return false;
+  const texto = valor.trim();
+  return (
+    /^data:image\/[\w+.-]+;base64,/i.test(texto) ||
+    /^data:image\/[\w+.-]+,/i.test(texto)
+  );
 }
 
 function esUrlHttp(valor: string): boolean {
@@ -195,7 +200,9 @@ function CampoFormularioVista({
   }
 
   if (tipo === "FIRMA") {
-    const fuente = respuesta.urlArchivo ?? respuesta.valorTexto;
+    const fuente =
+      respuesta.urlArchivo ??
+      (esDataUrlImagen(respuesta.valorTexto) ? respuesta.valorTexto : null);
     return (
       <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 sm:col-span-2">
         <p className="text-xs font-medium text-zinc-500">{etiqueta}</p>
@@ -206,6 +213,15 @@ function CampoFormularioVista({
               src={fuente}
               alt={`Firma: ${etiqueta}`}
               className="max-h-24 max-w-full object-contain"
+            />
+          </div>
+        ) : fuente && esUrlHttp(fuente) ? (
+          <div className="mt-2 overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={fuente}
+              alt={`Firma: ${etiqueta}`}
+              className="max-h-24 w-full object-contain"
             />
           </div>
         ) : (

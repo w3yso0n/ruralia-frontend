@@ -70,7 +70,18 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
 
   const puedeGestionar = puede("proyectos.editar");
   const puedeEliminar = puede("proyectos.eliminar");
-
+  const desdeRevision = searchParams.get("desde") === "revision";
+  const retornoRevision = (() => {
+    const bruto = searchParams.get("retorno");
+    if (!bruto) return "/revision";
+    try {
+      const decodificado = decodeURIComponent(bruto);
+      if (decodificado.startsWith("/revision")) return decodificado;
+    } catch {
+      // retorno inválido
+    }
+    return "/revision";
+  })();
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -248,11 +259,36 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
 
   return (
     <>
+      {desdeRevision ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-3">
+          <p className="text-sm text-ruralia-teal-text">
+            Estás viendo el proyecto desde la bandeja de revisión.
+          </p>
+          <Link
+            href={retornoRevision}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-ruralia-teal px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-ruralia-teal-hover"
+          >
+            Volver a revisión
+          </Link>
+        </div>
+      ) : null}
+
       <nav className="mb-4 text-sm text-zinc-500">
+        {desdeRevision ? (
+          <>
+            <Link
+              href={retornoRevision}
+              className="hover:text-ruralia-teal-text"
+            >
+              Revisión
+            </Link>
+            <span className="mx-2">/</span>
+          </>
+        ) : null}
         <Link href="/proyectos" className="hover:text-ruralia-teal-text">
           Proyectos
         </Link>
-        <span className="mx-2">›</span>
+        <span className="mx-2">/</span>
         <span className="text-zinc-900">{proyecto.nombre}</span>
       </nav>
 

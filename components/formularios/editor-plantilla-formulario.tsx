@@ -114,9 +114,18 @@ function generarClave(etiqueta: string): string {
 
 /** Genera claves únicas a partir de etiquetas (evita colisiones tipo "f"/"f"). */
 function clavesUnicasDesdeEtiquetas(etiquetas: string[]): string[] {
+  return asegurarClavesUnicas(
+    etiquetas.map(
+      (etiqueta, indice) => generarClave(etiqueta) || `col_${indice + 1}`,
+    ),
+  );
+}
+
+/** Si hay claves repetidas, sufija _2, _3, etc. Conserva las ya únicas. */
+function asegurarClavesUnicas(claves: string[]): string[] {
   const usadas = new Set<string>();
-  return etiquetas.map((etiqueta, indice) => {
-    const base = generarClave(etiqueta) || `col_${indice + 1}`;
+  return claves.map((raw, indice) => {
+    const base = (raw || `campo_${indice + 1}`).trim() || `campo_${indice + 1}`;
     let clave = base;
     let n = 2;
     while (usadas.has(clave)) {
@@ -268,8 +277,8 @@ export function EditorPlantillaFormulario({
   }
 
   function actualizarCampo(indice: number, cambios: Partial<CampoEnEdicion>) {
-    setCampos((prev) =>
-      prev.map((campo, i) => {
+    setCampos((prev) => {
+      const actualizados = prev.map((campo, i) => {
         if (i !== indice) return campo;
         const siguiente = { ...campo, ...cambios };
         if (
@@ -281,9 +290,33 @@ export function EditorPlantillaFormulario({
         if (cambios.tipoCampo && cambios.tipoCampo !== "TABLA") {
           siguiente.columnas = [];
         }
+        // Solo regenerar clave al editar etiqueta si el campo aún no está persistido
+        // (evita romper respuestas ya guardadas con la clave anterior).
+        if (
+          !campo.id &&
+          cambios.etiqueta !== undefined &&
+          cambios.clave === undefined
+        ) {
+          siguiente.clave = generarClave(cambios.etiqueta);
+        }
         return siguiente;
-      }),
-    );
+      });
+
+      if (
+        (!prev[indice]?.id && cambios.etiqueta !== undefined) ||
+        cambios.clave !== undefined
+      ) {
+        const claves = asegurarClavesUnicas(
+          actualizados.map(
+            (campo, i) =>
+              campo.clave || generarClave(campo.etiqueta) || `campo_${i + 1}`,
+          ),
+        );
+        return actualizados.map((campo, i) => ({ ...campo, clave: claves[i] }));
+      }
+
+      return actualizados;
+    });
   }
 
   function actualizarColumna(
@@ -416,6 +449,16 @@ export function EditorPlantillaFormulario({
           };
         },
       );
+
+      const clavesFinales = asegurarClavesUnicas(
+        camposPayload.map(
+          (campo, indice) =>
+            campo.clave || generarClave(campo.etiqueta) || `campo_${indice + 1}`,
+        ),
+      );
+      for (let i = 0; i < camposPayload.length; i += 1) {
+        camposPayload[i].clave = clavesFinales[i];
+      }
 
       if (esEdicion && plantillaId) {
         await actualizarPlantillaFormulario(token, plantillaId, {
@@ -695,7 +738,6 @@ export function EditorPlantillaFormulario({
                       onChange={(e) =>
                         actualizarCampo(indice, {
                           etiqueta: e.target.value,
-                          clave: generarClave(e.target.value),
                         })
                       }
                       placeholder={

@@ -44,7 +44,12 @@ function jornadasDelGrupo(
 
 function sumarEjecutadoMetaLocal(jornadas: Jornada[], metaId: string): number {
   return jornadas
-    .filter((j) => j.meta?.id === metaId && j.estado !== "CANCELADA")
+    .filter(
+      (j) =>
+        j.meta?.id === metaId &&
+        j.estado !== "CANCELADA" &&
+        j.estadoFuncional === "APROBADO",
+    )
     .reduce((acc, j) => {
       if (j.cantidadEjecutada != null) {
         return acc + Number(j.cantidadEjecutada);
@@ -117,6 +122,7 @@ export function PanelJornadas({
     metaId: string;
     tipo: TipoJornada;
     tecnicoResponsableIds: string[];
+    requiereRevision: boolean;
   }) {
     setEnviando(true);
     setError(null);
@@ -130,6 +136,7 @@ export function PanelJornadas({
         metaId: datos.metaId,
         tipo: datos.tipo,
         tecnicoResponsableIds: datos.tecnicoResponsableIds,
+        requiereRevision: datos.requiereRevision,
       });
       const primera = resultado.jornadas[0];
       await onActualizar();
@@ -354,6 +361,15 @@ export function PanelJornadas({
                           Grupal · asistencia
                         </span>
                       ) : null}
+                      {jornadaSeleccionada.requiereRevision !== false ? (
+                        <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                          Requiere revisión
+                        </span>
+                      ) : (
+                        <span className="ml-2 rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs font-medium text-ruralia-teal-text">
+                          Sin revisión
+                        </span>
+                      )}
                       {grupoActivo.length > 1 ? (
                         <span className="ml-2 rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs font-medium text-ruralia-teal-text">
                           {grupoActivo.length} agentes
@@ -363,7 +379,9 @@ export function PanelJornadas({
                   </div>
                   {puedeGestionar ? (
                     <div className="flex flex-wrap gap-2">
-                      {editandoId !== jornadaSeleccionada.id ? (
+                      {editandoId !== jornadaSeleccionada.id &&
+                      jornadaSeleccionada.estadoFuncional !== "EN_REVISION" &&
+                      jornadaSeleccionada.estadoFuncional !== "APROBADO" ? (
                         <button
                           type="button"
                           onClick={() =>
@@ -373,6 +391,14 @@ export function PanelJornadas({
                         >
                           Editar
                         </button>
+                      ) : null}
+                      {jornadaSeleccionada.estadoFuncional === "EN_REVISION" ||
+                      jornadaSeleccionada.estadoFuncional === "APROBADO" ? (
+                        <span className="self-center text-xs text-zinc-500">
+                          {jornadaSeleccionada.estadoFuncional === "APROBADO"
+                            ? "Completada: sin edición"
+                            : "En revisión: sin edición"}
+                        </span>
                       ) : null}
                       {jornadaSeleccionada.estado !== "CANCELADA" ? (
                         <button
@@ -423,7 +449,10 @@ export function PanelJornadas({
                   </div>
                 ) : null}
 
-                {editandoId === jornadaSeleccionada.id && puedeGestionar ? (
+                {editandoId === jornadaSeleccionada.id &&
+                puedeGestionar &&
+                jornadaSeleccionada.estadoFuncional !== "EN_REVISION" &&
+                jornadaSeleccionada.estadoFuncional !== "APROBADO" ? (
                   <FormularioEditarJornada
                     key={jornadaSeleccionada.id}
                     jornada={jornadaSeleccionada}
