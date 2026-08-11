@@ -503,13 +503,26 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
       ) : null}
 
       {tab === "equipo" ? (
-        <EquipoVinculos
-          token={token}
-          proyectoId={proyectoId}
-          proyecto={proyecto}
-          puedeGestionar={puedeGestionar}
-          onActualizar={cargar}
-        />
+        <>
+          <div className="mb-4 rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-3 text-sm text-ruralia-teal-text">
+            Las cuotas personales, el ranking y la evaluación individual están
+            en el módulo{" "}
+            <Link
+              href={`/evaluaciones?tab=asignaciones&proyectoId=${proyectoId}`}
+              className="font-semibold underline"
+            >
+              Evaluaciones
+            </Link>
+            .
+          </div>
+          <EquipoVinculos
+            token={token}
+            proyectoId={proyectoId}
+            proyecto={proyecto}
+            puedeGestionar={puedeGestionar}
+            onActualizar={cargar}
+          />
+        </>
       ) : null}
     </>
   );

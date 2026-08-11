@@ -13,6 +13,7 @@ import {
   MapPinned,
   Waypoints,
   Inbox,
+  ChartColumn,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -50,6 +51,12 @@ const ITEMS: {
     etiqueta: "Seguimiento",
     icono: Waypoints,
     puedeAlgunoDe: ["proyectos.ver", "jornadas.ver"],
+  },
+  {
+    href: "/evaluaciones",
+    etiqueta: "Evaluaciones",
+    icono: ChartColumn,
+    permiso: "evaluaciones.ver",
   },
   {
     href: "/usuarios",

@@ -44,6 +44,16 @@ import type {
   EstadisticasProyecto,
   Jornada,
   KpisDashboard,
+  DashboardCompleto,
+  MedidoresCumplimiento,
+  SerieMensualDashboard,
+  VeredaCobertura,
+  AsignacionMeta,
+  SugerenciaReparto,
+  ProductividadPersona,
+  ProductividadUsuarioDetalle,
+  UpsertAsignacionesMetaPayload,
+  ResumenDesviaciones,
   ModuloPermisos,
   MetaPeriodoPlan,
   MetaPlan,
@@ -1070,22 +1080,143 @@ export async function desactivarVeredaAdmin(
   });
 }
 
-export async function obtenerKpisDashboard(token: string): Promise<KpisDashboard> {
-  const [activos, total, jornadas, indicadores, recientes] = await Promise.all([
-    listarProyectos(token, { estado: "ACTIVO", limite: 1 }),
-    listarProyectos(token, { limite: 1 }),
-    fetchConAuth<RespuestaPaginada<unknown>>("/jornadas?limite=1", token),
-    fetchConAuth<unknown[]>("/indicadores", token),
-    listarProyectos(token, { estado: "ACTIVO", limite: 5 }),
-  ]);
+export async function obtenerDashboardCompleto(
+  token: string,
+  meses = 6,
+): Promise<DashboardCompleto> {
+  return fetchConAuth<DashboardCompleto>(
+    `/dashboard?meses=${meses}`,
+    token,
+  );
+}
 
-  return {
-    proyectosActivos: activos.total,
-    totalProyectos: total.total,
-    jornadasRegistradas: jornadas.total,
-    indicadoresMonitoreados: indicadores.length,
-    proyectosRecientes: recientes.datos,
-  };
+export async function obtenerKpisDashboard(token: string): Promise<KpisDashboard> {
+  return fetchConAuth<KpisDashboard>("/dashboard/resumen", token);
+}
+
+export async function obtenerCumplimientoDashboard(
+  token: string,
+): Promise<MedidoresCumplimiento> {
+  return fetchConAuth<MedidoresCumplimiento>("/dashboard/cumplimiento", token);
+}
+
+export async function obtenerActividadMensualDashboard(
+  token: string,
+  meses = 6,
+): Promise<SerieMensualDashboard[]> {
+  return fetchConAuth<SerieMensualDashboard[]>(
+    `/dashboard/actividad-mensual?meses=${meses}`,
+    token,
+  );
+}
+
+export async function obtenerMapaCoberturaDashboard(
+  token: string,
+): Promise<VeredaCobertura[]> {
+  return fetchConAuth<VeredaCobertura[]>("/dashboard/mapa-cobertura", token);
+}
+
+export async function obtenerCumplimientoEquipoDashboard(
+  token: string,
+  filtros?: { anio?: number; mes?: number },
+): Promise<ProductividadPersona[]> {
+  const params = new URLSearchParams();
+  if (filtros?.anio != null) params.set("anio", String(filtros.anio));
+  if (filtros?.mes != null) params.set("mes", String(filtros.mes));
+  const q = params.toString();
+  return fetchConAuth<ProductividadPersona[]>(
+    `/evaluaciones/ranking${q ? `?${q}` : ""}`,
+    token,
+  );
+}
+
+export async function listarAsignacionesMeta(
+  token: string,
+  proyectoId: string,
+  filtros?: { metaId?: string; anio?: number; mes?: number },
+): Promise<AsignacionMeta[]> {
+  const params = new URLSearchParams();
+  if (filtros?.metaId) params.set("metaId", filtros.metaId);
+  if (filtros?.anio != null) params.set("anio", String(filtros.anio));
+  if (filtros?.mes != null) params.set("mes", String(filtros.mes));
+  const q = params.toString();
+  return fetchConAuth<AsignacionMeta[]>(
+    `/evaluaciones/proyectos/${proyectoId}/asignaciones${q ? `?${q}` : ""}`,
+    token,
+  );
+}
+
+export async function guardarAsignacionesMeta(
+  token: string,
+  proyectoId: string,
+  payload: UpsertAsignacionesMetaPayload,
+): Promise<AsignacionMeta[]> {
+  return fetchConAuth<AsignacionMeta[]>(
+    `/evaluaciones/proyectos/${proyectoId}/asignaciones`,
+    token,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export async function sugerirRepartoMeta(
+  token: string,
+  proyectoId: string,
+  metaId: string,
+  metaPeriodoId?: string,
+): Promise<SugerenciaReparto[]> {
+  const params = new URLSearchParams({ metaId });
+  if (metaPeriodoId) params.set("metaPeriodoId", metaPeriodoId);
+  return fetchConAuth<SugerenciaReparto[]>(
+    `/evaluaciones/proyectos/${proyectoId}/sugerir-reparto?${params}`,
+    token,
+  );
+}
+
+export async function obtenerProductividadProyecto(
+  token: string,
+  proyectoId: string,
+  filtros?: { anio?: number; mes?: number },
+): Promise<ProductividadPersona[]> {
+  const params = new URLSearchParams();
+  if (filtros?.anio != null) params.set("anio", String(filtros.anio));
+  if (filtros?.mes != null) params.set("mes", String(filtros.mes));
+  const q = params.toString();
+  return fetchConAuth<ProductividadPersona[]>(
+    `/evaluaciones/proyectos/${proyectoId}/ranking${q ? `?${q}` : ""}`,
+    token,
+  );
+}
+
+export async function obtenerProductividadUsuario(
+  token: string,
+  usuarioId: string,
+  filtros?: { proyectoId?: string; anio?: number; mes?: number },
+): Promise<ProductividadUsuarioDetalle> {
+  const params = new URLSearchParams();
+  if (filtros?.proyectoId) params.set("proyectoId", filtros.proyectoId);
+  if (filtros?.anio != null) params.set("anio", String(filtros.anio));
+  if (filtros?.mes != null) params.set("mes", String(filtros.mes));
+  const q = params.toString();
+  return fetchConAuth<ProductividadUsuarioDetalle>(
+    `/evaluaciones/usuarios/${usuarioId}${q ? `?${q}` : ""}`,
+    token,
+  );
+}
+
+export async function obtenerDesviacionesUsuario(
+  token: string,
+  usuarioId: string,
+  filtros?: { proyectoId?: string; anio?: number; mes?: number },
+): Promise<ResumenDesviaciones> {
+  const params = new URLSearchParams();
+  if (filtros?.proyectoId) params.set("proyectoId", filtros.proyectoId);
+  if (filtros?.anio != null) params.set("anio", String(filtros.anio));
+  if (filtros?.mes != null) params.set("mes", String(filtros.mes));
+  const q = params.toString();
+  return fetchConAuth<ResumenDesviaciones>(
+    `/evaluaciones/usuarios/${usuarioId}/desviaciones${q ? `?${q}` : ""}`,
+    token,
+  );
 }
 
 export async function listarPlantillasFormulario(

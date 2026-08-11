@@ -1,9 +1,9 @@
 "use client";
 
-import type { MockSerieMensual } from "@/lib/mock/dashboard-mock";
+import type { SerieMensualDashboard } from "@/lib/types";
 
 interface GraficaActividadMensualProps {
-  datos: MockSerieMensual[];
+  datos: SerieMensualDashboard[];
 }
 
 export function GraficaActividadMensual({ datos }: GraficaActividadMensualProps) {

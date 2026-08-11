@@ -120,20 +120,3 @@ export function ListaProyectosRecientes({
   );
 }
 
-interface AvisoDatosMockProps {
-  activo: boolean;
-}
-
-/** Banner visible mientras se usen datos de demostración. */
-export function AvisoDatosMock({ activo }: AvisoDatosMockProps) {
-  if (!activo) return null;
-
-  return (
-    <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-      <p className="font-semibold">Modo demostración — datos mock</p>
-      <p className="mt-1 text-xs leading-relaxed opacity-90">
-        Los indicadores, gráficas y mapas usan datos de prueba
-      </p>
-    </div>
-  );
-}

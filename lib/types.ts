@@ -195,8 +195,84 @@ export interface KpisDashboard {
   proyectosActivos: number;
   totalProyectos: number;
   jornadasRegistradas: number;
-  indicadoresMonitoreados: number;
+  agentesEnCampo: number;
   proyectosRecientes: Proyecto[];
+}
+
+export interface MedidoresCumplimiento {
+  cumplimientoPlan: number;
+  coberturaTerritorial: number;
+  jornadasConEvidencia: number;
+  jornadasMesActual: number;
+}
+
+export interface SerieMensualDashboard {
+  mes: string;
+  jornadas: number;
+  formularios: number;
+  beneficiariosAtendidos: number;
+}
+
+export interface ProgresoProyectoDashboard {
+  proyectoId: string;
+  nombre: string;
+  tipo: TipoProyecto;
+  progresoPorcentaje: number;
+  conteoBeneficiarios: number;
+}
+
+export interface ProyectoEnVeredaCobertura {
+  proyectoId: string;
+  nombre: string;
+  estado: EstadoProyecto;
+  progresoPorcentaje: number;
+  beneficiarios: number;
+}
+
+export interface VeredaCobertura {
+  veredaId: string;
+  nombre: string;
+  municipio: string;
+  departamento: string;
+  latitud: number;
+  longitud: number;
+  proyectos: ProyectoEnVeredaCobertura[];
+}
+
+export interface JornadaGeorefDashboard {
+  jornadaId: string;
+  nombre: string;
+  latitud: number;
+  longitud: number;
+  estado: EstadoJornada;
+  fecha?: string;
+  descripcion: string;
+}
+
+export interface SeguimientoCampoDashboard {
+  proyectoId: string;
+  nombreProyecto: string;
+  jornadas: JornadaGeorefDashboard[];
+  progresoAvancePorcentaje: number;
+}
+
+export interface JornadaRecienteDashboard {
+  id: string;
+  proyectoNombre: string;
+  veredaNombre: string;
+  tecnico: string;
+  estado: EstadoJornada;
+  fecha: string;
+}
+
+export interface DashboardCompleto {
+  kpis: KpisDashboard;
+  medidores: MedidoresCumplimiento;
+  actividadMensual: SerieMensualDashboard[];
+  progresoProyectos: ProgresoProyectoDashboard[];
+  veredasCobertura: VeredaCobertura[];
+  seguimientoDestacado: SeguimientoCampoDashboard | null;
+  jornadasRecientes: JornadaRecienteDashboard[];
 }
 
 export interface CompletadaPor {
@@ -877,3 +953,92 @@ export type FiltrosCronologia = {
   fechaDesde?: string;
   fechaHasta?: string;
 };
+
+export interface AsignacionMeta {
+  id: string;
+  metaId: string;
+  metaNombre: string;
+  unidadMedida: string;
+  metaPeriodoId?: string | null;
+  anio?: number | null;
+  mes?: number | null;
+  usuario: { id: string; nombreCompleto: string; correo?: string };
+  cantidadAsignada: number;
+  ejecutado: number;
+  cumplimientoPorcentaje: number;
+  conteoJornadas: number;
+  beneficiariosAtendidos: number;
+  notas?: string | null;
+}
+
+export interface SugerenciaReparto {
+  usuario: { id: string; nombreCompleto: string; correo?: string };
+  conteoJornadas: number;
+  cantidadSugerida: number;
+}
+
+export interface ProductividadPersona {
+  usuarioId: string;
+  nombreCompleto: string;
+  cantidadAsignada: number;
+  ejecutado: number;
+  cumplimientoPorcentaje: number;
+  indiceEficiencia: number;
+  conteoJornadas: number;
+  jornadasAprobadas: number;
+  jornadasConEvidencia: number;
+  formulariosEnviados: number;
+  /** Veces rechazado en revisión (jornada / formulario-documento / evidencia). */
+  rechazosRevision: number;
+  beneficiariosAtendidos: number;
+  veredasCubiertas: number;
+  promedioBeneficiariosPorJornada: number;
+  ritmoEjecucion: number;
+  proyectoId?: string;
+  proyectoNombre?: string;
+}
+
+export interface ProductividadUsuarioDetalle {
+  usuario: { id: string; nombreCompleto: string; correo?: string };
+  asignaciones: AsignacionMeta[];
+  totalAsignado: number;
+  totalEjecutado: number;
+  cumplimientoPromedio: number;
+  conteoJornadas: number;
+  beneficiariosAtendidos: number;
+  veredasCubiertas: number;
+  rechazosRevision: number;
+}
+
+export interface UpsertAsignacionesMetaPayload {
+  metaId: string;
+  metaPeriodoId?: string;
+  asignaciones: Array<{
+    usuarioId: string;
+    cantidadAsignada: number;
+    notas?: string;
+  }>;
+}
+
+export interface DesviacionMeta {
+  metaId: string;
+  metaNombre: string;
+  unidadMedida: string;
+  proyectoId?: string;
+  proyectoNombre?: string;
+  cantidadAsignada: number;
+  ejecutado: number;
+  cumplimientoPorcentaje: number;
+  sinEjecucion: boolean;
+  incumplida: boolean;
+}
+
+export interface ResumenDesviaciones {
+  usuario: { id: string; nombreCompleto: string; correo?: string };
+  anio: number;
+  mes: number;
+  metasConCuota: number;
+  fallosSinEjecucion: number;
+  incumplimientos: number;
+  detalle: DesviacionMeta[];
+}

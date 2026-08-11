@@ -1,28 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Map, Route } from "lucide-react";
+import Link from "next/link";
+import { Activity, Map, Users } from "lucide-react";
+import { ListaAgentesEficientes } from "@/components/evaluaciones/lista-agentes-eficientes";
 import { GraficaActividadMensual } from "@/components/dashboard/grafica-actividad-mensual";
 import { GraficaProgresoProyectos } from "@/components/dashboard/grafica-progreso-proyectos";
 import { MapaCoberturaVeredas } from "@/components/dashboard/mapa-cobertura-veredas";
-import { MapaSeguimientoCampo } from "@/components/dashboard/mapa-seguimiento-campo";
 import { MedidorCircular } from "@/components/dashboard/medidor-circular";
 import { MetricaNumerica } from "@/components/dashboard/metrica-numerica";
 import { TablaJornadasRecientes } from "@/components/dashboard/tabla-jornadas-recientes";
 import {
-  AvisoDatosMock,
   ListaProyectosRecientes,
   TarjetaKpi,
 } from "@/components/dashboard/tarjeta-kpi";
 import { Alerta, Spinner } from "@/components/ui/modal";
-import { obtenerKpisDashboard } from "@/lib/api";
+import { obtenerDashboardCompleto, obtenerCumplimientoEquipoDashboard } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import {
-  DASHBOARD_USAR_MOCK,
-  MOCK_DASHBOARD,
-  type MockDashboardCompleto,
-} from "@/lib/mock/dashboard-mock";
-import type { KpisDashboard } from "@/lib/types";
+import type {
+  DashboardCompleto,
+  ProductividadPersona,
+} from "@/lib/types";
 
 function TarjetaSeccion({
   titulo,
@@ -61,15 +59,13 @@ function TarjetaSeccion({
 
 export function DashboardInicio() {
   const { token } = useAuth();
-  const [kpisReales, setKpisReales] = useState<KpisDashboard | null>(null);
-  const [cargando, setCargando] = useState(!DASHBOARD_USAR_MOCK);
+  const [datos, setDatos] = useState<DashboardCompleto | null>(null);
+  const [equipo, setEquipo] = useState<ProductividadPersona[]>([]);
+  const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const mock: MockDashboardCompleto = MOCK_DASHBOARD;
-  const kpis = DASHBOARD_USAR_MOCK ? mock.kpis : kpisReales;
-
   useEffect(() => {
-    if (DASHBOARD_USAR_MOCK || !token) return;
+    if (!token) return;
 
     let cancelado = false;
 
@@ -78,12 +74,18 @@ export function DashboardInicio() {
       setCargando(true);
       setError(null);
       try {
-        const datos = await obtenerKpisDashboard(token);
-        if (!cancelado) setKpisReales(datos);
+        const [completo, cumplimientoEquipo] = await Promise.all([
+          obtenerDashboardCompleto(token),
+          obtenerCumplimientoEquipoDashboard(token).catch(() => [] as ProductividadPersona[]),
+        ]);
+        if (!cancelado) {
+          setDatos(completo);
+          setEquipo(cumplimientoEquipo);
+        }
       } catch (err) {
         if (!cancelado) {
           setError(
-            err instanceof Error ? err.message : "Error al cargar indicadores",
+            err instanceof Error ? err.message : "Error al cargar el dashboard",
           );
         }
       } finally {
@@ -97,6 +99,8 @@ export function DashboardInicio() {
     };
   }, [token]);
 
+  const kpis = datos?.kpis;
+
   return (
     <>
       <div className="mb-8">
@@ -106,13 +110,11 @@ export function DashboardInicio() {
         </p>
       </div>
 
-      <AvisoDatosMock activo={DASHBOARD_USAR_MOCK} />
-
       {error ? <Alerta mensaje={error} /> : null}
 
       {cargando ? (
         <Spinner />
-      ) : kpis ? (
+      ) : kpis && datos ? (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <TarjetaKpi
@@ -132,9 +134,9 @@ export function DashboardInicio() {
               descripcion="Actividades registradas"
             />
             <TarjetaKpi
-              etiqueta="Indicadores"
-              valor={kpis.indicadoresMonitoreados}
-              descripcion="Métricas monitoreadas"
+              etiqueta="Agentes en campo"
+              valor={kpis.agentesEnCampo}
+              descripcion="Técnicos con jornadas registradas"
             />
           </div>
 
@@ -145,63 +147,69 @@ export function DashboardInicio() {
           >
             <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
               <MedidorCircular
-                valor={mock.medidores.cumplimientoPlan}
+                valor={datos.medidores.cumplimientoPlan}
                 etiqueta="Avance del plan"
                 subetiqueta="Promedio proyectos activos"
               />
               <MedidorCircular
-                valor={mock.medidores.coberturaTerritorial}
+                valor={datos.medidores.coberturaTerritorial}
                 etiqueta="Cobertura territorial"
                 subetiqueta="Veredas con jornada registrada"
                 color="#0d9488"
               />
               <MedidorCircular
-                valor={mock.medidores.jornadasConEvidencia}
+                valor={datos.medidores.jornadasConEvidencia}
                 etiqueta="Jornadas con evidencia"
                 subetiqueta="Completadas con foto adjunta"
                 color="#356960"
               />
               <MetricaNumerica
-                valor={mock.medidores.jornadasMesActual}
+                valor={datos.medidores.jornadasMesActual}
                 etiqueta="Jornadas del mes"
-                subetiqueta="COUNT por rango de fechas"
+                subetiqueta="Periodo calendario actual"
               />
             </div>
           </TarjetaSeccion>
+
+          {equipo.length > 0 ? (
+            <TarjetaSeccion
+              titulo="Agentes de campo más eficientes"
+              descripcion="Top del mes por índice de eficiencia (cumplimiento, jornadas, cobertura y evidencia)"
+              icono={Users}
+            >
+              <ListaAgentesEficientes personas={equipo} limite={6} />
+              <Link
+                href="/evaluaciones"
+                className="mt-4 inline-block text-sm font-semibold text-ruralia-teal-text hover:underline"
+              >
+                Ver módulo Evaluaciones →
+              </Link>
+            </TarjetaSeccion>
+          ) : null}
 
           <div className="grid gap-6 xl:grid-cols-2">
             <TarjetaSeccion
               titulo="Actividad mensual"
               descripcion="Jornadas, envíos de formulario y beneficiarios atendidos"
             >
-              <GraficaActividadMensual datos={mock.actividadMensual} />
+              <GraficaActividadMensual datos={datos.actividadMensual} />
             </TarjetaSeccion>
 
             <TarjetaSeccion
               titulo="Progreso por proyecto"
               descripcion="Avance del plan y beneficiarios vinculados"
             >
-              <GraficaProgresoProyectos datos={mock.progresoProyectos} />
+              <GraficaProgresoProyectos datos={datos.progresoProyectos} />
             </TarjetaSeccion>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-2">
-            <TarjetaSeccion
-              titulo="Mapa de cobertura territorial"
-              descripcion="Veredas con proyectos activos e inactivos (centroide de jornadas)"
-              icono={Map}
-            >
-              <MapaCoberturaVeredas veredas={mock.veredasCobertura} />
-            </TarjetaSeccion>
-
-            <TarjetaSeccion
-              titulo="Jornadas georreferenciadas"
-              descripcion={`${mock.seguimientoDestacado.nombreProyecto} — avance cronológico en campo`}
-              icono={Route}
-            >
-              <MapaSeguimientoCampo seguimiento={mock.seguimientoDestacado} />
-            </TarjetaSeccion>
-          </div>
+          <TarjetaSeccion
+            titulo="Mapa de cobertura territorial"
+            descripcion="Veredas con proyectos activos e inactivos (centroide de jornadas)"
+            icono={Map}
+          >
+            <MapaCoberturaVeredas veredas={datos.veredasCobertura} />
+          </TarjetaSeccion>
 
           <div className="grid gap-6 xl:grid-cols-2">
             <TarjetaSeccion
@@ -215,7 +223,7 @@ export function DashboardInicio() {
               titulo="Jornadas recientes"
               descripcion="Actividad de campo registrada por técnicos"
             >
-              <TablaJornadasRecientes jornadas={mock.jornadasRecientes} />
+              <TablaJornadasRecientes jornadas={datos.jornadasRecientes} />
             </TarjetaSeccion>
           </div>
         </div>

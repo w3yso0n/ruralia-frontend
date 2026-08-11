@@ -1,9 +1,9 @@
 "use client";
 
-import type { MockJornadaReciente } from "@/lib/mock/dashboard-mock";
+import type { JornadaRecienteDashboard, EstadoJornada } from "@/lib/types";
 
 const ESTADO_JORNADA: Record<
-  MockJornadaReciente["estado"],
+  EstadoJornada,
   { etiqueta: string; clase: string }
 > = {
   COMPLETADA: {
@@ -18,15 +18,25 @@ const ESTADO_JORNADA: Record<
     etiqueta: "Planificada",
     clase: "bg-zinc-100 text-zinc-600",
   },
+  CANCELADA: {
+    etiqueta: "Cancelada",
+    clase: "bg-red-50 text-red-700",
+  },
 };
 
 interface TablaJornadasRecientesProps {
-  jornadas: MockJornadaReciente[];
+  jornadas: JornadaRecienteDashboard[];
 }
 
 export function TablaJornadasRecientes({
   jornadas,
 }: TablaJornadasRecientesProps) {
+  if (jornadas.length === 0) {
+    return (
+      <p className="text-sm text-zinc-500">No hay jornadas registradas aún.</p>
+    );
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[520px] text-left text-sm">
@@ -39,22 +49,22 @@ export function TablaJornadasRecientes({
             <th className="pb-3 font-semibold">Estado</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-50">
-          {jornadas.map((jornada) => {
-            const estado = ESTADO_JORNADA[jornada.estado];
+        <tbody>
+          {jornadas.map((j) => {
+            const est = ESTADO_JORNADA[j.estado] ?? ESTADO_JORNADA.PLANIFICADA;
             return (
-              <tr key={jornada.id} className="text-zinc-700">
-                <td className="py-3 pr-4 font-medium text-zinc-900">
-                  {jornada.proyectoNombre}
+              <tr key={j.id} className="border-b border-zinc-50">
+                <td className="py-3 pr-4 font-medium text-zinc-800">
+                  {j.proyectoNombre}
                 </td>
-                <td className="py-3 pr-4">{jornada.veredaNombre}</td>
-                <td className="py-3 pr-4">{jornada.tecnico}</td>
-                <td className="py-3 pr-4 tabular-nums">{jornada.fecha}</td>
+                <td className="py-3 pr-4 text-zinc-600">{j.veredaNombre}</td>
+                <td className="py-3 pr-4 text-zinc-600">{j.tecnico}</td>
+                <td className="py-3 pr-4 text-zinc-600">{j.fecha}</td>
                 <td className="py-3">
                   <span
-                    className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${estado.clase}`}
+                    className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${est.clase}`}
                   >
-                    {estado.etiqueta}
+                    {est.etiqueta}
                   </span>
                 </td>
               </tr>

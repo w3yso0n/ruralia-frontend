@@ -7,23 +7,25 @@ import {
   cargarGoogleMapsDashboard,
   crearContenidoMarcadorCircular,
 } from "@/lib/google-maps";
-import type { MockSeguimientoCampo } from "@/lib/mock/dashboard-mock";
+import type { SeguimientoCampoDashboard } from "@/lib/types";
 
 interface MapaSeguimientoCampoProps {
-  seguimiento: MockSeguimientoCampo;
+  seguimiento: SeguimientoCampoDashboard;
 }
 
-const COLOR_ESTADO = {
+const COLOR_ESTADO: Record<string, string> = {
   COMPLETADA: "#42827A",
   EN_PROGRESO: "#42827A",
   PLANIFICADA: "#a1a1aa",
-} as const;
+  CANCELADA: "#dc2626",
+};
 
-const ETIQUETA_ESTADO = {
+const ETIQUETA_ESTADO: Record<string, string> = {
   COMPLETADA: "Completada",
   EN_PROGRESO: "En progreso",
   PLANIFICADA: "Planificada",
-} as const;
+  CANCELADA: "Cancelada",
+};
 
 /**
  * Mapa de jornadas georreferenciadas de un proyecto (orden cronológico).
@@ -97,7 +99,7 @@ export function MapaSeguimientoCampo({ seguimiento }: MapaSeguimientoCampoProps)
             position: posicion,
             title: jornada.nombre,
             content: crearContenidoMarcadorCircular(
-              COLOR_ESTADO[jornada.estado],
+              COLOR_ESTADO[jornada.estado] ?? "#a1a1aa",
               { etiqueta: String(index + 1), tamano: 24 },
             ),
           });
@@ -108,7 +110,7 @@ export function MapaSeguimientoCampo({ seguimiento }: MapaSeguimientoCampoProps)
             content: `
               <div style="font-family:system-ui;max-width:220px;padding:4px">
                 <p style="font-weight:600;margin:0 0 4px">${jornada.nombre}</p>
-                <p style="font-size:11px;color:#666;margin:0 0 6px">${ETIQUETA_ESTADO[jornada.estado]}${jornada.fecha ? ` · ${jornada.fecha}` : ""}</p>
+                <p style="font-size:11px;color:#666;margin:0 0 6px">${ETIQUETA_ESTADO[jornada.estado] ?? jornada.estado}${jornada.fecha ? ` · ${jornada.fecha}` : ""}</p>
                 <p style="font-size:12px;margin:0">${jornada.descripcion}</p>
               </div>
             `,
@@ -217,14 +219,16 @@ export function MapaSeguimientoCampo({ seguimiento }: MapaSeguimientoCampoProps)
           <li key={jornada.jornadaId} className="flex items-start gap-3 text-sm">
             <span
               className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-              style={{ backgroundColor: COLOR_ESTADO[jornada.estado] }}
+              style={{
+                backgroundColor: COLOR_ESTADO[jornada.estado] ?? "#a1a1aa",
+              }}
             >
               {index + 1}
             </span>
             <div>
               <p className="font-medium text-zinc-900">{jornada.nombre}</p>
               <p className="text-xs text-zinc-500">
-                {ETIQUETA_ESTADO[jornada.estado]}
+                {ETIQUETA_ESTADO[jornada.estado] ?? jornada.estado}
                 {jornada.fecha ? ` · ${jornada.fecha}` : ""} — {jornada.descripcion}
               </p>
             </div>

@@ -7,11 +7,11 @@ import {
   cargarGoogleMapsDashboard,
   crearContenidoMarcadorCircular,
 } from "@/lib/google-maps";
-import type { MockVeredaCobertura } from "@/lib/mock/dashboard-mock";
+import type { VeredaCobertura } from "@/lib/types";
 import type { EstadoProyecto } from "@/lib/types";
 
 interface MapaCoberturaVeredasProps {
-  veredas: MockVeredaCobertura[];
+  veredas: VeredaCobertura[];
 }
 
 interface FilaProyectoCobertura {
@@ -23,15 +23,15 @@ interface FilaProyectoCobertura {
   departamento: string;
 }
 
-function veredaTieneProyectoActivo(vereda: MockVeredaCobertura): boolean {
+function veredaTieneProyectoActivo(vereda: VeredaCobertura): boolean {
   return vereda.proyectos.some((p) => p.estado === "ACTIVO");
 }
 
-function veredaTieneProyectoSuspendido(vereda: MockVeredaCobertura): boolean {
+function veredaTieneProyectoSuspendido(vereda: VeredaCobertura): boolean {
   return vereda.proyectos.some((p) => p.estado === "SUSPENDIDO");
 }
 
-function colorMarcadorVereda(vereda: MockVeredaCobertura): string {
+function colorMarcadorVereda(vereda: VeredaCobertura): string {
   if (veredaTieneProyectoActivo(vereda)) return "#42827A";
   if (veredaTieneProyectoSuspendido(vereda)) return "#dc2626";
   return "#a1a1aa";
@@ -68,8 +68,7 @@ function estilosBadgeInfo(estado: EstadoProyecto): { bg: string; color: string }
 
 /**
  * Mapa de cobertura territorial: veredas con proyectos activos e inactivos.
- * Fuente real: proyecto_veredas + centroide AVG(jornadas.lat/lng) por vereda.
- * Datos mock → lib/mock/dashboard-mock.ts → veredasCobertura
+ * Fuente: proyecto_veredas + centroide AVG(jornadas.lat/lng) por vereda.
  */
 export function MapaCoberturaVeredas({ veredas }: MapaCoberturaVeredasProps) {
   const contenedorRef = useRef<HTMLDivElement>(null);

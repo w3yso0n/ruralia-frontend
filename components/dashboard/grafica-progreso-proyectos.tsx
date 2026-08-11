@@ -1,6 +1,6 @@
 "use client";
 
-import type { MockProgresoProyecto } from "@/lib/mock/dashboard-mock";
+import type { ProgresoProyectoDashboard } from "@/lib/types";
 
 const COLOR_TIPO: Record<string, string> = {
   AGRICOLA: "bg-ruralia-teal",
@@ -10,7 +10,7 @@ const COLOR_TIPO: Record<string, string> = {
 };
 
 interface GraficaProgresoProyectosProps {
-  datos: MockProgresoProyecto[];
+  datos: ProgresoProyectoDashboard[];
 }
 
 export function GraficaProgresoProyectos({
