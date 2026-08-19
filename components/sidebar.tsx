@@ -99,7 +99,10 @@ const ITEMS: {
     href: "/configuracion",
     etiqueta: "Configuración",
     icono: Settings,
-    permiso: "dashboard.ver",
+    puedeAlgunoDe: [
+      "configuracion.editar_dashboard",
+      "configuracion.gestionar_plantillas",
+    ],
   },
 ];
 

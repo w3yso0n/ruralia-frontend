@@ -55,6 +55,10 @@ import type {
   WidgetDisponible,
   ConfiguracionDashboard,
   ItemPreferenciaDashboard,
+  PlantillaDashboard,
+  CrearPlantillaDashboardPayload,
+  ActualizarPlantillaDashboardPayload,
+  CompatibilidadRolWidget,
   AsignacionMeta,
   SugerenciaReparto,
   ProductividadPersona,
@@ -245,6 +249,15 @@ export async function clonarRol(
   id: string,
 ): Promise<RolDetalle> {
   return fetchConAuth<RolDetalle>(`/roles/${id}/clonar`, token, {
+    method: "POST",
+  });
+}
+
+export async function restablecerRolAValoresDeFabrica(
+  token: string,
+  id: string,
+): Promise<RolDetalle> {
+  return fetchConAuth<RolDetalle>(`/roles/${id}/restablecer`, token, {
     method: "POST",
   });
 }
@@ -1182,6 +1195,81 @@ export async function restablecerMiConfiguracionDashboard(
     "/dashboard/mi-configuracion/restablecer",
     token,
     { method: "POST" },
+  );
+}
+
+export async function listarPlantillasDashboard(
+  token: string,
+): Promise<PlantillaDashboard[]> {
+  return fetchConAuth<PlantillaDashboard[]>("/dashboard/plantillas", token);
+}
+
+export async function obtenerPlantillaDashboard(
+  token: string,
+  id: string,
+): Promise<PlantillaDashboard> {
+  return fetchConAuth<PlantillaDashboard>(`/dashboard/plantillas/${id}`, token);
+}
+
+export async function obtenerCompatibilidadRolesDashboard(
+  token: string,
+): Promise<CompatibilidadRolWidget[]> {
+  return fetchConAuth<CompatibilidadRolWidget[]>(
+    "/dashboard/plantillas/compatibilidad-roles",
+    token,
+  );
+}
+
+export async function crearPlantillaDashboard(
+  token: string,
+  payload: CrearPlantillaDashboardPayload,
+): Promise<PlantillaDashboard> {
+  return fetchConAuth<PlantillaDashboard>("/dashboard/plantillas", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actualizarPlantillaDashboard(
+  token: string,
+  id: string,
+  payload: ActualizarPlantillaDashboardPayload,
+): Promise<PlantillaDashboard> {
+  return fetchConAuth<PlantillaDashboard>(`/dashboard/plantillas/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function eliminarPlantillaDashboard(
+  token: string,
+  id: string,
+): Promise<void> {
+  return fetchConAuth<void>(`/dashboard/plantillas/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
+export async function asignarPlantillaDashboardARol(
+  token: string,
+  plantillaId: string,
+  rolId: string,
+): Promise<void> {
+  return fetchConAuth<void>(
+    `/dashboard/plantillas/${plantillaId}/asignar`,
+    token,
+    { method: "POST", body: JSON.stringify({ rolId }) },
+  );
+}
+
+export async function quitarAsignacionPlantillaDashboard(
+  token: string,
+  rolId: string,
+): Promise<void> {
+  return fetchConAuth<void>(
+    `/dashboard/plantillas/asignaciones/${rolId}`,
+    token,
+    { method: "DELETE" },
   );
 }
 

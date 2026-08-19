@@ -10,6 +10,7 @@ import {
   listarPermisos,
   listarRoles,
   obtenerRol,
+  restablecerRolAValoresDeFabrica,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { ModuloPermisos, RolDetalle } from "@/lib/types";
@@ -62,6 +63,8 @@ export function GestionRoles() {
   const [confirmarEliminar, setConfirmarEliminar] = useState<RolDetalle | null>(
     null,
   );
+  const [confirmarRestablecer, setConfirmarRestablecer] =
+    useState<RolDetalle | null>(null);
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -248,6 +251,30 @@ export function GestionRoles() {
       await abrirEditar(clon.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al clonar rol");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function manejarRestablecer() {
+    if (!token || !confirmarRestablecer) return;
+    setEnviando(true);
+    setError(null);
+    setExito(null);
+    try {
+      const actualizado = await restablecerRolAValoresDeFabrica(
+        token,
+        confirmarRestablecer.id,
+      );
+      setExito(`Rol ${etiquetaRol(actualizado.nombre)} restablecido a valores de fábrica`);
+      setConfirmarRestablecer(null);
+      cerrarEditor();
+      await cargar();
+      await refrescarUsuario();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Error al restablecer el rol",
+      );
     } finally {
       setEnviando(false);
     }
@@ -502,22 +529,36 @@ export function GestionRoles() {
           ) : null}
 
           {(puede("roles.editar") || creando) && (
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={cerrarEditor}
-                className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={enviando || !nombre.trim()}
-                onClick={() => void guardar()}
-                className="rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {enviando ? "Guardando..." : "Guardar"}
-              </button>
+            <div className="flex items-center justify-between gap-3 pt-2">
+              {editando?.esSistema && puede("roles.editar") ? (
+                <button
+                  type="button"
+                  disabled={enviando}
+                  onClick={() => setConfirmarRestablecer(editando)}
+                  className="rounded-xl px-3 py-2 text-sm font-semibold text-zinc-500 hover:bg-zinc-50 disabled:opacity-60"
+                >
+                  Restablecer a valores de fábrica
+                </button>
+              ) : (
+                <span />
+              )}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={cerrarEditor}
+                  className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={enviando || !nombre.trim()}
+                  onClick={() => void guardar()}
+                  className="rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {enviando ? "Guardando..." : "Guardar"}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -548,6 +589,38 @@ export function GestionRoles() {
             className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             {enviando ? "Eliminando..." : "Eliminar"}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        titulo="Restablecer a valores de fábrica"
+        abierto={confirmarRestablecer !== null}
+        onCerrar={() => setConfirmarRestablecer(null)}
+      >
+        <p className="text-sm text-zinc-600">
+          ¿Restablecer el rol{" "}
+          <strong>
+            {confirmarRestablecer ? etiquetaRol(confirmarRestablecer.nombre) : ""}
+          </strong>{" "}
+          a su matriz de permisos original? Se perderán los cambios manuales
+          hechos a este rol.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setConfirmarRestablecer(null)}
+            className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={enviando}
+            onClick={() => void manejarRestablecer()}
+            className="rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {enviando ? "Restableciendo..." : "Restablecer"}
           </button>
         </div>
       </Modal>

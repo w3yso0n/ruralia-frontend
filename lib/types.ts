@@ -306,9 +306,47 @@ export interface ItemPreferenciaDashboard {
   visible: boolean;
 }
 
+export type OrigenConfiguracionDashboard = "PROPIA" | "PLANTILLA" | "FABRICA";
+
 export interface ConfiguracionDashboard {
   items: ItemPreferenciaDashboard[];
   esPorDefecto: boolean;
+  origen: OrigenConfiguracionDashboard;
+}
+
+export interface RolResumenPlantilla {
+  id: string;
+  nombre: string;
+  etiqueta?: string;
+}
+
+export interface PlantillaDashboard {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  items: ItemPreferenciaDashboard[];
+  rolesAsignados: RolResumenPlantilla[];
+  creadoEn: string;
+  actualizadoEn: string;
+}
+
+export interface CrearPlantillaDashboardPayload {
+  nombre: string;
+  descripcion?: string;
+  items: ItemPreferenciaDashboard[];
+}
+
+export interface ActualizarPlantillaDashboardPayload {
+  nombre?: string;
+  descripcion?: string;
+  items?: ItemPreferenciaDashboard[];
+}
+
+export interface CompatibilidadRolWidget {
+  widgetClave: string;
+  permisoRequerido?: string;
+  rolesCompatibles: RolResumenPlantilla[];
+  rolesIncompatibles: RolResumenPlantilla[];
 }
 
 export interface CompletadaPor {

@@ -10,6 +10,7 @@ import {
 import { Alerta, Spinner } from "@/components/ui/modal";
 import { obtenerMiConfiguracionDashboard } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { usePermisos } from "@/lib/use-permisos";
 import type { ConfiguracionDashboard, TamanoWidgetDashboard } from "@/lib/types";
 
 /** Etiquetas y descripciones de sección para widgets que no son KPI simple. */
@@ -101,6 +102,7 @@ function TarjetaSeccion({
 
 export function DashboardInicio() {
   const { token } = useAuth();
+  const { puede } = usePermisos();
   const [config, setConfig] = useState<ConfiguracionDashboard | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -142,29 +144,42 @@ export function DashboardInicio() {
             Monitoreo operativo de proyectos, territorio y actividad en campo
           </p>
         </div>
-        <Link
-          href="/configuracion/dashboard"
-          className="flex shrink-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-        >
-          <Settings2 className="h-4 w-4 text-ruralia-teal" />
-          Personalizar
-        </Link>
+        {puede("configuracion.editar_dashboard") ? (
+          <Link
+            href="/configuracion/dashboard"
+            className="flex shrink-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            <Settings2 className="h-4 w-4 text-ruralia-teal" />
+            Personalizar
+          </Link>
+        ) : null}
       </div>
 
       {error ? <Alerta mensaje={error} /> : null}
+
+      {!cargando && config?.origen === "PLANTILLA" && !puede("configuracion.editar_dashboard") ? (
+        <p className="mb-4 text-xs text-zinc-500">
+          Este dashboard fue configurado por tu administrador para tu rol.
+        </p>
+      ) : null}
 
       {cargando ? (
         <Spinner />
       ) : items.length === 0 ? (
         <p className="text-sm text-zinc-500">
-          Tu dashboard no tiene widgets configurados todavía.{" "}
-          <Link
-            href="/configuracion/dashboard"
-            className="font-semibold text-ruralia-teal-text hover:underline"
-          >
-            Personalízalo aquí
-          </Link>
-          .
+          Tu dashboard no tiene widgets configurados todavía.
+          {puede("configuracion.editar_dashboard") ? (
+            <>
+              {" "}
+              <Link
+                href="/configuracion/dashboard"
+                className="font-semibold text-ruralia-teal-text hover:underline"
+              >
+                Personalízalo aquí
+              </Link>
+              .
+            </>
+          ) : null}
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
