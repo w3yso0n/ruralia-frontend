@@ -14,6 +14,7 @@ import {
   Waypoints,
   Inbox,
   ChartColumn,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -93,6 +94,12 @@ const ITEMS: {
     etiqueta: "Formularios",
     icono: ClipboardList,
     permiso: "formularios.ver",
+  },
+  {
+    href: "/configuracion",
+    etiqueta: "Configuración",
+    icono: Settings,
+    permiso: "dashboard.ver",
   },
 ];
 

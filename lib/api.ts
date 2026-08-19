@@ -51,6 +51,10 @@ import type {
   MedidoresCumplimiento,
   SerieMensualDashboard,
   VeredaCobertura,
+  JornadaRecienteDashboard,
+  WidgetDisponible,
+  ConfiguracionDashboard,
+  ItemPreferenciaDashboard,
   AsignacionMeta,
   SugerenciaReparto,
   ProductividadPersona,
@@ -1119,6 +1123,16 @@ export async function obtenerMapaCoberturaDashboard(
   return fetchConAuth<VeredaCobertura[]>("/dashboard/mapa-cobertura", token);
 }
 
+export async function obtenerJornadasRecientesDashboard(
+  token: string,
+  limite = 5,
+): Promise<JornadaRecienteDashboard[]> {
+  return fetchConAuth<JornadaRecienteDashboard[]>(
+    `/dashboard/jornadas-recientes?limite=${limite}`,
+    token,
+  );
+}
+
 export async function obtenerCumplimientoEquipoDashboard(
   token: string,
   filtros?: { anio?: number; mes?: number },
@@ -1130,6 +1144,44 @@ export async function obtenerCumplimientoEquipoDashboard(
   return fetchConAuth<ProductividadPersona[]>(
     `/evaluaciones/ranking${q ? `?${q}` : ""}`,
     token,
+  );
+}
+
+export async function obtenerWidgetsDisponiblesDashboard(
+  token: string,
+): Promise<WidgetDisponible[]> {
+  return fetchConAuth<WidgetDisponible[]>(
+    "/dashboard/widgets-disponibles",
+    token,
+  );
+}
+
+export async function obtenerMiConfiguracionDashboard(
+  token: string,
+): Promise<ConfiguracionDashboard> {
+  return fetchConAuth<ConfiguracionDashboard>(
+    "/dashboard/mi-configuracion",
+    token,
+  );
+}
+
+export async function actualizarMiConfiguracionDashboard(
+  token: string,
+  items: ItemPreferenciaDashboard[],
+): Promise<ConfiguracionDashboard> {
+  return fetchConAuth<ConfiguracionDashboard>("/dashboard/mi-configuracion", token, {
+    method: "PUT",
+    body: JSON.stringify({ items }),
+  });
+}
+
+export async function restablecerMiConfiguracionDashboard(
+  token: string,
+): Promise<ConfiguracionDashboard> {
+  return fetchConAuth<ConfiguracionDashboard>(
+    "/dashboard/mi-configuracion/restablecer",
+    token,
+    { method: "POST" },
   );
 }
 

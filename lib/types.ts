@@ -275,6 +275,42 @@ export interface DashboardCompleto {
   jornadasRecientes: JornadaRecienteDashboard[];
 }
 
+export type TipoWidgetDashboard =
+  | "KPI"
+  | "MEDIDOR"
+  | "METRICA"
+  | "GRAFICA"
+  | "MAPA"
+  | "TABLA"
+  | "LISTA";
+
+export type TamanoWidgetDashboard =
+  | "PEQUENO"
+  | "MEDIANO"
+  | "GRANDE"
+  | "COMPLETO";
+
+export interface WidgetDisponible {
+  clave: string;
+  titulo: string;
+  descripcion?: string;
+  tipo: TipoWidgetDashboard;
+  tamanosPermitidos: TamanoWidgetDashboard[];
+  tamanoPorDefecto: TamanoWidgetDashboard;
+}
+
+export interface ItemPreferenciaDashboard {
+  widgetClave: string;
+  posicion: number;
+  tamano: TamanoWidgetDashboard;
+  visible: boolean;
+}
+
+export interface ConfiguracionDashboard {
+  items: ItemPreferenciaDashboard[];
+  esPorDefecto: boolean;
+}
+
 export interface CompletadaPor {
   id: string;
   nombreCompleto: string;
