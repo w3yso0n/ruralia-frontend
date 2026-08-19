@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alerta, Spinner } from "@/components/ui/modal";
 import { EquipoVinculos } from "@/components/proyectos/gestion-proyecto/equipo-vinculos";
+import { PanelExpediente } from "@/components/proyectos/gestion-proyecto/panel-expediente";
 import { PanelJornadas } from "@/components/proyectos/gestion-proyecto/panel-jornadas";
 import { PanelPlan } from "@/components/proyectos/gestion-proyecto/panel-plan";
 import { ResumenAsignaciones } from "@/components/proyectos/gestion-proyecto/resumen-asignaciones";
@@ -29,9 +30,15 @@ import type {
   Proyecto,
 } from "@/lib/types";
 
-type Tab = "resumen" | "plan" | "jornadas" | "equipo";
+type Tab = "resumen" | "plan" | "jornadas" | "equipo" | "expediente";
 
-const TABS_VALIDOS: Tab[] = ["resumen", "plan", "jornadas", "equipo"];
+const TABS_VALIDOS: Tab[] = [
+  "resumen",
+  "plan",
+  "jornadas",
+  "equipo",
+  "expediente",
+];
 
 function tabDesdeParam(valor: string | null): Tab {
   if (valor && TABS_VALIDOS.includes(valor as Tab)) {
@@ -168,6 +175,7 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
     { id: "plan", etiqueta: "Plan del proyecto" },
     { id: "jornadas", etiqueta: "Jornadas" },
     { id: "equipo", etiqueta: "Equipo y contraparte" },
+    { id: "expediente", etiqueta: "Expediente" },
   ];
 
   if (cargando) return <Spinner />;
@@ -523,6 +531,16 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
             onActualizar={cargar}
           />
         </>
+      ) : null}
+
+      {tab === "expediente" ? (
+        <PanelExpediente
+          token={token}
+          proyectoId={proyectoId}
+          proyecto={proyecto}
+          plan={plan}
+          puedeGestionar={puede("documentos_externos.crear")}
+        />
       ) : null}
     </>
   );

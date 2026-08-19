@@ -38,6 +38,9 @@ import type {
   CrearUsuarioPayload,
   CategoriaRechazo,
   DocumentoJornada,
+  DocumentoExterno,
+  ExpedienteProyecto,
+  SubirDocumentoExternoPayload,
   EnviarFormularioPayload,
   EnvioFormularioResumen,
   EntidadRevisable,
@@ -1219,6 +1222,51 @@ export async function obtenerDesviacionesUsuario(
   );
 }
 
+export async function descargarPdfEvaluaciones(
+  token: string,
+  filtros?: { proyectoId?: string; anio?: number; mes?: number },
+): Promise<Blob> {
+  const params = new URLSearchParams();
+  if (filtros?.proyectoId) params.set("proyectoId", filtros.proyectoId);
+  if (filtros?.anio != null) params.set("anio", String(filtros.anio));
+  if (filtros?.mes != null) params.set("mes", String(filtros.mes));
+  const q = params.toString();
+  const respuesta = await fetch(
+    `${API_URL}/evaluaciones/reporte/pdf${q ? `?${q}` : ""}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    throw new Error(
+      `Backend respondió ${respuesta.status}: ${cuerpo || respuesta.statusText}`,
+    );
+  }
+  return respuesta.blob();
+}
+
+export async function descargarPdfFichaUsuario(
+  token: string,
+  usuarioId: string,
+  filtros?: { proyectoId?: string; anio?: number; mes?: number },
+): Promise<Blob> {
+  const params = new URLSearchParams();
+  if (filtros?.proyectoId) params.set("proyectoId", filtros.proyectoId);
+  if (filtros?.anio != null) params.set("anio", String(filtros.anio));
+  if (filtros?.mes != null) params.set("mes", String(filtros.mes));
+  const q = params.toString();
+  const respuesta = await fetch(
+    `${API_URL}/evaluaciones/usuarios/${usuarioId}/reporte/pdf${q ? `?${q}` : ""}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    throw new Error(
+      `Backend respondió ${respuesta.status}: ${cuerpo || respuesta.statusText}`,
+    );
+  }
+  return respuesta.blob();
+}
+
 export async function listarPlantillasFormulario(
   token: string,
 ): Promise<PlantillaFormulario[]> {
@@ -1618,4 +1666,86 @@ export async function compararVersionesDocumento(
     `/documentos/${documentoId}/versiones/comparar?a=${a}&b=${b}`,
     token,
   );
+}
+
+/** RF-24: documentos externos y expediente digital del proyecto. */
+
+export async function subirDocumentoExterno(
+  token: string,
+  archivo: File,
+  datos: SubirDocumentoExternoPayload,
+): Promise<DocumentoExterno> {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  formData.append("titulo", datos.titulo);
+  if (datos.descripcion) formData.append("descripcion", datos.descripcion);
+  formData.append("tipo", datos.tipo);
+  formData.append("proyectoId", datos.proyectoId);
+  if (datos.actividadId) formData.append("actividadId", datos.actividadId);
+  if (datos.subactividadId)
+    formData.append("subactividadId", datos.subactividadId);
+  if (datos.jornadaId) formData.append("jornadaId", datos.jornadaId);
+  if (datos.beneficiarioId)
+    formData.append("beneficiarioId", datos.beneficiarioId);
+  if (datos.asociacionId) formData.append("asociacionId", datos.asociacionId);
+  if (datos.veredaId) formData.append("veredaId", datos.veredaId);
+
+  const respuesta = await fetch(`${API_URL}/documentos-externos`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    let mensaje = cuerpo || respuesta.statusText;
+    try {
+      const json = JSON.parse(cuerpo) as { message?: string | string[] };
+      if (json.message) {
+        mensaje = Array.isArray(json.message)
+          ? json.message.join(" ")
+          : json.message;
+      }
+    } catch {
+      // el cuerpo no era JSON, se usa el texto crudo como mensaje
+    }
+    throw new ErrorApi(mensaje, respuesta.status);
+  }
+
+  return respuesta.json() as Promise<DocumentoExterno>;
+}
+
+export async function listarDocumentosExternos(
+  token: string,
+  filtros: {
+    proyectoId?: string;
+    actividadId?: string;
+    subactividadId?: string;
+    jornadaId?: string;
+    beneficiarioId?: string;
+    asociacionId?: string;
+    veredaId?: string;
+    tipo?: string;
+  },
+): Promise<DocumentoExterno[]> {
+  return fetchConAuth(
+    `/documentos-externos${construirQuery(filtros)}`,
+    token,
+  );
+}
+
+export async function eliminarDocumentoExterno(
+  token: string,
+  id: string,
+): Promise<void> {
+  return fetchConAuth(`/documentos-externos/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
+export async function obtenerExpedienteProyecto(
+  token: string,
+  proyectoId: string,
+): Promise<ExpedienteProyecto> {
+  return fetchConAuth(`/proyectos/${proyectoId}/expediente`, token);
 }

@@ -18,6 +18,7 @@ interface FilaProyectoCobertura {
   proyectoId: string;
   nombre: string;
   estado: EstadoProyecto;
+  veredaId: string;
   vereda: string;
   municipio: string;
   departamento: string;
@@ -82,6 +83,7 @@ export function MapaCoberturaVeredas({ veredas }: MapaCoberturaVeredasProps) {
         proyectoId: proyecto.proyectoId,
         nombre: proyecto.nombre,
         estado: proyecto.estado,
+        veredaId: vereda.veredaId,
         vereda: vereda.nombre,
         municipio: vereda.municipio,
         departamento: vereda.departamento,
@@ -243,7 +245,7 @@ export function MapaCoberturaVeredas({ veredas }: MapaCoberturaVeredasProps) {
         <ul className="divide-y divide-ruralia-teal-border">
           {filasProyectos.map((fila) => (
             <li
-              key={`${fila.proyectoId}-${fila.vereda}`}
+              key={`${fila.proyectoId}-${fila.veredaId}`}
               className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="min-w-0">

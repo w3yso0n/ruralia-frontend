@@ -495,6 +495,65 @@ export interface DocumentoJornada {
   creadoEn: string;
 }
 
+export type TipoDocumentoExterno =
+  | "PDF"
+  | "WORD"
+  | "EXCEL"
+  | "ESCANEO"
+  | "FOTO"
+  | "ACTA_TERCERO"
+  | "OTRO";
+
+export interface DocumentoExterno {
+  id: string;
+  titulo: string;
+  descripcion?: string | null;
+  tipo: TipoDocumentoExterno;
+  nombreArchivo: string;
+  urlArchivo: string;
+  tipoMime: string;
+  tamanoArchivo: number;
+  proyectoId: string;
+  actividadId?: string | null;
+  actividad?: { id: string; nombre: string } | null;
+  subactividadId?: string | null;
+  subactividad?: { id: string; nombre: string } | null;
+  jornadaId?: string | null;
+  jornada?: { id: string; nombre: string } | null;
+  beneficiarioId?: string | null;
+  beneficiario?: { id: string; nombres: string; apellidos: string } | null;
+  asociacionId?: string | null;
+  asociacion?: { id: string; nombre: string } | null;
+  veredaId?: string | null;
+  vereda?: { id: string; nombre: string } | null;
+  subidoPor: { id: string; nombreCompleto: string };
+  creadoEn: string;
+}
+
+export interface SubirDocumentoExternoPayload {
+  titulo: string;
+  descripcion?: string;
+  tipo: TipoDocumentoExterno;
+  proyectoId: string;
+  actividadId?: string;
+  subactividadId?: string;
+  jornadaId?: string;
+  beneficiarioId?: string;
+  asociacionId?: string;
+  veredaId?: string;
+}
+
+export interface ExpedienteProyecto {
+  proyectoId: string;
+  documentosGenerados: DocumentoJornada[];
+  documentosExternos: DocumentoExterno[];
+  totales: {
+    generados: number;
+    externos: number;
+    total: number;
+  };
+}
+
 export interface CrearJornadasResultado {
   grupoJornadaId: string | null;
   jornadas: Jornada[];

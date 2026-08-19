@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CalendarRange, Target } from "lucide-react";
 import { Alerta, Spinner } from "@/components/ui/modal";
+import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
 import {
   guardarAsignacionesMeta,
   listarAsignacionesMeta,
@@ -223,40 +225,46 @@ export function PanelAsignaciones({
           meta.
         </p>
 
-        <div className="mt-4 flex flex-wrap gap-3">
-          <label className="text-sm">
-            <span className="mb-1 block text-zinc-500">Meta del proceso</span>
-            <select
+        <div className="mt-4 flex flex-wrap gap-4">
+          <div className="min-w-[220px] flex-1">
+            <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+              Meta del proceso
+            </span>
+            <SelectorDesplegable
               value={metaId}
-              onChange={(e) => {
-                setMetaId(e.target.value);
+              onChange={(id) => {
+                setMetaId(id);
                 setPeriodoId("");
               }}
-              className="rounded-xl border border-zinc-200 px-3 py-2"
-            >
-              {metas.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nombre} ({m.unidadMedida})
-                </option>
-              ))}
-            </select>
-          </label>
+              opciones={metas.map((m) => ({
+                id: m.id,
+                nombre: m.nombre,
+                subtitulo: m.unidadMedida,
+              }))}
+              mensajeSinOpciones="Sin metas en el plan"
+              icono={Target}
+            />
+          </div>
 
-          <label className="text-sm">
-            <span className="mb-1 block text-zinc-500">Periodo (opcional)</span>
-            <select
+          <div className="min-w-[220px] flex-1">
+            <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+              Periodo (opcional)
+            </span>
+            <SelectorDesplegable
               value={periodoId}
-              onChange={(e) => setPeriodoId(e.target.value)}
-              className="rounded-xl border border-zinc-200 px-3 py-2"
-            >
-              <option value="">Meta total</option>
-              {periodos.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {MESES[p.mes - 1]} {p.anio} — plan {p.cantidadPlaneada}
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={setPeriodoId}
+              opciones={periodos.map((p) => ({
+                id: p.id,
+                nombre: `${MESES[p.mes - 1]} ${p.anio}`,
+                subtitulo: `Plan ${p.cantidadPlaneada}`,
+              }))}
+              permitirVacio
+              etiquetaVacio="Meta total"
+              placeholder="Meta total"
+              mensajeSinOpciones="Sin periodos definidos"
+              icono={CalendarRange}
+            />
+          </div>
         </div>
       </div>
 

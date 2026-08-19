@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { CalendarDays, Download, FolderKanban } from "lucide-react";
 import { PanelAsignaciones } from "@/components/evaluaciones/panel-asignaciones";
 import { ListaAgentesEficientes } from "@/components/evaluaciones/lista-agentes-eficientes";
 import { RankingProductividad } from "@/components/evaluaciones/ranking-productividad";
 import { Alerta, Spinner } from "@/components/ui/modal";
+import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
 import {
+  descargarPdfEvaluaciones,
+  descargarPdfFichaUsuario,
   listarProyectos,
   obtenerCumplimientoEquipoDashboard,
   obtenerDesviacionesUsuario,
@@ -71,8 +75,60 @@ export function PanelEvaluaciones() {
   const [planAsignacion, setPlanAsignacion] = useState<PlanProyecto | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [descargandoPdf, setDescargandoPdf] = useState(false);
+  const [descargandoPdfFicha, setDescargandoPdfFicha] = useState(false);
 
   const puedeGestionar = puede("evaluaciones.gestionar");
+
+  async function descargarPdf() {
+    if (!token) return;
+    setDescargandoPdf(true);
+    setError(null);
+    try {
+      const blob = await descargarPdfEvaluaciones(token, {
+        proyectoId: proyectoId || undefined,
+        anio,
+        mes,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `evaluaciones-${anio}-${String(mes).padStart(2, "0")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Error al descargar el PDF",
+      );
+    } finally {
+      setDescargandoPdf(false);
+    }
+  }
+
+  async function descargarPdfFicha() {
+    if (!token || !usuarioId) return;
+    setDescargandoPdfFicha(true);
+    setError(null);
+    try {
+      const blob = await descargarPdfFichaUsuario(token, usuarioId, {
+        proyectoId: proyectoId || undefined,
+        anio,
+        mes,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ficha-${usuarioId.slice(0, 8)}-${anio}-${String(mes).padStart(2, "0")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Error al descargar el PDF",
+      );
+    } finally {
+      setDescargandoPdfFicha(false);
+    }
+  }
 
   useEffect(() => {
     if (!token) return;
@@ -238,49 +294,55 @@ export function PanelEvaluaciones() {
         ))}
       </div>
 
-      <div className="mb-6 flex flex-wrap gap-3 rounded-2xl border border-ruralia-teal-border bg-white p-4">
-        <label className="text-sm">
-          <span className="mb-1 block text-zinc-500">Año</span>
+      <div className="mb-6 flex flex-wrap gap-4 rounded-2xl border border-ruralia-teal-border bg-white p-4">
+        <div className="w-24">
+          <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+            Año
+          </span>
           <input
             type="number"
             value={anio}
             onChange={(e) => setAnio(Number(e.target.value))}
-            className="w-24 rounded-xl border border-zinc-200 px-3 py-2"
+            className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm transition hover:border-ruralia-teal-border focus:border-ruralia-teal focus:outline-none focus:ring-2 focus:ring-ruralia-teal/20"
           />
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-zinc-500">Mes</span>
-          <select
-            value={mes}
-            onChange={(e) => setMes(Number(e.target.value))}
-            className="rounded-xl border border-zinc-200 px-3 py-2"
-          >
-            {MESES.map((nombre, i) => (
-              <option key={nombre} value={i + 1}>
-                {nombre}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-zinc-500">Proyecto</span>
-          <select
+        </div>
+        <div className="w-44">
+          <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+            Mes
+          </span>
+          <SelectorDesplegable
+            value={String(mes)}
+            onChange={(id) => setMes(Number(id))}
+            opciones={MESES.map((nombre, i) => ({
+              id: String(i + 1),
+              nombre,
+            }))}
+            icono={CalendarDays}
+          />
+        </div>
+        <div className="min-w-[240px] flex-1">
+          <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+            Proyecto
+          </span>
+          <SelectorDesplegable
             value={proyectoId}
-            onChange={(e) => setProyectoId(e.target.value)}
-            className="min-w-[220px] rounded-xl border border-zinc-200 px-3 py-2"
-          >
-            {tab === "asignaciones" ? (
-              <option value="">Selecciona un proyecto</option>
-            ) : (
-              <option value="">Todos los activos</option>
-            )}
-            {proyectos.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre}
-              </option>
-            ))}
-          </select>
-        </label>
+            onChange={setProyectoId}
+            opciones={proyectos.map((p) => ({ id: p.id, nombre: p.nombre }))}
+            permitirVacio
+            etiquetaVacio={
+              tab === "asignaciones"
+                ? "Selecciona un proyecto"
+                : "Todos los activos"
+            }
+            placeholder={
+              tab === "asignaciones"
+                ? "Selecciona un proyecto"
+                : "Todos los activos"
+            }
+            mensajeSinOpciones="Sin proyectos activos"
+            icono={FolderKanban}
+          />
+        </div>
       </div>
 
       {error ? <Alerta mensaje={error} /> : null}
@@ -298,9 +360,20 @@ export function PanelEvaluaciones() {
               />
             </div>
             <div className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
-              <h3 className="mb-4 text-lg font-semibold text-zinc-900">
-                Tabla detallada — {MESES[mes - 1]} {anio}
-              </h3>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-lg font-semibold text-zinc-900">
+                  Tabla detallada — {MESES[mes - 1]} {anio}
+                </h3>
+                <button
+                  type="button"
+                  disabled={descargandoPdf || ranking.length === 0}
+                  onClick={() => void descargarPdf()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {descargandoPdf ? "Generando…" : "Descargar PDF"}
+                </button>
+              </div>
               <RankingProductividad
                 personas={ranking}
                 mostrarProyecto={!proyectoId}
@@ -401,13 +474,24 @@ export function PanelEvaluaciones() {
             ) : (
               <div className="space-y-6">
                 <section className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
-                  <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-zinc-900">
-                      {detalle.usuario.nombreCompleto}
-                    </h3>
-                    <p className="text-sm text-zinc-500">
-                      {detalle.usuario.correo}
-                    </p>
+                  <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-zinc-900">
+                        {detalle.usuario.nombreCompleto}
+                      </h3>
+                      <p className="text-sm text-zinc-500">
+                        {detalle.usuario.correo}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={descargandoPdfFicha}
+                      onClick={() => void descargarPdfFicha()}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      {descargandoPdfFicha ? "Generando…" : "Descargar PDF"}
+                    </button>
                   </div>
 
                   <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
