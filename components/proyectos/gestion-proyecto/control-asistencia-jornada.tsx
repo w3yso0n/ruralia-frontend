@@ -1085,17 +1085,19 @@ function ControlAsistenciaMatriz({
                         <td className="px-3 py-2 text-zinc-400">
                           {indiceFila + 1}
                         </td>
-                        {columnas.map((col, iCol) => (
+                        {columnas.map((col, iCol) => {
+                          const valorCelda = fila[col.clave];
+                          const valorMostrar =
+                            typeof valorCelda === "string" &&
+                            valorCelda.startsWith("data:image") &&
+                            col.tipoCampo !== "FIRMA"
+                              ? ""
+                              : valorCelda;
+                          return (
                           <td key={`${iCol}-${col.clave}`} className="px-3 py-2">
                             <CeldaColumna
                               columna={col}
-                              valor={
-                                typeof fila[col.clave] === "string" &&
-                                fila[col.clave].startsWith("data:image") &&
-                                col.tipoCampo !== "FIRMA"
-                                  ? ""
-                                  : fila[col.clave]
-                              }
+                              valor={valorMostrar}
                               disabled={!puedeEditar}
                               firmando={
                                 firmando?.claveTabla === campoTabla.clave &&
@@ -1120,7 +1122,8 @@ function ControlAsistenciaMatriz({
                               onCancelarFirma={() => setFirmando(null)}
                             />
                           </td>
-                        ))}
+                          );
+                        })}
                         {puedeEditar ? (
                           <td className="px-3 py-2">
                             <button
