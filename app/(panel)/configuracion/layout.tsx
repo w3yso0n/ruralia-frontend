@@ -39,14 +39,14 @@ export default function LayoutConfiguracion({
   return (
     <div>
       {tabs.length > 1 ? (
-        <div className="mb-8 flex gap-6 border-b border-ruralia-teal-border">
+        <div className="mb-8 flex gap-6 overflow-x-auto border-b border-ruralia-teal-border">
           {tabs.map((tab) => {
             const activo = pathname.startsWith(tab.href);
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`-mb-px border-b-2 px-1 pb-3 text-sm font-medium transition ${
+                className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-1 pb-3 text-sm font-medium transition ${
                   activo
                     ? "border-ruralia-teal text-ruralia-teal-text"
                     : "border-transparent text-zinc-500 hover:text-zinc-700"

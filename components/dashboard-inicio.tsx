@@ -80,7 +80,7 @@ function TarjetaSeccion({
 }) {
   return (
     <section
-      className={`flex h-full flex-col rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm ${className}`}
+      className={`flex h-full flex-col rounded-2xl border border-ruralia-teal-border bg-white p-4 shadow-sm sm:p-6 ${className}`}
     >
       <div className="mb-5 flex items-start gap-3">
         {Icono ? (
@@ -137,8 +137,8 @@ export function DashboardInicio() {
 
   return (
     <>
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div>
+      <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <h2 className="text-2xl font-semibold text-zinc-900">Dashboard</h2>
           <p className="mt-1 text-zinc-600">
             Monitoreo operativo de proyectos, territorio y actividad en campo
@@ -147,7 +147,7 @@ export function DashboardInicio() {
         {puede("configuracion.editar_dashboard") ? (
           <Link
             href="/configuracion/dashboard"
-            className="flex shrink-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            className="flex w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 sm:w-auto"
           >
             <Settings2 className="h-4 w-4 text-ruralia-teal" />
             Personalizar

@@ -15,6 +15,7 @@ import {
   Inbox,
   ChartColumn,
   Settings,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -121,7 +122,13 @@ function itemPermitido(
   return puede(item.permiso);
 }
 
-export function Sidebar() {
+export function Sidebar({
+  abiertoMovil = false,
+  onCerrarMovil,
+}: {
+  abiertoMovil?: boolean;
+  onCerrarMovil?: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { token } = useAuth();
@@ -165,60 +172,95 @@ export function Sidebar() {
     };
   }, [token, puede]);
 
-  return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-ruralia-teal-border bg-white">
-      <div className="flex items-center gap-3 border-b border-ruralia-teal-border px-5 py-5">
-        <Image
-          src="/icono-fondo-blanco.png"
-          alt="Ruralia"
-          width={40}
-          height={40}
-          unoptimized
-          className="h-10 w-10 shrink-0 rounded-xl bg-transparent object-contain"
-          priority
-        />
-        <div>
-          <p className="font-semibold text-zinc-900">Ruralia</p>
-          <p className="text-xs text-zinc-500">Panel de gestión</p>
-        </div>
+  const renderEncabezado = (mostrarCerrar: boolean) => (
+    <div className="flex items-center gap-3 border-b border-ruralia-teal-border px-5 py-5">
+      <Image
+        src="/icono-fondo-blanco.png"
+        alt="Ruralia"
+        width={40}
+        height={40}
+        unoptimized
+        className="h-10 w-10 shrink-0 rounded-xl bg-transparent object-contain"
+        priority
+      />
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-zinc-900">Ruralia</p>
+        <p className="text-xs text-zinc-500">Panel de gestión</p>
       </div>
+      {mostrarCerrar ? (
+        <button
+          type="button"
+          onClick={onCerrarMovil}
+          aria-label="Cerrar menú"
+          className="rounded-lg p-1.5 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      ) : null}
+    </div>
+  );
 
-      <nav className="flex flex-1 flex-col gap-1 p-3">
-        {items.map((item) => {
-          const activo =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
-          const Icon = item.icono;
-          const badge =
-            item.badgeKey === "revision" && badgeRevision > 0
-              ? badgeRevision
-              : 0;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                activo
-                  ? "bg-ruralia-teal text-white"
-                  : "text-zinc-700 hover:bg-zinc-50"
-              }`}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span className="flex-1">{item.etiqueta}</span>
-              {badge > 0 && (
-                <span
-                  className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold ${
-                    activo
-                      ? "bg-white/20 text-white"
-                      : "bg-rose-500 text-white"
-                  }`}
-                >
-                  {badge > 99 ? "99+" : badge}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
-    </aside>
+  const renderNavegacion = () => (
+    <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+      {items.map((item) => {
+        const activo =
+          pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const Icon = item.icono;
+        const badge =
+          item.badgeKey === "revision" && badgeRevision > 0
+            ? badgeRevision
+            : 0;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onCerrarMovil}
+            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+              activo
+                ? "bg-ruralia-teal text-white"
+                : "text-zinc-700 hover:bg-zinc-50"
+            }`}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            <span className="flex-1">{item.etiqueta}</span>
+            {badge > 0 && (
+              <span
+                className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold ${
+                  activo
+                    ? "bg-white/20 text-white"
+                    : "bg-rose-500 text-white"
+                }`}
+              >
+                {badge > 99 ? "99+" : badge}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+
+  return (
+    <>
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-ruralia-teal-border bg-white lg:flex">
+        {renderEncabezado(false)}
+        {renderNavegacion()}
+      </aside>
+
+      {abiertoMovil ? (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <button
+            type="button"
+            aria-label="Cerrar menú"
+            className="absolute inset-0 bg-zinc-900/40"
+            onClick={onCerrarMovil}
+          />
+          <aside className="relative z-10 flex h-full w-[min(18rem,85vw)] flex-col bg-white shadow-2xl">
+            {renderEncabezado(true)}
+            {renderNavegacion()}
+          </aside>
+        </div>
+      ) : null}
+    </>
   );
 }
