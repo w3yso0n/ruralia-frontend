@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MapPin } from "lucide-react";
 import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
@@ -8,8 +8,20 @@ import {
   fechaFueraDeProyecto,
   SelectorFechaJornada,
 } from "@/components/ui/selector-fecha-jornada";
-import type { ActividadPlan, TipoJornada, VeredaResumen } from "@/lib/types";
+import { listarCatalogoFormulariosJornada } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import type {
+  ActividadPlan,
+  PlantillaFormularioCatalogo,
+  TipoJornada,
+  VeredaResumen,
+} from "@/lib/types";
 import { SelectorMetaPlan } from "./selector-meta-plan";
+import {
+  CLAVE_FORMULARIO_INDIVIDUAL,
+  resolverSeleccionFormulario,
+  SelectorFormularioJornada,
+} from "./selector-formulario-jornada";
 
 interface AgenteOpcion {
   id: string;
@@ -30,6 +42,7 @@ interface FormularioJornadaProps {
     observaciones?: string;
     metaId: string;
     tipo: TipoJornada;
+    plantillaFormularioId?: string | null;
     tecnicoResponsableIds: string[];
     requiereRevision: boolean;
   }) => Promise<void>;
@@ -44,15 +57,31 @@ export function FormularioJornada({
   enviando,
   onSubmit,
 }: FormularioJornadaProps) {
+  const { token } = useAuth();
   const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState("");
   const [veredaId, setVeredaId] = useState(veredas[0]?.id ?? "");
   const [observaciones, setObservaciones] = useState("");
   const [metaId, setMetaId] = useState("");
-  const [esGrupal, setEsGrupal] = useState(false);
+  const [claveFormulario, setClaveFormulario] = useState(
+    CLAVE_FORMULARIO_INDIVIDUAL,
+  );
+  const [plantillas, setPlantillas] = useState<PlantillaFormularioCatalogo[]>(
+    [],
+  );
   const [requiereRevision, setRequiereRevision] = useState(true);
   const [agenteIds, setAgenteIds] = useState<string[]>([]);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    void listarCatalogoFormulariosJornada(token)
+      .then(setPlantillas)
+      .catch(() => setPlantillas([]));
+  }, [token]);
+
+  const seleccion = resolverSeleccionFormulario(claveFormulario, plantillas);
+  const esGrupal = seleccion.tipo === "GRUPAL";
 
   async function manejarSubmit(evento: React.FormEvent) {
     evento.preventDefault();
@@ -93,7 +122,8 @@ export function FormularioJornada({
       nombre: nombre.trim() || undefined,
       observaciones: observaciones.trim() || undefined,
       metaId,
-      tipo: esGrupal ? "GRUPAL" : "INDIVIDUAL",
+      tipo: seleccion.tipo,
+      plantillaFormularioId: seleccion.plantillaFormularioId,
       tecnicoResponsableIds: agenteIds,
       requiereRevision,
     });
@@ -102,7 +132,7 @@ export function FormularioJornada({
     setFecha("");
     setObservaciones("");
     setMetaId("");
-    setEsGrupal(false);
+    setClaveFormulario(CLAVE_FORMULARIO_INDIVIDUAL);
     setRequiereRevision(true);
     setAgenteIds([]);
   }
@@ -110,9 +140,8 @@ export function FormularioJornada({
   return (
     <form onSubmit={(e) => void manejarSubmit(e)} className="space-y-4">
       <p className="text-sm text-zinc-600">
-        {esGrupal
-          ? "Actividad grupal: usará el formulario grupal asignado al proceso de la meta (lista de asistencia con filas repetibles)."
-          : "Registra la jornada de campo seleccionando la meta del plan a la que aporta esta visita. La meta define qué formularios estarán disponibles en el celular."}
+        Elige la meta del plan y el formulario: el individual o grupal del
+        proceso, o cualquier plantilla publicada del catálogo.
       </p>
 
       <div>
@@ -202,28 +231,12 @@ export function FormularioJornada({
         />
       </div>
 
-      <label
-        className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 transition ${
-          esGrupal
-            ? "border-ruralia-teal bg-ruralia-teal-soft/50"
-            : "border-zinc-200 bg-white hover:border-ruralia-teal-border"
-        }`}
-      >
-        <input
-          type="checkbox"
-          checked={esGrupal}
-          onChange={(e) => setEsGrupal(e.target.checked)}
-          className="mt-1 h-4 w-4 rounded border-zinc-300 text-ruralia-teal focus:ring-ruralia-teal/30"
-        />
-        <span>
-          <span className="block text-sm font-semibold text-zinc-800">
-            Actividad grupal
-          </span>
-          <span className="mt-0.5 block text-xs text-zinc-500">
-            Usa el formulario grupal del proceso (campos repetibles por asistente)
-          </span>
-        </span>
-      </label>
+      <SelectorFormularioJornada
+        value={claveFormulario}
+        onChange={setClaveFormulario}
+        plantillas={plantillas}
+        disabled={enviando}
+      />
 
       <label
         className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 transition ${

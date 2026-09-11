@@ -16,6 +16,14 @@ interface GraficaProgresoProyectosProps {
 export function GraficaProgresoProyectos({
   datos,
 }: GraficaProgresoProyectosProps) {
+  if (datos.length === 0) {
+    return (
+      <p className="text-sm text-zinc-500">
+        No hay proyectos para mostrar en este filtro.
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {datos.map((proyecto) => (

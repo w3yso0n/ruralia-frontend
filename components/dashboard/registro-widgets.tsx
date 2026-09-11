@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Activity, Map, Users } from "lucide-react";
+import { useFiltroDashboard } from "@/components/dashboard/filtro-dashboard-context";
 import { ListaAgentesEficientes } from "@/components/evaluaciones/lista-agentes-eficientes";
 import { GraficaActividadMensual } from "@/components/dashboard/grafica-actividad-mensual";
 import { GraficaProgresoProyectos } from "@/components/dashboard/grafica-progreso-proyectos";
@@ -34,7 +35,10 @@ import type {
  * Hook genérico para que cada widget pida su propio dato de forma autocontenida,
  * en vez de depender del blob /dashboard completo.
  */
-function useDatoWidget<T>(cargar: (token: string) => Promise<T>) {
+function useDatoWidget<T>(
+  cargar: (token: string) => Promise<T>,
+  deps: unknown[] = [],
+) {
   const { token } = useAuth();
   const [datos, setDatos] = useState<T | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -43,6 +47,8 @@ function useDatoWidget<T>(cargar: (token: string) => Promise<T>) {
   useEffect(() => {
     if (!token) return;
     let vivo = true;
+    setCargando(true);
+    setError(false);
     cargar(token)
       .then((res) => {
         if (!vivo) return;
@@ -59,7 +65,7 @@ function useDatoWidget<T>(cargar: (token: string) => Promise<T>) {
       vivo = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, ...deps]);
 
   return { datos, cargando, error };
 }
@@ -91,14 +97,19 @@ type CampoKpiNumerico =
   | "agentesEnCampo";
 
 function WidgetKpisResumen({ campo }: { campo: CampoKpiNumerico }) {
-  const { datos, cargando, error } = useDatoWidget(obtenerKpisDashboard);
+  const { proyectoId } = useFiltroDashboard();
+  const { datos, cargando, error } = useDatoWidget(
+    (token) => obtenerKpisDashboard(token, proyectoId || undefined),
+    [proyectoId],
+  );
+  const etiquetas = proyectoId ? ETIQUETAS_KPI_PROYECTO : ETIQUETAS_KPI;
   return (
     <EstadoCargaWidget cargando={cargando} error={error}>
       {datos ? (
         <TarjetaKpi
-          etiqueta={ETIQUETAS_KPI[campo].etiqueta}
+          etiqueta={etiquetas[campo].etiqueta}
           valor={datos[campo]}
-          descripcion={ETIQUETAS_KPI[campo].descripcion}
+          descripcion={etiquetas[campo].descripcion}
           destacado={campo === "proyectosActivos"}
         />
       ) : null}
@@ -128,12 +139,39 @@ const ETIQUETAS_KPI: Record<
   },
 };
 
+const ETIQUETAS_KPI_PROYECTO: Record<
+  CampoKpiNumerico,
+  { etiqueta: string; descripcion: string }
+> = {
+  proyectosActivos: {
+    etiqueta: "En ejecución",
+    descripcion: "1 si este proyecto está activo",
+  },
+  totalProyectos: {
+    etiqueta: "Proyectos en vista",
+    descripcion: "Filtro actual",
+  },
+  jornadasRegistradas: {
+    etiqueta: "Jornadas de campo",
+    descripcion: "De este proyecto",
+  },
+  agentesEnCampo: {
+    etiqueta: "Agentes en campo",
+    descripcion: "Técnicos con jornadas en este proyecto",
+  },
+};
+
 /**
  * Los 4 indicadores de cumplimiento operativo son un único widget: siempre se
  * calculan y muestran juntos, no tiene sentido dejarlos como piezas sueltas.
  */
 function WidgetCumplimientoOperativo() {
-  const { datos, cargando, error } = useDatoWidget(obtenerCumplimientoDashboard);
+  const { proyectoId } = useFiltroDashboard();
+  const { datos, cargando, error } = useDatoWidget(
+    (token) => obtenerCumplimientoDashboard(token, proyectoId || undefined),
+    [proyectoId],
+  );
+  const filtrado = Boolean(proyectoId);
   return (
     <EstadoCargaWidget cargando={cargando} error={error}>
       {datos ? (
@@ -141,7 +179,9 @@ function WidgetCumplimientoOperativo() {
           <MedidorCircular
             valor={datos.cumplimientoPlan}
             etiqueta="Avance del plan"
-            subetiqueta="Promedio proyectos activos"
+            subetiqueta={
+              filtrado ? "De este proyecto" : "Promedio proyectos activos"
+            }
           />
           <MedidorCircular
             valor={datos.coberturaTerritorial}
@@ -167,8 +207,13 @@ function WidgetCumplimientoOperativo() {
 }
 
 function WidgetAgentesEficientes() {
+  const { proyectoId } = useFiltroDashboard();
   const { datos, cargando, error } = useDatoWidget<ProductividadPersona[]>(
-    (token) => obtenerCumplimientoEquipoDashboard(token),
+    (token) =>
+      obtenerCumplimientoEquipoDashboard(token, {
+        proyectoId: proyectoId || undefined,
+      }),
+    [proyectoId],
   );
   return (
     <EstadoCargaWidget cargando={cargando} error={error}>
@@ -176,7 +221,11 @@ function WidgetAgentesEficientes() {
         <>
           <ListaAgentesEficientes personas={datos} limite={6} />
           <Link
-            href="/evaluaciones"
+            href={
+              proyectoId
+                ? `/evaluaciones?proyectoId=${encodeURIComponent(proyectoId)}`
+                : "/evaluaciones"
+            }
             className="mt-4 inline-block text-sm font-semibold text-ruralia-teal-text hover:underline"
           >
             Ver módulo Evaluaciones →
@@ -190,8 +239,11 @@ function WidgetAgentesEficientes() {
 }
 
 function WidgetActividadMensual() {
+  const { proyectoId } = useFiltroDashboard();
   const { datos, cargando, error } = useDatoWidget<SerieMensualDashboard[]>(
-    (token) => obtenerActividadMensualDashboard(token),
+    (token) =>
+      obtenerActividadMensualDashboard(token, 6, proyectoId || undefined),
+    [proyectoId],
   );
   return (
     <EstadoCargaWidget cargando={cargando} error={error}>
@@ -201,7 +253,11 @@ function WidgetActividadMensual() {
 }
 
 function WidgetProgresoProyectos() {
-  const { datos, cargando, error } = useDatoWidget(obtenerKpisDashboard);
+  const { proyectoId } = useFiltroDashboard();
+  const { datos, cargando, error } = useDatoWidget(
+    (token) => obtenerKpisDashboard(token, proyectoId || undefined),
+    [proyectoId],
+  );
   return (
     <EstadoCargaWidget cargando={cargando} error={error}>
       {datos ? (
@@ -220,8 +276,10 @@ function WidgetProgresoProyectos() {
 }
 
 function WidgetMapaCobertura() {
-  const { datos, cargando, error } = useDatoWidget<VeredaCobertura[]>((token) =>
-    obtenerMapaCoberturaDashboard(token),
+  const { proyectoId } = useFiltroDashboard();
+  const { datos, cargando, error } = useDatoWidget<VeredaCobertura[]>(
+    (token) => obtenerMapaCoberturaDashboard(token, proyectoId || undefined),
+    [proyectoId],
   );
   return (
     <EstadoCargaWidget cargando={cargando} error={error}>
@@ -231,7 +289,11 @@ function WidgetMapaCobertura() {
 }
 
 function WidgetProyectosRecientes() {
-  const { datos, cargando, error } = useDatoWidget(obtenerKpisDashboard);
+  const { proyectoId } = useFiltroDashboard();
+  const { datos, cargando, error } = useDatoWidget(
+    (token) => obtenerKpisDashboard(token, proyectoId || undefined),
+    [proyectoId],
+  );
   return (
     <EstadoCargaWidget cargando={cargando} error={error}>
       {datos ? (
@@ -242,8 +304,11 @@ function WidgetProyectosRecientes() {
 }
 
 function WidgetJornadasRecientes() {
-  const { datos, cargando, error } = useDatoWidget((token) =>
-    obtenerJornadasRecientesDashboard(token, 5),
+  const { proyectoId } = useFiltroDashboard();
+  const { datos, cargando, error } = useDatoWidget(
+    (token) =>
+      obtenerJornadasRecientesDashboard(token, 5, proyectoId || undefined),
+    [proyectoId],
   );
   return (
     <EstadoCargaWidget cargando={cargando} error={error}>

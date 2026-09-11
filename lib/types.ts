@@ -265,6 +265,13 @@ export interface JornadaRecienteDashboard {
   fecha: string;
 }
 
+export interface ProyectoFiltroDashboard {
+  id: string;
+  nombre: string;
+  tipo: TipoProyecto;
+  estado: EstadoProyecto;
+}
+
 export interface DashboardCompleto {
   kpis: KpisDashboard;
   medidores: MedidoresCumplimiento;
@@ -487,6 +494,12 @@ export interface Jornada {
   asistentes?: JornadaAsistente[];
   grupoJornadaId?: string | null;
   grupo?: HermanoGrupoJornada[];
+  plantillaFormulario?: {
+    id: string;
+    nombre: string;
+    tipoPlantilla?: TipoPlantillaFormulario;
+    version?: number;
+  } | null;
 }
 
 export interface ContadoresAprobacion {
@@ -867,6 +880,7 @@ export interface CrearJornadaPayload {
   tecnicoResponsableIds?: string[];
   tipo?: TipoJornada;
   requiereRevision?: boolean;
+  plantillaFormularioId?: string | null;
 }
 
 export interface ActualizarJornadaPayload {
@@ -877,6 +891,7 @@ export interface ActualizarJornadaPayload {
   metaId?: string;
   cantidadEjecutada?: number;
   tipo?: TipoJornada;
+  plantillaFormularioId?: string | null;
 }
 
 export interface GuardarAsistenciaPayload {
@@ -951,6 +966,13 @@ export interface ColumnaCampoTabla {
 }
 
 export type TipoPlantillaFormulario = "INDIVIDUAL" | "GRUPAL";
+
+export interface PlantillaFormularioCatalogo {
+  id: string;
+  nombre: string;
+  tipoPlantilla: TipoPlantillaFormulario;
+  version: number;
+}
 
 export interface CampoFormulario {
   id: string;

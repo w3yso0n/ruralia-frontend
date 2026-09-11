@@ -121,6 +121,7 @@ export function PanelJornadas({
     observaciones?: string;
     metaId: string;
     tipo: TipoJornada;
+    plantillaFormularioId?: string | null;
     tecnicoResponsableIds: string[];
     requiereRevision: boolean;
   }) {
@@ -135,6 +136,7 @@ export function PanelJornadas({
         observaciones: datos.observaciones,
         metaId: datos.metaId,
         tipo: datos.tipo,
+        plantillaFormularioId: datos.plantillaFormularioId,
         tecnicoResponsableIds: datos.tecnicoResponsableIds,
         requiereRevision: datos.requiereRevision,
       });
@@ -167,6 +169,7 @@ export function PanelJornadas({
       observaciones?: string;
       metaId: string;
       tipo: TipoJornada;
+      plantillaFormularioId?: string | null;
     },
   ) {
     setEnviando(true);
@@ -359,6 +362,11 @@ export function PanelJornadas({
                       {jornadaSeleccionada.tipo === "GRUPAL" ? (
                         <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
                           Grupal · asistencia
+                        </span>
+                      ) : null}
+                      {jornadaSeleccionada.plantillaFormulario?.nombre ? (
+                        <span className="ml-2 rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs font-medium text-ruralia-teal-text">
+                          {jornadaSeleccionada.plantillaFormulario.nombre}
                         </span>
                       ) : null}
                       {jornadaSeleccionada.requiereRevision !== false ? (

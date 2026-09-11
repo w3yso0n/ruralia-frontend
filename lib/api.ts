@@ -52,6 +52,7 @@ import type {
   SerieMensualDashboard,
   VeredaCobertura,
   JornadaRecienteDashboard,
+  ProyectoFiltroDashboard,
   WidgetDisponible,
   ConfiguracionDashboard,
   ItemPreferenciaDashboard,
@@ -71,6 +72,7 @@ import type {
   OrdenProyecto,
   PlanProyecto,
   PlantillaFormulario,
+  PlantillaFormularioCatalogo,
   ProcesoPlan,
   ProgresoProyecto,
   Proyecto,
@@ -681,6 +683,15 @@ export async function crearJornada(
   });
 }
 
+export async function listarCatalogoFormulariosJornada(
+  token: string,
+): Promise<PlantillaFormularioCatalogo[]> {
+  return fetchConAuth<PlantillaFormularioCatalogo[]>(
+    "/jornadas/catalogo-formularios",
+    token,
+  );
+}
+
 export async function obtenerJornada(
   token: string,
   id: string,
@@ -1103,53 +1114,99 @@ export async function desactivarVeredaAdmin(
 export async function obtenerDashboardCompleto(
   token: string,
   meses = 6,
+  proyectoId?: string,
 ): Promise<DashboardCompleto> {
   return fetchConAuth<DashboardCompleto>(
-    `/dashboard?meses=${meses}`,
+    `/dashboard${construirQuery({ meses, proyectoId })}`,
     token,
   );
 }
 
-export async function obtenerKpisDashboard(token: string): Promise<KpisDashboard> {
-  return fetchConAuth<KpisDashboard>("/dashboard/resumen", token);
+export async function listarProyectosFiltroDashboard(
+  token: string,
+): Promise<ProyectoFiltroDashboard[]> {
+  return fetchConAuth<ProyectoFiltroDashboard[]>("/dashboard/proyectos", token);
+}
+
+export async function descargarPdfDashboard(
+  token: string,
+  proyectoId?: string,
+): Promise<Blob> {
+  const respuesta = await fetch(
+    `${API_URL}/dashboard/reporte/pdf${construirQuery({ proyectoId })}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    throw new Error(
+      `Backend respondió ${respuesta.status}: ${cuerpo || respuesta.statusText}`,
+    );
+  }
+  return respuesta.blob();
+}
+
+export async function obtenerKpisDashboard(
+  token: string,
+  proyectoId?: string,
+): Promise<KpisDashboard> {
+  return fetchConAuth<KpisDashboard>(
+    `/dashboard/resumen${construirQuery({ proyectoId })}`,
+    token,
+  );
 }
 
 export async function obtenerCumplimientoDashboard(
   token: string,
+  proyectoId?: string,
 ): Promise<MedidoresCumplimiento> {
-  return fetchConAuth<MedidoresCumplimiento>("/dashboard/cumplimiento", token);
+  return fetchConAuth<MedidoresCumplimiento>(
+    `/dashboard/cumplimiento${construirQuery({ proyectoId })}`,
+    token,
+  );
 }
 
 export async function obtenerActividadMensualDashboard(
   token: string,
   meses = 6,
+  proyectoId?: string,
 ): Promise<SerieMensualDashboard[]> {
   return fetchConAuth<SerieMensualDashboard[]>(
-    `/dashboard/actividad-mensual?meses=${meses}`,
+    `/dashboard/actividad-mensual${construirQuery({ meses, proyectoId })}`,
     token,
   );
 }
 
 export async function obtenerMapaCoberturaDashboard(
   token: string,
+  proyectoId?: string,
 ): Promise<VeredaCobertura[]> {
-  return fetchConAuth<VeredaCobertura[]>("/dashboard/mapa-cobertura", token);
+  return fetchConAuth<VeredaCobertura[]>(
+    `/dashboard/mapa-cobertura${construirQuery({ proyectoId })}`,
+    token,
+  );
 }
 
 export async function obtenerJornadasRecientesDashboard(
   token: string,
   limite = 5,
+  proyectoId?: string,
 ): Promise<JornadaRecienteDashboard[]> {
   return fetchConAuth<JornadaRecienteDashboard[]>(
-    `/dashboard/jornadas-recientes?limite=${limite}`,
+    `/dashboard/jornadas-recientes${construirQuery({ limite, proyectoId })}`,
     token,
   );
 }
 
 export async function obtenerCumplimientoEquipoDashboard(
   token: string,
-  filtros?: { anio?: number; mes?: number },
+  filtros?: { proyectoId?: string; anio?: number; mes?: number },
 ): Promise<ProductividadPersona[]> {
+  if (filtros?.proyectoId) {
+    return obtenerProductividadProyecto(token, filtros.proyectoId, {
+      anio: filtros.anio,
+      mes: filtros.mes,
+    });
+  }
   const params = new URLSearchParams();
   if (filtros?.anio != null) params.set("anio", String(filtros.anio));
   if (filtros?.mes != null) params.set("mes", String(filtros.mes));
