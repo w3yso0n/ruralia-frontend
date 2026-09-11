@@ -2,6 +2,33 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  Calendar,
+  Camera,
+  CheckSquare,
+  ChevronDown,
+  ChevronUp,
+  CircleDot,
+  ClipboardList,
+  Hash,
+  MapPin,
+  Paperclip,
+  PenLine,
+  Plus,
+  Table2,
+  ToggleLeft,
+  Trash2,
+  Type,
+  User,
+  Users,
+} from "lucide-react";
+import {
+  EditorOpciones,
+  opcionesDesdeTexto,
+  textoDesdeOpciones,
+} from "@/components/formularios/editor-opciones";
 import { Alerta, Spinner } from "@/components/ui/modal";
 import {
   actualizarPlantillaFormulario,
@@ -45,23 +72,45 @@ interface CampoEnEdicion extends CampoFormularioPayload {
   columnas: ColumnaEnEdicion[];
 }
 
-const TIPOS_CAMPO_BASE: { valor: TipoCampoFormulario; etiqueta: string }[] = [
-  { valor: "TEXTO", etiqueta: "Texto corto" },
-  { valor: "NUMERO", etiqueta: "Número" },
-  { valor: "FECHA", etiqueta: "Fecha" },
-  { valor: "SI_NO", etiqueta: "Sí / No" },
-  { valor: "SELECCION_UNICA", etiqueta: "Selección única" },
-  { valor: "SELECCION_MULTIPLE", etiqueta: "Selección múltiple" },
-  { valor: "GPS", etiqueta: "Ubicación GPS" },
-  { valor: "FOTO", etiqueta: "Foto" },
-  { valor: "FIRMA", etiqueta: "Firma" },
-  { valor: "ARCHIVO", etiqueta: "Archivo adjunto" },
+const TIPOS_CAMPO_BASE: {
+  valor: TipoCampoFormulario;
+  etiqueta: string;
+  pista: string;
+  icono: typeof Type;
+}[] = [
+  { valor: "TEXTO", etiqueta: "Texto", pista: "Nombre, observaciones…", icono: Type },
+  { valor: "NUMERO", etiqueta: "Número", pista: "Cantidades", icono: Hash },
+  { valor: "FECHA", etiqueta: "Fecha", pista: "Día del evento", icono: Calendar },
+  { valor: "SI_NO", etiqueta: "Sí / No", pista: "Pregunta cerrada", icono: ToggleLeft },
+  {
+    valor: "SELECCION_UNICA",
+    etiqueta: "Una opción",
+    pista: "Elige una de la lista",
+    icono: CircleDot,
+  },
+  {
+    valor: "SELECCION_MULTIPLE",
+    etiqueta: "Varias opciones",
+    pista: "Puede marcar varias",
+    icono: CheckSquare,
+  },
+  { valor: "GPS", etiqueta: "Ubicación", pista: "Punto en el mapa", icono: MapPin },
+  { valor: "FOTO", etiqueta: "Foto", pista: "Cámara o galería", icono: Camera },
+  { valor: "FIRMA", etiqueta: "Firma", pista: "Dibujo a mano", icono: PenLine },
+  {
+    valor: "ARCHIVO",
+    etiqueta: "Archivo",
+    pista: "Documento adjunto",
+    icono: Paperclip,
+  },
 ];
 
-const TIPOS_CAMPO_GRUPAL: { valor: TipoCampoFormulario; etiqueta: string }[] = [
-  ...TIPOS_CAMPO_BASE,
-  { valor: "TABLA", etiqueta: "Tabla / lista de asistencia" },
-];
+const TIPO_TABLA = {
+  valor: "TABLA" as TipoCampoFormulario,
+  etiqueta: "Lista de personas",
+  pista: "Varias filas: nombre, firma…",
+  icono: Table2,
+};
 
 const TIPOS_COLUMNA_TABLA: {
   valor: TipoCampoColumnaTabla;
@@ -71,7 +120,7 @@ const TIPOS_COLUMNA_TABLA: {
   { valor: "NUMERO", etiqueta: "Número" },
   { valor: "FECHA", etiqueta: "Fecha" },
   { valor: "SI_NO", etiqueta: "Sí / No" },
-  { valor: "SELECCION_UNICA", etiqueta: "Selección única" },
+  { valor: "SELECCION_UNICA", etiqueta: "Una opción" },
   { valor: "FIRMA", etiqueta: "Firma" },
 ];
 
@@ -112,7 +161,6 @@ function generarClave(etiqueta: string): string {
     .replace(/^_+|_+$/g, "");
 }
 
-/** Genera claves únicas a partir de etiquetas (evita colisiones tipo "f"/"f"). */
 function clavesUnicasDesdeEtiquetas(etiquetas: string[]): string[] {
   return asegurarClavesUnicas(
     etiquetas.map(
@@ -121,7 +169,6 @@ function clavesUnicasDesdeEtiquetas(etiquetas: string[]): string[] {
   );
 }
 
-/** Si hay claves repetidas, sufija _2, _3, etc. Conserva las ya únicas. */
 function asegurarClavesUnicas(claves: string[]): string[] {
   const usadas = new Set<string>();
   return claves.map((raw, indice) => {
@@ -157,6 +204,194 @@ function parsearColumnas(
   }));
 }
 
+function Interruptor({
+  checked,
+  onChange,
+  etiqueta,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  etiqueta: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="inline-flex items-center gap-2 text-sm text-zinc-700"
+    >
+      <span
+        className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+          checked ? "bg-ruralia-teal" : "bg-zinc-300"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-[left] ${
+            checked ? "left-4.5" : "left-0.5"
+          }`}
+        />
+      </span>
+      {etiqueta}
+    </button>
+  );
+}
+
+function SelectorTipoCampo({
+  valor,
+  onChange,
+  tipos,
+}: {
+  valor: TipoCampoFormulario;
+  onChange: (tipo: TipoCampoFormulario) => void;
+  tipos: Array<{
+    valor: TipoCampoFormulario;
+    etiqueta: string;
+    pista: string;
+    icono: typeof Type;
+  }>;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      {tipos.map((tipo) => {
+        const Icono = tipo.icono;
+        const activo = valor === tipo.valor;
+        return (
+          <button
+            key={tipo.valor}
+            type="button"
+            onClick={() => onChange(tipo.valor)}
+            className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-left transition ${
+              activo
+                ? "border-ruralia-teal bg-ruralia-teal-soft/60 ring-2 ring-ruralia-teal/20"
+                : "border-zinc-200 bg-white hover:border-ruralia-teal-border"
+            }`}
+          >
+            <Icono
+              className={`mt-0.5 h-4 w-4 shrink-0 ${
+                activo ? "text-ruralia-teal" : "text-zinc-400"
+              }`}
+            />
+            <span className="min-w-0">
+              <span
+                className={`block text-sm font-semibold ${
+                  activo ? "text-ruralia-teal-text" : "text-zinc-800"
+                }`}
+              >
+                {tipo.etiqueta}
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-zinc-500">
+                {tipo.pista}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function VistaPreviaCampo({ campo }: { campo: CampoEnEdicion }) {
+  const opciones = opcionesDesdeTexto(campo.claveOpciones);
+  const pregunta = campo.etiqueta.trim() || "Así se verá la pregunta";
+
+  return (
+    <div className="rounded-xl bg-zinc-50 p-3">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+        Vista previa
+      </p>
+      <p className="mb-2 text-sm font-medium text-zinc-800">
+        {pregunta}
+        {campo.esObligatorio ? (
+          <span className="ml-1 text-red-500">*</span>
+        ) : null}
+      </p>
+      {campo.tipoCampo === "TEXTO" || campo.tipoCampo === "NUMERO" ? (
+        <div className="h-9 rounded-lg border border-dashed border-zinc-200 bg-white px-3 text-sm leading-9 text-zinc-400">
+          {campo.tipoCampo === "NUMERO" ? "0" : "Escribir aquí…"}
+        </div>
+      ) : null}
+      {campo.tipoCampo === "FECHA" ? (
+        <div className="h-9 rounded-lg border border-dashed border-zinc-200 bg-white px-3 text-sm leading-9 text-zinc-400">
+          dd / mm / aaaa
+        </div>
+      ) : null}
+      {campo.tipoCampo === "SI_NO" ? (
+        <div className="flex gap-2">
+          {["Sí", "No"].map((op) => (
+            <span
+              key={op}
+              className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs text-zinc-600"
+            >
+              {op}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {campo.tipoCampo === "SELECCION_UNICA" ? (
+        <div className="space-y-1.5">
+          {(opciones.length ? opciones : ["Opción A", "Opción B"]).map((op) => (
+            <label key={op} className="flex items-center gap-2 text-sm text-zinc-600">
+              <span className="h-3.5 w-3.5 rounded-full border border-zinc-300" />
+              {op}
+            </label>
+          ))}
+        </div>
+      ) : null}
+      {campo.tipoCampo === "SELECCION_MULTIPLE" ? (
+        <div className="space-y-1.5">
+          {(opciones.length ? opciones : ["Opción A", "Opción B"]).map((op) => (
+            <label key={op} className="flex items-center gap-2 text-sm text-zinc-600">
+              <span className="h-3.5 w-3.5 rounded border border-zinc-300" />
+              {op}
+            </label>
+          ))}
+        </div>
+      ) : null}
+      {campo.tipoCampo === "GPS" ? (
+        <p className="text-xs text-zinc-500">Botón para marcar ubicación</p>
+      ) : null}
+      {campo.tipoCampo === "FOTO" || campo.tipoCampo === "ARCHIVO" ? (
+        <p className="text-xs text-zinc-500">
+          {campo.tipoCampo === "FOTO" ? "Tomar o subir una foto" : "Adjuntar un archivo"}
+        </p>
+      ) : null}
+      {campo.tipoCampo === "FIRMA" ? (
+        <div className="h-14 rounded-lg border border-dashed border-zinc-200 bg-white text-center text-xs leading-[3.5rem] text-zinc-400">
+          Área para firmar
+        </div>
+      ) : null}
+      {campo.tipoCampo === "TABLA" ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs text-zinc-600">
+            <thead>
+              <tr>
+                {(campo.columnas.length
+                  ? campo.columnas
+                  : [{ etiqueta: "Nombre" }, { etiqueta: "Firma" }]
+                ).map((col, i) => (
+                  <th key={i} className="border-b border-zinc-200 py-1 pr-3 font-medium">
+                    {col.etiqueta.trim() || `Columna ${i + 1}`}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {(campo.columnas.length ? campo.columnas : [1, 2]).map((_, i) => (
+                  <td key={i} className="py-1.5 pr-3 text-zinc-400">
+                    —
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function EditorPlantillaFormulario({
   plantillaId,
 }: EditorPlantillaFormularioProps) {
@@ -181,6 +416,7 @@ export function EditorPlantillaFormulario({
   const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
 
   const [campos, setCampos] = useState<CampoEnEdicion[]>([campoVacio(0)]);
+  const [mostrarAsignacion, setMostrarAsignacion] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -231,6 +467,12 @@ export function EditorPlantillaFormulario({
         setEstaActivo(plantilla.estaActivo);
         setProcesoIds(plantilla.procesoIds ?? []);
         setUsuarioIds(plantilla.usuarioIds ?? []);
+        if (
+          (plantilla.procesoIds?.length ?? 0) > 0 ||
+          (plantilla.usuarioIds?.length ?? 0) > 0
+        ) {
+          setMostrarAsignacion(true);
+        }
         setCampos(
           (plantilla.campos ?? [])
             .slice()
@@ -290,8 +532,6 @@ export function EditorPlantillaFormulario({
         if (cambios.tipoCampo && cambios.tipoCampo !== "TABLA") {
           siguiente.columnas = [];
         }
-        // Solo regenerar clave al editar etiqueta si el campo aún no está persistido
-        // (evita romper respuestas ya guardadas con la clave anterior).
         if (
           !campo.id &&
           cambios.etiqueta !== undefined &&
@@ -420,10 +660,7 @@ export function EditorPlantillaFormulario({
                 };
                 if (col.tipoCampo === "SELECCION_UNICA") {
                   base.opciones = {
-                    valores: col.claveOpciones
-                      .split("\n")
-                      .map((v) => v.trim())
-                      .filter(Boolean),
+                    valores: opcionesDesdeTexto(col.claveOpciones),
                   };
                 }
                 return base;
@@ -431,10 +668,7 @@ export function EditorPlantillaFormulario({
             };
           } else if (TIPOS_CON_OPCIONES.includes(campo.tipoCampo)) {
             opciones = {
-              valores: campo.claveOpciones
-                .split("\n")
-                .map((v) => v.trim())
-                .filter(Boolean),
+              valores: opcionesDesdeTexto(campo.claveOpciones),
             };
           }
 
@@ -488,19 +722,29 @@ export function EditorPlantillaFormulario({
   }
 
   const tiposDisponibles =
-    tipoPlantilla === "GRUPAL" ? TIPOS_CAMPO_GRUPAL : TIPOS_CAMPO_BASE;
+    tipoPlantilla === "GRUPAL"
+      ? [...TIPOS_CAMPO_BASE, TIPO_TABLA]
+      : TIPOS_CAMPO_BASE;
 
   if (cargando) return <Spinner />;
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
+      <Link
+        href="/formularios"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-ruralia-teal-text hover:underline"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Volver a formularios
+      </Link>
+
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-zinc-900">
-            {esEdicion ? "Editar plantilla" : "Nueva plantilla de formulario"}
+            {esEdicion ? "Editar formulario" : "Crear formulario"}
           </h2>
           <p className="mt-1 text-zinc-600">
-            Diseña los campos que se capturarán en campo
+            Escribe las preguntas como las verá el técnico en el celular.
           </p>
         </div>
         {esEdicion ? (
@@ -511,7 +755,7 @@ export function EditorPlantillaFormulario({
                 : "bg-zinc-100 text-zinc-500"
             }`}
           >
-            {estaActivo ? "Publicada" : "Borrador"}
+            {estaActivo ? "En uso" : "Borrador"}
           </span>
         ) : null}
       </div>
@@ -519,14 +763,14 @@ export function EditorPlantillaFormulario({
       {error ? <Alerta mensaje={error} /> : null}
 
       <form onSubmit={manejarGuardar} className="space-y-6">
-        <div className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
-          <h3 className="mb-4 text-sm font-semibold text-zinc-900">
-            Información general
+        <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5 shadow-sm sm:p-6">
+          <h3 className="mb-4 text-base font-semibold text-zinc-900">
+            1. Datos del formulario
           </h3>
           <div className="space-y-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-zinc-700">
-                Nombre de la plantilla
+                Nombre
               </label>
               <input
                 required
@@ -538,293 +782,211 @@ export function EditorPlantillaFormulario({
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-zinc-700">
-                Descripción (opcional)
+                Nota interna{" "}
+                <span className="font-normal text-zinc-400">(opcional)</span>
               </label>
-              <textarea
+              <input
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
-                rows={2}
+                placeholder="Para recordar para qué sirve. No la ve el técnico."
                 className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal focus:ring-4 focus:ring-ruralia-teal/10"
               />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-zinc-700">
-                Tipo de formulario
-              </label>
-              <div className="flex flex-wrap gap-3">
-                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm has-[:checked]:border-ruralia-teal has-[:checked]:bg-ruralia-teal-soft/40">
-                  <input
-                    type="radio"
-                    name="tipoPlantilla"
-                    value="INDIVIDUAL"
-                    checked={tipoPlantilla === "INDIVIDUAL"}
-                    onChange={() => cambiarTipoPlantilla("INDIVIDUAL")}
-                  />
-                  Individual (principal)
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm has-[:checked]:border-ruralia-teal has-[:checked]:bg-ruralia-teal-soft/40">
-                  <input
-                    type="radio"
-                    name="tipoPlantilla"
-                    value="GRUPAL"
-                    checked={tipoPlantilla === "GRUPAL"}
-                    onChange={() => cambiarTipoPlantilla("GRUPAL")}
-                  />
-                  Grupal · lista de asistencia
-                </label>
-              </div>
-              <p className="mt-2 text-xs text-zinc-500">
-                {tipoPlantilla === "GRUPAL"
-                  ? "Combina datos del evento (fecha, lugar, actividad…) con una o más tablas de asistencia de columnas flexibles."
-                  : "Un envío por jornada. Es el formulario principal de campo."}
+              <p className="mb-2 text-sm font-medium text-zinc-700">
+                ¿Quién responde?
               </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
-          <h3 className="mb-1 text-sm font-semibold text-zinc-900">
-            Procesos asignados (opcional)
-          </h3>
-          <p className="mb-4 text-xs text-zinc-500">
-            Vincula la plantilla a uno o más procesos del plan. El técnico la verá
-            al registrar jornadas contra metas de esos procesos.
-          </p>
-
-          {grupos.length === 0 ? (
-            <p className="text-sm text-zinc-500">
-              No hay proyectos con procesos definidos. Configúralos en Plan del
-              proyecto.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {grupos.map((grupo) => (
-                <div key={grupo.proyecto.id}>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                    {grupo.proyecto.nombre}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {grupo.procesos.map((proceso) => (
-                      <button
-                        key={proceso.id}
-                        type="button"
-                        onClick={() => alternarProceso(proceso.id)}
-                        className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                          procesoIds.includes(proceso.id)
-                            ? "bg-ruralia-teal text-white"
-                            : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                        }`}
-                      >
-                        {proceso.etiqueta}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
-          <h3 className="mb-1 text-sm font-semibold text-zinc-900">
-            Usuarios asignados (opcional)
-          </h3>
-          <p className="mb-4 text-xs text-zinc-500">
-            Asigna la plantilla directamente a usuarios específicos, sin
-            depender de un proyecto o subactividad. Útil para encuestas
-            generales que el usuario responde sin una jornada asociada.
-          </p>
-
-          {usuarios.length === 0 ? (
-            <p className="text-sm text-zinc-500">
-              No hay usuarios activos registrados todavía.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {usuarios.map((usuario) => (
+              <div className="grid gap-3 sm:grid-cols-2">
                 <button
-                  key={usuario.id}
                   type="button"
-                  onClick={() => alternarUsuario(usuario.id)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                    usuarioIds.includes(usuario.id)
-                      ? "bg-ruralia-teal text-white"
-                      : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                  onClick={() => cambiarTipoPlantilla("INDIVIDUAL")}
+                  className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition ${
+                    tipoPlantilla === "INDIVIDUAL"
+                      ? "border-ruralia-teal bg-ruralia-teal-soft/50 ring-2 ring-ruralia-teal/20"
+                      : "border-zinc-200 hover:border-ruralia-teal-border"
                   }`}
                 >
-                  {usuario.nombreCompleto}
+                  <User className="mt-0.5 h-5 w-5 shrink-0 text-ruralia-teal" />
+                  <span>
+                    <span className="block font-semibold text-zinc-900">
+                      Una persona
+                    </span>
+                    <span className="mt-0.5 block text-sm text-zinc-500">
+                      El técnico llena el formulario una vez por visita.
+                    </span>
+                  </span>
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => cambiarTipoPlantilla("GRUPAL")}
+                  className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition ${
+                    tipoPlantilla === "GRUPAL"
+                      ? "border-ruralia-teal bg-ruralia-teal-soft/50 ring-2 ring-ruralia-teal/20"
+                      : "border-zinc-200 hover:border-ruralia-teal-border"
+                  }`}
+                >
+                  <Users className="mt-0.5 h-5 w-5 shrink-0 text-ruralia-teal" />
+                  <span>
+                    <span className="block font-semibold text-zinc-900">
+                      Varias personas
+                    </span>
+                    <span className="mt-0.5 block text-sm text-zinc-500">
+                      Lista de asistencia: varias filas (nombre, firma, etc.).
+                    </span>
+                  </span>
+                </button>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        </section>
 
-        <div className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
+        <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-zinc-900">
-                Campos del formulario
+              <h3 className="text-base font-semibold text-zinc-900">
+                2. Preguntas
               </h3>
-              {tipoPlantilla === "GRUPAL" ? (
-                <p className="mt-1 text-xs text-zinc-500">
-                  Campos normales = datos del evento (una sola vez). Tipo{" "}
-                  <strong>Tabla</strong> = lista de asistencia con columnas
-                  configurables.
-                </p>
-              ) : null}
+              <p className="mt-1 text-sm text-zinc-500">
+                {tipoPlantilla === "GRUPAL"
+                  ? "Puedes mezclar datos del evento (fecha, lugar) con una lista de personas."
+                  : "Agrega cada pregunta y elige cómo se responde."}
+              </p>
             </div>
             <button
               type="button"
               onClick={agregarCampo}
-              className="rounded-lg border border-ruralia-teal-border px-3 py-1.5 text-xs font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-ruralia-teal px-3.5 py-2 text-sm font-semibold text-white hover:bg-ruralia-teal-hover"
             >
-              + Agregar campo
+              <Plus className="h-4 w-4" />
+              Nueva pregunta
             </button>
           </div>
 
           <div className="space-y-4">
             {campos.map((campo, indice) => (
-              <div
-                key={indice}
-                className="rounded-xl border border-zinc-200 p-4"
+              <article
+                key={campo.id ?? `nuevo-${indice}`}
+                className="rounded-2xl border border-zinc-200 p-4 sm:p-5"
               >
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                    {campo.tipoCampo === "TABLA"
-                      ? `Tabla ${indice + 1}`
-                      : `Campo ${indice + 1}`}
+                <div className="mb-4 flex items-center justify-between gap-2">
+                  <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-ruralia-teal-soft px-2 text-xs font-bold text-ruralia-teal-text">
+                    {indice + 1}
                   </span>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => moverCampo(indice, -1)}
                       disabled={indice === 0}
-                      className="rounded-lg px-2 py-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-30"
-                      aria-label="Mover arriba"
+                      className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-30"
+                      aria-label="Subir"
                     >
-                      ↑
+                      <ChevronUp className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
                       onClick={() => moverCampo(indice, 1)}
                       disabled={indice === campos.length - 1}
-                      className="rounded-lg px-2 py-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-30"
-                      aria-label="Mover abajo"
+                      className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-30"
+                      aria-label="Bajar"
                     >
-                      ↓
+                      <ChevronDown className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
                       onClick={() => eliminarCampo(indice)}
                       disabled={campos.length === 1}
-                      className="rounded-lg px-2 py-1 text-red-500 hover:bg-red-50 disabled:opacity-30"
-                      aria-label="Eliminar campo"
+                      className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-30"
+                      aria-label="Eliminar pregunta"
                     >
-                      ✕
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">
-                      {campo.tipoCampo === "TABLA"
-                        ? "Nombre de la lista"
-                        : "Etiqueta"}
-                    </label>
-                    <input
-                      required
-                      value={campo.etiqueta}
-                      onChange={(e) =>
-                        actualizarCampo(indice, {
-                          etiqueta: e.target.value,
-                        })
-                      }
-                      placeholder={
-                        campo.tipoCampo === "TABLA"
-                          ? "Ej: Listado de asistencia"
-                          : "Ej: ¿Cuántas hectáreas se sembraron?"
-                      }
-                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">
-                      Tipo de campo
-                    </label>
-                    <select
-                      value={campo.tipoCampo}
-                      onChange={(e) =>
-                        actualizarCampo(indice, {
-                          tipoCampo: e.target.value as TipoCampoFormulario,
-                        })
-                      }
-                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
-                    >
-                      {tiposDisponibles.map((tipo) => (
-                        <option key={tipo.valor} value={tipo.valor}>
-                          {tipo.etiqueta}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">
+                  {campo.tipoCampo === "TABLA"
+                    ? "Nombre de la lista"
+                    : "Pregunta"}
+                </label>
+                <input
+                  required
+                  value={campo.etiqueta}
+                  onChange={(e) =>
+                    actualizarCampo(indice, { etiqueta: e.target.value })
+                  }
+                  placeholder={
+                    campo.tipoCampo === "TABLA"
+                      ? "Ej: Listado de asistencia"
+                      : "Ej: ¿Cuántas hectáreas se sembraron?"
+                  }
+                  className="mb-4 w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal focus:ring-4 focus:ring-ruralia-teal/10"
+                />
+
+                <p className="mb-2 text-sm font-medium text-zinc-700">
+                  Cómo se responde
+                </p>
+                <SelectorTipoCampo
+                  valor={campo.tipoCampo}
+                  onChange={(tipoCampo) =>
+                    actualizarCampo(indice, { tipoCampo })
+                  }
+                  tipos={tiposDisponibles}
+                />
 
                 {TIPOS_CON_OPCIONES.includes(campo.tipoCampo) ? (
-                  <div className="mt-3">
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">
-                      Opciones (una por línea)
-                    </label>
-                    <textarea
-                      value={campo.claveOpciones}
-                      onChange={(e) =>
+                  <div className="mt-4">
+                    <p className="mb-2 text-sm font-medium text-zinc-700">
+                      Opciones de respuesta
+                    </p>
+                    <EditorOpciones
+                      valores={opcionesDesdeTexto(campo.claveOpciones)}
+                      onChange={(valores) =>
                         actualizarCampo(indice, {
-                          claveOpciones: e.target.value,
+                          claveOpciones: textoDesdeOpciones(valores),
                         })
                       }
-                      rows={3}
-                      placeholder={"Opción 1\nOpción 2\nOpción 3"}
-                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
+                      placeholder="Ej: Maíz"
                     />
                   </div>
                 ) : null}
 
                 {campo.tipoCampo === "TABLA" ? (
-                  <div className="mt-4 space-y-3 rounded-lg border border-dashed border-zinc-200 bg-zinc-50/60 p-3">
+                  <div className="mt-4 space-y-3 rounded-xl bg-zinc-50 p-3 sm:p-4">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                        Columnas de la tabla
+                      <p className="text-sm font-semibold text-zinc-800">
+                        Columnas de cada fila
                       </p>
                       <button
                         type="button"
                         onClick={() => agregarColumna(indice)}
-                        className="rounded-lg border border-ruralia-teal-border px-2.5 py-1 text-xs font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft"
+                        className="inline-flex items-center gap-1 rounded-lg border border-ruralia-teal-border bg-white px-2.5 py-1 text-xs font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft"
                       >
-                        + Columna
+                        <Plus className="h-3.5 w-3.5" />
+                        Columna
                       </button>
                     </div>
                     {campo.columnas.map((columna, indiceCol) => (
                       <div
                         key={indiceCol}
-                        className="rounded-lg border border-zinc-200 bg-white p-3"
+                        className="rounded-xl border border-zinc-200 bg-white p-3"
                       >
                         <div className="mb-2 flex items-center justify-between">
-                          <span className="text-xs text-zinc-400">
+                          <span className="text-xs font-medium text-zinc-500">
                             Columna {indiceCol + 1}
                           </span>
                           <button
                             type="button"
                             onClick={() => eliminarColumna(indice, indiceCol)}
                             disabled={campo.columnas.length <= 1}
-                            className="rounded px-2 py-0.5 text-xs text-red-500 hover:bg-red-50 disabled:opacity-30"
+                            className="text-xs font-medium text-red-500 hover:underline disabled:opacity-30"
                           >
                             Quitar
                           </button>
                         </div>
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <div>
                             <label className="mb-1 block text-xs font-medium text-zinc-600">
-                              Etiqueta
+                              Título
                             </label>
                             <input
                               required
@@ -841,82 +1003,186 @@ export function EditorPlantillaFormulario({
                           </div>
                           <div>
                             <label className="mb-1 block text-xs font-medium text-zinc-600">
-                              Tipo
+                              Cómo se llena
                             </label>
-                            <select
-                              value={columna.tipoCampo}
-                              onChange={(e) =>
-                                actualizarColumna(indice, indiceCol, {
-                                  tipoCampo: e.target
-                                    .value as TipoCampoColumnaTabla,
-                                })
-                              }
-                              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
-                            >
-                              {TIPOS_COLUMNA_TABLA.map((tipo) => (
-                                <option key={tipo.valor} value={tipo.valor}>
-                                  {tipo.etiqueta}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="flex flex-wrap gap-1.5">
+                              {TIPOS_COLUMNA_TABLA.map((tipo) => {
+                                const activo = columna.tipoCampo === tipo.valor;
+                                return (
+                                  <button
+                                    key={tipo.valor}
+                                    type="button"
+                                    onClick={() =>
+                                      actualizarColumna(indice, indiceCol, {
+                                        tipoCampo: tipo.valor,
+                                      })
+                                    }
+                                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
+                                      activo
+                                        ? "bg-ruralia-teal text-white"
+                                        : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                                    }`}
+                                  >
+                                    {tipo.etiqueta}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
                         </div>
                         {columna.tipoCampo === "SELECCION_UNICA" ? (
-                          <div className="mt-2">
-                            <label className="mb-1 block text-xs font-medium text-zinc-600">
-                              Opciones (una por línea)
-                            </label>
-                            <textarea
-                              value={columna.claveOpciones}
-                              onChange={(e) =>
+                          <div className="mt-3">
+                            <p className="mb-1.5 text-xs font-medium text-zinc-600">
+                              Opciones
+                            </p>
+                            <EditorOpciones
+                              valores={opcionesDesdeTexto(columna.claveOpciones)}
+                              onChange={(valores) =>
                                 actualizarColumna(indice, indiceCol, {
-                                  claveOpciones: e.target.value,
+                                  claveOpciones: textoDesdeOpciones(valores),
                                 })
                               }
-                              rows={2}
-                              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
                             />
                           </div>
                         ) : null}
-                        <label className="mt-2 flex items-center gap-2 text-xs text-zinc-700">
-                          <input
-                            type="checkbox"
+                        <div className="mt-3">
+                          <Interruptor
                             checked={columna.esObligatorio ?? false}
-                            onChange={(e) =>
+                            onChange={(v) =>
                               actualizarColumna(indice, indiceCol, {
-                                esObligatorio: e.target.checked,
+                                esObligatorio: v,
                               })
                             }
-                            className="rounded border-zinc-300"
+                            etiqueta="Obligatoria"
                           />
-                          Columna obligatoria
-                        </label>
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : null}
 
-                <label className="mt-3 flex items-center gap-2 text-sm text-zinc-700">
-                  <input
-                    type="checkbox"
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <Interruptor
                     checked={campo.esObligatorio ?? false}
-                    onChange={(e) =>
-                      actualizarCampo(indice, {
-                        esObligatorio: e.target.checked,
-                      })
+                    onChange={(v) =>
+                      actualizarCampo(indice, { esObligatorio: v })
                     }
-                    className="rounded border-zinc-300"
+                    etiqueta={
+                      campo.tipoCampo === "TABLA"
+                        ? "Hay que llenar al menos una fila"
+                        : "Pregunta obligatoria"
+                    }
                   />
-                  {campo.tipoCampo === "TABLA"
-                    ? "Tabla obligatoria (al menos una fila)"
-                    : "Campo obligatorio"}
-                </label>
-              </div>
+                </div>
+
+                <div className="mt-4">
+                  <VistaPreviaCampo campo={campo} />
+                </div>
+              </article>
             ))}
           </div>
-        </div>
+        </section>
 
-        <div className="flex justify-end gap-3">
+        <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+          <button
+            type="button"
+            onClick={() => setMostrarAsignacion((v) => !v)}
+            className="flex w-full items-center justify-between gap-3 text-left"
+          >
+            <span>
+              <span className="block text-base font-semibold text-zinc-900">
+                3. Dónde se usa{" "}
+                <span className="font-normal text-zinc-400">(opcional)</span>
+              </span>
+              <span className="mt-0.5 block text-sm text-zinc-500">
+                Si lo dejas vacío, luego lo asignas desde la lista de formularios.
+              </span>
+            </span>
+            <ChevronDown
+              className={`h-5 w-5 shrink-0 text-zinc-400 transition ${
+                mostrarAsignacion ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+
+          {mostrarAsignacion ? (
+            <div className="mt-5 space-y-6 border-t border-zinc-100 pt-5">
+              <div>
+                <p className="mb-1 text-sm font-medium text-zinc-800">
+                  Procesos del plan
+                </p>
+                <p className="mb-3 text-xs text-zinc-500">
+                  El técnico lo verá al registrar jornadas de esos procesos.
+                </p>
+                {grupos.length === 0 ? (
+                  <p className="text-sm text-zinc-500">
+                    Todavía no hay procesos en los proyectos. Se configuran en
+                    Plan del proyecto.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {grupos.map((grupo) => (
+                      <div key={grupo.proyecto.id}>
+                        <p className="mb-2 text-xs font-semibold text-zinc-500">
+                          {grupo.proyecto.nombre}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {grupo.procesos.map((proceso) => (
+                            <button
+                              key={proceso.id}
+                              type="button"
+                              onClick={() => alternarProceso(proceso.id)}
+                              className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                                procesoIds.includes(proceso.id)
+                                  ? "bg-ruralia-teal text-white"
+                                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                              }`}
+                            >
+                              {proceso.etiqueta}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="mb-1 text-sm font-medium text-zinc-800">
+                  Personas concretas
+                </p>
+                <p className="mb-3 text-xs text-zinc-500">
+                  Para encuestas que no van ligadas a una jornada.
+                </p>
+                {usuarios.length === 0 ? (
+                  <p className="text-sm text-zinc-500">
+                    No hay usuarios activos todavía.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {usuarios.map((usuario) => (
+                      <button
+                        key={usuario.id}
+                        type="button"
+                        onClick={() => alternarUsuario(usuario.id)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                          usuarioIds.includes(usuario.id)
+                            ? "bg-ruralia-teal text-white"
+                            : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                        }`}
+                      >
+                        {usuario.nombreCompleto}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </section>
+
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={() => router.push("/formularios")}
@@ -927,9 +1193,10 @@ export function EditorPlantillaFormulario({
           <button
             type="submit"
             disabled={guardando}
-            className="rounded-xl bg-ruralia-teal px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-ruralia-teal-hover disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-ruralia-teal px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-ruralia-teal-hover disabled:opacity-60"
           >
-            {guardando ? "Guardando..." : "Guardar plantilla"}
+            <ClipboardList className="h-4 w-4" />
+            {guardando ? "Guardando…" : "Guardar formulario"}
           </button>
         </div>
       </form>
