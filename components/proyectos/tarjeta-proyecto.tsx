@@ -52,16 +52,19 @@ export function TarjetaProyecto({ proyecto }: { proyecto: Proyecto }) {
       </div>
 
       <div className="mt-4 space-y-2 text-sm text-zinc-600">
-        {proyecto.beneficiarioPrincipal ? (
+        {proyecto.beneficiarios?.length || proyecto.asociaciones?.length ? (
           <p>
             <span className="text-zinc-400">Contraparte: </span>
-            Beneficiario — {proyecto.beneficiarioPrincipal.nombres}{" "}
-            {proyecto.beneficiarioPrincipal.apellidos}
-          </p>
-        ) : proyecto.asociacionPrincipal ? (
-          <p>
-            <span className="text-zinc-400">Contraparte: </span>
-            Asociación — {proyecto.asociacionPrincipal.nombre}
+            {[
+              proyecto.beneficiarios?.length
+                ? `${proyecto.beneficiarios.length} beneficiario${proyecto.beneficiarios.length === 1 ? "" : "s"}`
+                : null,
+              proyecto.asociaciones?.length
+                ? `${proyecto.asociaciones.length} asociación${proyecto.asociaciones.length === 1 ? "" : "es"}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         ) : (
           <p className="text-amber-700">Sin contraparte asignada</p>

@@ -22,10 +22,6 @@ export function ResumenAsignaciones({
   onIrAEquipo,
 }: ResumenAsignacionesProps) {
   const personal = proyecto.personal ?? [];
-  const beneficiario =
-    proyecto.beneficiarioPrincipal ?? proyecto.beneficiarios?.[0];
-  const asociacion =
-    proyecto.asociacionPrincipal ?? proyecto.asociaciones?.[0];
 
   return (
     <div className="mb-6 grid gap-4 lg:grid-cols-2">
@@ -94,28 +90,51 @@ export function ResumenAsignaciones({
           ) : null}
         </div>
         <p className="mb-3 text-sm text-zinc-500">
-          Cada proyecto se vincula a <strong>un beneficiario</strong> o{" "}
-          <strong>una asociación</strong>, no a ambos.
+          El proyecto puede tener varios beneficiarios y varias asociaciones.
+          En cada jornada se elige a quién se atiende.
         </p>
-        {beneficiario ? (
-          <div className="rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-3">
+        {proyecto.beneficiarios?.length ? (
+          <div className="mb-3">
             <p className="text-xs font-medium uppercase tracking-wide text-ruralia-teal-text">
-              Beneficiario
+              Beneficiarios ({proyecto.beneficiarios.length})
             </p>
-            <p className="mt-1 font-medium text-zinc-900">
-              {beneficiario.nombres} {beneficiario.apellidos}
-            </p>
+            <ul className="mt-2 space-y-1.5">
+              {proyecto.beneficiarios.slice(0, 6).map((b) => (
+                <li key={b.id} className="text-sm text-zinc-800">
+                  {b.nombres} {b.apellidos}
+                  {b.reemplazaA ? (
+                    <span className="ml-1 text-xs text-amber-700">
+                      (reemplazo de {b.reemplazaA.nombres}{" "}
+                      {b.reemplazaA.apellidos})
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            {proyecto.beneficiarios.length > 6 ? (
+              <p className="mt-1 text-xs text-zinc-500">
+                +{proyecto.beneficiarios.length - 6} más
+              </p>
+            ) : null}
           </div>
-        ) : asociacion ? (
-          <div className="rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-3">
+        ) : null}
+        {proyecto.asociaciones?.length ? (
+          <div className="mb-3">
             <p className="text-xs font-medium uppercase tracking-wide text-ruralia-teal-text">
-              Asociación
+              Asociaciones ({proyecto.asociaciones.length})
             </p>
-            <p className="mt-1 font-medium text-zinc-900">{asociacion.nombre}</p>
+            <ul className="mt-2 space-y-1.5">
+              {proyecto.asociaciones.map((a) => (
+                <li key={a.id} className="text-sm text-zinc-800">
+                  {a.nombre}
+                </li>
+              ))}
+            </ul>
           </div>
-        ) : (
+        ) : null}
+        {!proyecto.beneficiarios?.length && !proyecto.asociaciones?.length ? (
           <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Sin beneficiario ni asociación asignados.
+            Sin beneficiarios ni asociaciones asignados.
             {puedeGestionar && onIrAEquipo ? (
               <>
                 {" "}
@@ -129,7 +148,7 @@ export function ResumenAsignaciones({
               </>
             ) : null}
           </p>
-        )}
+        ) : null}
         {proyecto.veredas?.length ? (
           <p className="mt-4 text-sm text-zinc-600">
             <span className="text-zinc-400">Territorio: </span>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { MapPin } from "lucide-react";
+import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
 import {
   fechaFueraDeProyecto,
@@ -27,6 +28,8 @@ interface FormularioEditarJornadaProps {
   jornada: Jornada;
   veredas: VeredaResumen[];
   actividadesPlan: ActividadPlan[];
+  beneficiarios?: { id: string; nombre: string; subtitulo?: string }[];
+  asociaciones?: { id: string; nombre: string }[];
   fechaInicioProyecto?: string;
   fechaFinProyecto?: string;
   enviando: boolean;
@@ -39,6 +42,8 @@ interface FormularioEditarJornadaProps {
     metaId: string;
     tipo: TipoJornada;
     plantillaFormularioId?: string | null;
+    beneficiarioIds: string[];
+    asociacionIds: string[];
   }) => Promise<void>;
   onCancelar: () => void;
 }
@@ -51,6 +56,8 @@ export function FormularioEditarJornada({
   jornada,
   veredas,
   actividadesPlan,
+  beneficiarios = [],
+  asociaciones = [],
   fechaInicioProyecto,
   fechaFinProyecto,
   enviando,
@@ -71,6 +78,12 @@ export function FormularioEditarJornada({
     [],
   );
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
+  const [beneficiarioIds, setBeneficiarioIds] = useState<string[]>(
+    jornada.beneficiarios?.map((b) => b.id) ?? [],
+  );
+  const [asociacionIds, setAsociacionIds] = useState<string[]>(
+    jornada.asociaciones?.map((a) => a.id) ?? [],
+  );
 
   useEffect(() => {
     if (!token) return;
@@ -132,6 +145,8 @@ export function FormularioEditarJornada({
       metaId,
       tipo: seleccion.tipo,
       plantillaFormularioId: seleccion.plantillaFormularioId,
+      beneficiarioIds,
+      asociacionIds,
     });
   }
 
@@ -191,6 +206,38 @@ export function FormularioEditarJornada({
           disabled={enviando}
         />
       </div>
+
+      {beneficiarios.length ? (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-zinc-700">
+            Beneficiarios de esta jornada
+          </label>
+          <SelectorCatalogo
+            multiple
+            opciones={beneficiarios}
+            value={beneficiarioIds}
+            onChange={setBeneficiarioIds}
+            placeholder="¿A quién se atiende en esta visita?"
+            mensajeVacio="No hay beneficiarios vinculados al proyecto."
+          />
+        </div>
+      ) : null}
+
+      {asociaciones.length ? (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-zinc-700">
+            Asociaciones de esta jornada
+          </label>
+          <SelectorCatalogo
+            multiple
+            opciones={asociaciones}
+            value={asociacionIds}
+            onChange={setAsociacionIds}
+            placeholder="¿Qué asociaciones se atienden?"
+            mensajeVacio="No hay asociaciones vinculadas al proyecto."
+          />
+        </div>
+      ) : null}
 
       <div className="space-y-3 rounded-2xl border border-ruralia-teal-border bg-white p-4">
         <p className="text-sm font-medium text-zinc-800">Meta del plan *</p>

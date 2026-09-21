@@ -114,6 +114,25 @@ export function PanelJornadas({
     [proyecto.personal],
   );
 
+  const opcionesBeneficiarios = useMemo(
+    () =>
+      (proyecto.beneficiarios ?? []).map((b) => ({
+        id: b.id,
+        nombre: `${b.nombres} ${b.apellidos}`,
+        subtitulo: b.numeroDocumento,
+      })),
+    [proyecto.beneficiarios],
+  );
+
+  const opcionesAsociaciones = useMemo(
+    () =>
+      (proyecto.asociaciones ?? []).map((a) => ({
+        id: a.id,
+        nombre: a.nombre,
+      })),
+    [proyecto.asociaciones],
+  );
+
   async function manejarCrearJornada(datos: {
     fecha: string;
     veredaId: string;
@@ -124,6 +143,8 @@ export function PanelJornadas({
     plantillaFormularioId?: string | null;
     tecnicoResponsableIds: string[];
     requiereRevision: boolean;
+    beneficiarioIds: string[];
+    asociacionIds: string[];
   }) {
     setEnviando(true);
     setError(null);
@@ -139,6 +160,8 @@ export function PanelJornadas({
         plantillaFormularioId: datos.plantillaFormularioId,
         tecnicoResponsableIds: datos.tecnicoResponsableIds,
         requiereRevision: datos.requiereRevision,
+        beneficiarioIds: datos.beneficiarioIds,
+        asociacionIds: datos.asociacionIds,
       });
       const primera = resultado.jornadas[0];
       await onActualizar();
@@ -170,6 +193,8 @@ export function PanelJornadas({
       metaId: string;
       tipo: TipoJornada;
       plantillaFormularioId?: string | null;
+      beneficiarioIds?: string[];
+      asociacionIds?: string[];
     },
   ) {
     setEnviando(true);
@@ -302,6 +327,8 @@ export function PanelJornadas({
             veredas={proyecto.veredas ?? []}
             actividadesPlan={plan?.actividades ?? []}
             agentes={agentes}
+            beneficiarios={opcionesBeneficiarios}
+            asociaciones={opcionesAsociaciones}
             fechaInicioProyecto={proyecto.fechaInicio}
             fechaFinProyecto={proyecto.fechaFin}
             enviando={enviando}
@@ -384,6 +411,31 @@ export function PanelJornadas({
                         </span>
                       ) : null}
                     </p>
+                    {(jornadaSeleccionada.beneficiarios?.length ||
+                      jornadaSeleccionada.asociaciones?.length) ? (
+                      <p className="mt-2 text-sm text-zinc-600">
+                        {jornadaSeleccionada.beneficiarios?.length ? (
+                          <span>
+                            Beneficiarios:{" "}
+                            {jornadaSeleccionada.beneficiarios
+                              .map((b) => b.nombre)
+                              .join(", ")}
+                          </span>
+                        ) : null}
+                        {jornadaSeleccionada.beneficiarios?.length &&
+                        jornadaSeleccionada.asociaciones?.length
+                          ? " · "
+                          : null}
+                        {jornadaSeleccionada.asociaciones?.length ? (
+                          <span>
+                            Asociaciones:{" "}
+                            {jornadaSeleccionada.asociaciones
+                              .map((a) => a.nombre)
+                              .join(", ")}
+                          </span>
+                        ) : null}
+                      </p>
+                    ) : null}
                   </div>
                   {puedeGestionar ? (
                     <div className="flex flex-wrap gap-2">
@@ -466,6 +518,8 @@ export function PanelJornadas({
                     jornada={jornadaSeleccionada}
                     veredas={proyecto.veredas ?? []}
                     actividadesPlan={plan?.actividades ?? []}
+                    beneficiarios={opcionesBeneficiarios}
+                    asociaciones={opcionesAsociaciones}
                     fechaInicioProyecto={proyecto.fechaInicio}
                     fechaFinProyecto={proyecto.fechaFin}
                     enviando={enviando}

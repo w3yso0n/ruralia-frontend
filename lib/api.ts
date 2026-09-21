@@ -90,6 +90,12 @@ import type {
   EventoCronologia,
   FiltrosCronologia,
   ResumenCronologiaProyecto,
+  Geocerca,
+  CrearGeocercaPayload,
+  ActualizarGeocercaPayload,
+  ResultadoCargaMasivaBeneficiarios,
+  ReemplazarBeneficiarioPayload,
+  HistorialBeneficiarioProyecto,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -410,6 +416,146 @@ export async function asignarAsociacionesProyecto(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+function dispararDescargaBlob(blob: Blob, nombreArchivo: string) {
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = nombreArchivo;
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+  URL.revokeObjectURL(url);
+}
+
+export async function descargarPlantillaBeneficiarios(
+  token: string,
+): Promise<void> {
+  const respuesta = await fetch(
+    `${API_URL}/proyectos/plantilla-beneficiarios-excel`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    throw new ErrorApi(
+      cuerpo || respuesta.statusText,
+      respuesta.status,
+    );
+  }
+  dispararDescargaBlob(
+    await respuesta.blob(),
+    "plantilla-beneficiarios.xlsx",
+  );
+}
+
+export async function importarBeneficiariosExcelProyecto(
+  token: string,
+  proyectoId: string,
+  archivo: File,
+): Promise<ResultadoCargaMasivaBeneficiarios> {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  const respuesta = await fetch(
+    `${API_URL}/proyectos/${proyectoId}/beneficiarios/importar`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    },
+  );
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    let mensaje = cuerpo || respuesta.statusText;
+    try {
+      const json = JSON.parse(cuerpo) as { message?: string | string[] };
+      if (json.message) {
+        mensaje = Array.isArray(json.message)
+          ? json.message.join(" ")
+          : json.message;
+      }
+    } catch {
+      // texto crudo
+    }
+    throw new ErrorApi(mensaje, respuesta.status);
+  }
+  return respuesta.json() as Promise<ResultadoCargaMasivaBeneficiarios>;
+}
+
+export async function reemplazarBeneficiarioProyecto(
+  token: string,
+  proyectoId: string,
+  beneficiarioId: string,
+  payload: ReemplazarBeneficiarioPayload,
+): Promise<Proyecto> {
+  return fetchConAuth<Proyecto>(
+    `/proyectos/${proyectoId}/beneficiarios/${beneficiarioId}/reemplazar`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function historialBeneficiarioProyecto(
+  token: string,
+  proyectoId: string,
+  beneficiarioId: string,
+): Promise<HistorialBeneficiarioProyecto> {
+  return fetchConAuth<HistorialBeneficiarioProyecto>(
+    `/proyectos/${proyectoId}/beneficiarios/${beneficiarioId}/historial`,
+    token,
+  );
+}
+
+export async function listarGeocercasProyecto(
+  token: string,
+  proyectoId: string,
+): Promise<Geocerca[]> {
+  return fetchConAuth<Geocerca[]>(
+    `/proyectos/${proyectoId}/geocercas`,
+    token,
+  );
+}
+
+export async function crearGeocercaProyecto(
+  token: string,
+  proyectoId: string,
+  payload: CrearGeocercaPayload,
+): Promise<Geocerca> {
+  return fetchConAuth<Geocerca>(`/proyectos/${proyectoId}/geocercas`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actualizarGeocercaProyecto(
+  token: string,
+  proyectoId: string,
+  geocercaId: string,
+  payload: ActualizarGeocercaPayload,
+): Promise<Geocerca> {
+  return fetchConAuth<Geocerca>(
+    `/proyectos/${proyectoId}/geocercas/${geocercaId}`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function eliminarGeocercaProyecto(
+  token: string,
+  proyectoId: string,
+  geocercaId: string,
+): Promise<void> {
+  return fetchConAuth<void>(
+    `/proyectos/${proyectoId}/geocercas/${geocercaId}`,
+    token,
+    { method: "DELETE" },
+  );
 }
 
 export async function crearActividad(

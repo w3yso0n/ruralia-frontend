@@ -148,6 +148,11 @@ export interface BeneficiarioResumen {
   id: string;
   nombres: string;
   apellidos: string;
+  numeroDocumento?: string;
+  estaActivoEnProyecto?: boolean;
+  reemplazaA?: BeneficiarioResumen;
+  reemplazadoPor?: BeneficiarioResumen;
+  reemplazadoEn?: string | null;
 }
 
 export interface AsociacionResumen {
@@ -161,6 +166,36 @@ export interface VeredaResumen {
   codigo?: string;
   latitud?: number;
   longitud?: number;
+}
+
+export interface PuntoGeocerca {
+  latitud: number;
+  longitud: number;
+}
+
+export interface Geocerca {
+  id: string;
+  proyectoId: string;
+  nombre: string;
+  descripcion?: string | null;
+  color: string;
+  puntos: PuntoGeocerca[];
+  creadoEn: string;
+  actualizadoEn: string;
+}
+
+export interface CrearGeocercaPayload {
+  nombre: string;
+  descripcion?: string;
+  color?: string;
+  puntos: PuntoGeocerca[];
+}
+
+export interface ActualizarGeocercaPayload {
+  nombre?: string;
+  descripcion?: string;
+  color?: string;
+  puntos?: PuntoGeocerca[];
 }
 
 export interface Proyecto {
@@ -177,6 +212,7 @@ export interface Proyecto {
   progresoPorcentaje?: number;
   beneficiarioPrincipal?: BeneficiarioResumen;
   beneficiarios?: BeneficiarioResumen[];
+  beneficiariosReemplazados?: BeneficiarioResumen[];
   asociacionPrincipal?: AsociacionResumen;
   asociaciones?: AsociacionResumen[];
   personal?: UsuarioResumen[];
@@ -490,6 +526,8 @@ export interface Jornada {
   meta?: MetaResumenJornada;
   vereda?: { id: string; nombre: string };
   tecnicoResponsable?: { id: string; nombre: string };
+  beneficiarios?: { id: string; nombre: string }[];
+  asociaciones?: { id: string; nombre: string }[];
   actividades?: JornadaActividadItem[];
   asistentes?: JornadaAsistente[];
   grupoJornadaId?: string | null;
@@ -881,6 +919,8 @@ export interface CrearJornadaPayload {
   tipo?: TipoJornada;
   requiereRevision?: boolean;
   plantillaFormularioId?: string | null;
+  beneficiarioIds?: string[];
+  asociacionIds?: string[];
 }
 
 export interface ActualizarJornadaPayload {
@@ -892,6 +932,8 @@ export interface ActualizarJornadaPayload {
   cantidadEjecutada?: number;
   tipo?: TipoJornada;
   plantillaFormularioId?: string | null;
+  beneficiarioIds?: string[];
+  asociacionIds?: string[];
 }
 
 export interface GuardarAsistenciaPayload {
@@ -930,6 +972,54 @@ export interface AsignacionBeneficiariosPayload {
 
 export interface AsignacionAsociacionesPayload {
   asociaciones: VinculoAsociacionPayload[];
+}
+
+export interface ResultadoFilaCargaBeneficiario {
+  fila: number;
+  identificador: string;
+  nombres: string;
+  apellidos: string;
+  resultado: "creado" | "asignado_existente" | "ya_en_proyecto" | "error";
+  mensaje?: string;
+  beneficiarioId?: string;
+}
+
+export interface ResultadoCargaMasivaBeneficiarios {
+  totalFilas: number;
+  creados: number;
+  asignadosExistentes: number;
+  yaEnProyecto: number;
+  errores: number;
+  detalle: ResultadoFilaCargaBeneficiario[];
+}
+
+export interface ReemplazarBeneficiarioPayload {
+  nuevoBeneficiarioId?: string;
+  nombres?: string;
+  apellidos?: string;
+  numeroDocumento?: string;
+  tipoDocumento?: TipoDocumento;
+  nota?: string;
+}
+
+export interface EventoJornadaHistorial {
+  id: string;
+  fecha: string;
+  nombre?: string | null;
+  estado: string;
+  vereda?: string;
+  esHeredada: boolean;
+  beneficiarioEnRegistro?: BeneficiarioResumen;
+}
+
+export interface HistorialBeneficiarioProyecto {
+  beneficiario: BeneficiarioResumen;
+  reemplazaA?: BeneficiarioResumen;
+  reemplazadoPor?: BeneficiarioResumen;
+  reemplazadoEn?: string | null;
+  notaReemplazo?: string | null;
+  cadenaReemplazos: BeneficiarioResumen[];
+  jornadas: EventoJornadaHistorial[];
 }
 
 export interface AsignacionPersonalPayload {

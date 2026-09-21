@@ -8,6 +8,7 @@ import { EquipoVinculos } from "@/components/proyectos/gestion-proyecto/equipo-v
 import { PanelExpediente } from "@/components/proyectos/gestion-proyecto/panel-expediente";
 import { PanelJornadas } from "@/components/proyectos/gestion-proyecto/panel-jornadas";
 import { PanelPlan } from "@/components/proyectos/gestion-proyecto/panel-plan";
+import { PanelTerritorio } from "@/components/proyectos/gestion-proyecto/panel-territorio";
 import { ResumenAsignaciones } from "@/components/proyectos/gestion-proyecto/resumen-asignaciones";
 import { ResumenInformacionBasica } from "@/components/proyectos/gestion-proyecto/resumen-informacion-basica";
 import {
@@ -30,10 +31,11 @@ import type {
   Proyecto,
 } from "@/lib/types";
 
-type Tab = "resumen" | "plan" | "jornadas" | "equipo" | "expediente";
+type Tab = "resumen" | "territorio" | "plan" | "jornadas" | "equipo" | "expediente";
 
 const TABS_VALIDOS: Tab[] = [
   "resumen",
+  "territorio",
   "plan",
   "jornadas",
   "equipo",
@@ -172,6 +174,7 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
 
   const tabs: { id: Tab; etiqueta: string }[] = [
     { id: "resumen", etiqueta: "Resumen" },
+    { id: "territorio", etiqueta: "Territorio" },
     { id: "plan", etiqueta: "Plan del proyecto" },
     { id: "jornadas", etiqueta: "Jornadas" },
     { id: "equipo", etiqueta: "Equipo y contraparte" },
@@ -310,7 +313,7 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
           >
             Equipo y contraparte
           </button>{" "}
-          para asignar veredas, equipo interno y beneficiario o asociación antes
+          para asignar veredas, equipo interno y beneficiarios o asociaciones antes
           de crear jornadas.
         </div>
       ) : null}
@@ -484,6 +487,16 @@ export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) 
             </div>
           ) : null}
         </>
+      ) : null}
+
+      {tab === "territorio" ? (
+        <PanelTerritorio
+          token={token}
+          proyectoId={proyectoId}
+          proyecto={proyecto}
+          puedeGestionar={puedeGestionar}
+          onIrAEquipo={() => cambiarTab("equipo")}
+        />
       ) : null}
 
       {tab === "plan" ? (

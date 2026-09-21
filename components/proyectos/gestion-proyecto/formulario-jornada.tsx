@@ -32,6 +32,8 @@ interface FormularioJornadaProps {
   veredas: VeredaResumen[];
   actividadesPlan: ActividadPlan[];
   agentes: AgenteOpcion[];
+  beneficiarios?: AgenteOpcion[];
+  asociaciones?: AgenteOpcion[];
   fechaInicioProyecto?: string;
   fechaFinProyecto?: string;
   enviando: boolean;
@@ -45,6 +47,8 @@ interface FormularioJornadaProps {
     plantillaFormularioId?: string | null;
     tecnicoResponsableIds: string[];
     requiereRevision: boolean;
+    beneficiarioIds: string[];
+    asociacionIds: string[];
   }) => Promise<void>;
 }
 
@@ -52,6 +56,8 @@ export function FormularioJornada({
   veredas,
   actividadesPlan,
   agentes,
+  beneficiarios = [],
+  asociaciones = [],
   fechaInicioProyecto,
   fechaFinProyecto,
   enviando,
@@ -71,6 +77,8 @@ export function FormularioJornada({
   );
   const [requiereRevision, setRequiereRevision] = useState(true);
   const [agenteIds, setAgenteIds] = useState<string[]>([]);
+  const [beneficiarioIds, setBeneficiarioIds] = useState<string[]>([]);
+  const [asociacionIds, setAsociacionIds] = useState<string[]>([]);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
 
   useEffect(() => {
@@ -126,6 +134,8 @@ export function FormularioJornada({
       plantillaFormularioId: seleccion.plantillaFormularioId,
       tecnicoResponsableIds: agenteIds,
       requiereRevision,
+      beneficiarioIds,
+      asociacionIds,
     });
 
     setNombre("");
@@ -135,6 +145,8 @@ export function FormularioJornada({
     setClaveFormulario(CLAVE_FORMULARIO_INDIVIDUAL);
     setRequiereRevision(true);
     setAgenteIds([]);
+    setBeneficiarioIds([]);
+    setAsociacionIds([]);
   }
 
   return (
@@ -161,6 +173,38 @@ export function FormularioJornada({
           plan y fecha), ligadas para editar o cancelar en conjunto.
         </p>
       </div>
+
+      {beneficiarios.length ? (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-zinc-700">
+            Beneficiarios de esta jornada
+          </label>
+          <SelectorCatalogo
+            multiple
+            opciones={beneficiarios}
+            value={beneficiarioIds}
+            onChange={setBeneficiarioIds}
+            placeholder="¿A quién se atiende en esta visita?"
+            mensajeVacio="No hay beneficiarios vinculados al proyecto."
+          />
+        </div>
+      ) : null}
+
+      {asociaciones.length ? (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-zinc-700">
+            Asociaciones de esta jornada
+          </label>
+          <SelectorCatalogo
+            multiple
+            opciones={asociaciones}
+            value={asociacionIds}
+            onChange={setAsociacionIds}
+            placeholder="¿Qué asociaciones se atienden?"
+            mensajeVacio="No hay asociaciones vinculadas al proyecto."
+          />
+        </div>
+      ) : null}
 
       <div>
         <label className="mb-1 block text-sm font-medium text-zinc-700">

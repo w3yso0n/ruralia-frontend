@@ -10,6 +10,7 @@ export interface GoogleMapsDashboardLibs {
   InfoWindow: typeof google.maps.InfoWindow;
   LatLngBounds: typeof google.maps.LatLngBounds;
   Polyline: typeof google.maps.Polyline;
+  Polygon: typeof google.maps.Polygon;
   AdvancedMarkerElement: typeof google.maps.marker.AdvancedMarkerElement;
 }
 
@@ -178,7 +179,8 @@ export function cargarGoogleMapsDashboard(): Promise<GoogleMapsDashboardLibs> {
         Map: mapsLib.Map,
         InfoWindow: mapsLib.InfoWindow,
         LatLngBounds: google.maps.LatLngBounds,
-        Polyline: mapsLib.Polyline,
+        Polyline: mapsLib.Polyline ?? google.maps.Polyline,
+        Polygon: mapsLib.Polygon ?? google.maps.Polygon,
         AdvancedMarkerElement,
       };
     })();

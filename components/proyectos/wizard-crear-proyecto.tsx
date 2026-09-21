@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Alerta, Spinner } from "@/components/ui/modal";
 import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 import { SelectorVeredasMultiple } from "@/components/ui/selector-veredas-multiple";
+import { CargaExcelBeneficiarios } from "@/components/proyectos/carga-excel-beneficiarios";
 import {
   asignarAsociacionesProyecto,
   asignarBeneficiariosProyecto,
@@ -14,6 +15,7 @@ import {
   activarProyecto,
   crearActividad,
   crearProyecto,
+  importarBeneficiariosExcelProyecto,
   listarAsociaciones,
   listarBeneficiarios,
   listarUsuarios,
@@ -54,17 +56,16 @@ export function WizardCrearProyecto() {
   });
   const [veredaIds, setVeredaIds] = useState<string[]>([]);
   const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
-  const [tipoContraparte, setTipoContraparte] = useState<
-    "beneficiario" | "asociacion" | null
-  >(null);
-  const [contraparteId, setContraparteId] = useState("");
+  const [beneficiarioIds, setBeneficiarioIds] = useState<string[]>([]);
+  const [asociacionIds, setAsociacionIds] = useState<string[]>([]);
+  const [archivoExcel, setArchivoExcel] = useState<File | null>(null);
   const [actividades, setActividades] = useState<string[]>([""]);
 
   const [opcionesUsuarios, setOpcionesUsuarios] = useState<
     { id: string; nombre: string }[]
   >([]);
   const [opcionesBeneficiarios, setOpcionesBeneficiarios] = useState<
-    { id: string; nombre: string }[]
+    { id: string; nombre: string; subtitulo?: string }[]
   >([]);
   const [opcionesAsociaciones, setOpcionesAsociaciones] = useState<
     { id: string; nombre: string }[]
@@ -74,9 +75,9 @@ export function WizardCrearProyecto() {
     if (!token) return;
     setCargandoOpciones(true);
     void Promise.all([
-      listarUsuarios(token, { limite: 100, estaActivo: true }),
-      listarBeneficiarios(token, { limite: 100 }),
-      listarAsociaciones(token, { limite: 100 }),
+      listarUsuarios(token, { limite: 200, estaActivo: true }),
+      listarBeneficiarios(token, { limite: 500 }),
+      listarAsociaciones(token, { limite: 200 }),
     ])
       .then(([usuarios, beneficiarios, asociaciones]) => {
         setOpcionesUsuarios(
@@ -89,6 +90,7 @@ export function WizardCrearProyecto() {
           beneficiarios.datos.map((b) => ({
             id: b.id,
             nombre: `${b.nombres} ${b.apellidos}`,
+            subtitulo: b.numeroDocumento,
           })),
         );
         setOpcionesAsociaciones(
@@ -113,8 +115,12 @@ export function WizardCrearProyecto() {
         if (!usuarioIds.length) return "Asigna al menos un miembro del equipo interno";
         return null;
       case 3:
-        if (!tipoContraparte || !contraparteId) {
-          return "Selecciona un beneficiario o una asociación como contraparte";
+        if (
+          !beneficiarioIds.length &&
+          !asociacionIds.length &&
+          !archivoExcel
+        ) {
+          return "Vincula al menos un beneficiario, una asociación o un Excel de beneficiarios";
         }
         return null;
       default:
@@ -153,14 +159,22 @@ export function WizardCrearProyecto() {
       await asignarTerritoriosProyecto(token, proyecto.id, { veredaIds });
       await asignarPersonalProyecto(token, proyecto.id, { usuarioIds });
 
-      if (tipoContraparte === "beneficiario") {
+      if (beneficiarioIds.length) {
         await asignarBeneficiariosProyecto(token, proyecto.id, {
-          beneficiarios: [{ beneficiarioId: contraparteId, esPrincipal: true }],
+          beneficiarios: beneficiarioIds.map((id) => ({ beneficiarioId: id })),
         });
-      } else if (tipoContraparte === "asociacion") {
+      }
+      if (asociacionIds.length) {
         await asignarAsociacionesProyecto(token, proyecto.id, {
-          asociaciones: [{ asociacionId: contraparteId, esPrincipal: true }],
+          asociaciones: asociacionIds.map((id) => ({ asociacionId: id })),
         });
+      }
+      if (archivoExcel) {
+        await importarBeneficiariosExcelProyecto(
+          token,
+          proyecto.id,
+          archivoExcel,
+        );
       }
 
       const nombresActividades = actividades
@@ -331,62 +345,48 @@ export function WizardCrearProyecto() {
         )}
 
         {paso === 3 && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <p className="text-sm text-zinc-600">
-              Cada proyecto se vincula a <strong>un beneficiario</strong> o{" "}
-              <strong>una asociación</strong> (no a ambos). *
+              Un proyecto puede tener <strong>varios beneficiarios</strong> y{" "}
+              <strong>varias asociaciones a la vez</strong>. En cada jornada se
+              elige a quién se atiende. Si son muchos, súbelos por Excel:
+              nombre e identificador único; si ya existen en la BD solo se
+              asignan.
             </p>
-            <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="tipoContraparteWizard"
-                  checked={tipoContraparte === "beneficiario"}
-                  onChange={() => {
-                    setTipoContraparte("beneficiario");
-                    setContraparteId("");
-                  }}
-                />
-                Beneficiario
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="tipoContraparteWizard"
-                  checked={tipoContraparte === "asociacion"}
-                  onChange={() => {
-                    setTipoContraparte("asociacion");
-                    setContraparteId("");
-                  }}
-                />
-                Asociación
-              </label>
-            </div>
-            {tipoContraparte ? (
-              <SelectorCatalogo
-                opciones={
-                  tipoContraparte === "beneficiario"
-                    ? opcionesBeneficiarios
-                    : opcionesAsociaciones
-                }
-                value={contraparteId}
-                onChange={setContraparteId}
-                placeholder={
-                  tipoContraparte === "beneficiario"
-                    ? "Buscar beneficiario…"
-                    : "Buscar asociación…"
-                }
-                mensajeVacio={
-                  tipoContraparte === "beneficiario"
-                    ? "Selecciona un beneficiario de la lista."
-                    : "Selecciona una asociación de la lista."
-                }
-              />
-            ) : (
-              <p className="text-sm text-zinc-500">
-                Elige el tipo de contraparte para ver las opciones.
+            <div>
+              <p className="mb-2 text-sm font-medium text-zinc-800">
+                Beneficiarios de la base de datos
               </p>
-            )}
+              <SelectorCatalogo
+                multiple
+                opciones={opcionesBeneficiarios}
+                value={beneficiarioIds}
+                onChange={setBeneficiarioIds}
+                placeholder="Buscar y añadir beneficiarios…"
+                mensajeVacio="Opcional si vas a cargar un Excel."
+              />
+            </div>
+            {token ? (
+              <CargaExcelBeneficiarios
+                token={token}
+                archivo={archivoExcel}
+                onArchivo={setArchivoExcel}
+                disabled={enviando}
+              />
+            ) : null}
+            <div>
+              <p className="mb-2 text-sm font-medium text-zinc-800">
+                Asociaciones
+              </p>
+              <SelectorCatalogo
+                multiple
+                opciones={opcionesAsociaciones}
+                value={asociacionIds}
+                onChange={setAsociacionIds}
+                placeholder="Buscar asociaciones…"
+                mensajeVacio="Opcional. Se pueden añadir después."
+              />
+            </div>
           </div>
         )}
 
@@ -448,15 +448,20 @@ export function WizardCrearProyecto() {
               <dd>{usuarioIds.length} personas</dd>
             </div>
             <div>
-              <dt className="text-zinc-500">Contraparte</dt>
+              <dt className="text-zinc-500">Beneficiarios</dt>
               <dd>
-                {tipoContraparte && contraparteId
-                  ? tipoContraparte === "beneficiario"
-                    ? opcionesBeneficiarios.find((b) => b.id === contraparteId)
-                        ?.nombre ?? "Beneficiario seleccionado"
-                    : opcionesAsociaciones.find((a) => a.id === contraparteId)
-                        ?.nombre ?? "Asociación seleccionada"
-                  : "—"}
+                {beneficiarioIds.length
+                  ? `${beneficiarioIds.length} de la BD`
+                  : "Ninguno de la BD"}
+                {archivoExcel ? ` · Excel: ${archivoExcel.name}` : ""}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">Asociaciones</dt>
+              <dd>
+                {asociacionIds.length
+                  ? `${asociacionIds.length} seleccionadas`
+                  : "Ninguna"}
               </dd>
             </div>
             <div>
