@@ -61,6 +61,8 @@ interface SelectorFechaJornadaProps {
   fechaFinProyecto?: string;
   required?: boolean;
   disabled?: boolean;
+  /** El calendario empuja el contenido en lugar de flotar, para poder desplazarlo dentro de un modal. */
+  enFlujo?: boolean;
 }
 
 export function SelectorFechaJornada({
@@ -70,6 +72,7 @@ export function SelectorFechaJornada({
   fechaFinProyecto,
   required,
   disabled,
+  enFlujo = false,
 }: SelectorFechaJornadaProps) {
   const min = aDia(fechaInicioProyecto);
   const max = aDia(fechaFinProyecto);
@@ -257,7 +260,13 @@ export function SelectorFechaJornada({
       ) : null}
 
       {abierto ? (
-        <div className="absolute z-40 mt-2 w-[min(100%,20rem)] rounded-2xl border border-ruralia-teal-border bg-white p-4 shadow-lg shadow-zinc-900/10">
+        <div
+          className={
+            enFlujo
+              ? "relative z-10 mt-2 w-full max-w-[20rem] rounded-2xl border border-ruralia-teal-border bg-white p-4 shadow-lg shadow-zinc-900/10"
+              : "absolute z-40 mt-2 w-[min(100%,20rem)] rounded-2xl border border-ruralia-teal-border bg-white p-4 shadow-lg shadow-zinc-900/10"
+          }
+        >
           <div className="mb-3 flex items-center justify-between gap-2">
             <button
               type="button"

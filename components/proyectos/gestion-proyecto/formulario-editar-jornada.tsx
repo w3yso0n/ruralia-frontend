@@ -2,8 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { MapPin } from "lucide-react";
-import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
+import {
+  AsignacionJornada,
+  destinoInicialAsignacion,
+  errorAsignacionJornada,
+  type DestinoAsignacionJornada,
+} from "./asignacion-jornada";
 import {
   fechaFueraDeProyecto,
   SelectorFechaJornada,
@@ -78,11 +83,16 @@ export function FormularioEditarJornada({
     [],
   );
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
+  const beneficiariosIniciales = jornada.beneficiarios?.map((b) => b.id) ?? [];
+  const asociacionesIniciales = jornada.asociaciones?.map((a) => a.id) ?? [];
+  const [destino, setDestino] = useState<DestinoAsignacionJornada>(
+    destinoInicialAsignacion(beneficiariosIniciales, asociacionesIniciales),
+  );
   const [beneficiarioIds, setBeneficiarioIds] = useState<string[]>(
-    jornada.beneficiarios?.map((b) => b.id) ?? [],
+    beneficiariosIniciales,
   );
   const [asociacionIds, setAsociacionIds] = useState<string[]>(
-    jornada.asociaciones?.map((a) => a.id) ?? [],
+    asociacionesIniciales,
   );
 
   useEffect(() => {
@@ -136,6 +146,16 @@ export function FormularioEditarJornada({
       return;
     }
 
+    const errorAsignacion = errorAsignacionJornada(
+      destino,
+      beneficiarioIds,
+      asociacionIds,
+    );
+    if (errorAsignacion) {
+      setErrorLocal(errorAsignacion);
+      return;
+    }
+
     const seleccion = resolverSeleccionFormulario(claveFormulario, plantillas);
     await onSubmit({
       fecha,
@@ -145,8 +165,8 @@ export function FormularioEditarJornada({
       metaId,
       tipo: seleccion.tipo,
       plantillaFormularioId: seleccion.plantillaFormularioId,
-      beneficiarioIds,
-      asociacionIds,
+      beneficiarioIds: destino === "beneficiario" ? beneficiarioIds : [],
+      asociacionIds: destino === "asociacion" ? asociacionIds : [],
     });
   }
 
@@ -155,8 +175,8 @@ export function FormularioEditarJornada({
       {tamanoGrupo > 1 ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           Esta jornada pertenece a un grupo de {tamanoGrupo} agentes. Los
-          cambios de fecha, meta, vereda, nombre, formulario y observaciones se
-          aplicarán a todos.
+          cambios de fecha, meta, vereda, nombre, formulario, asignación y
+          observaciones se aplicarán a todos.
         </p>
       ) : null}
 
@@ -207,37 +227,21 @@ export function FormularioEditarJornada({
         />
       </div>
 
-      {beneficiarios.length ? (
-        <div>
-          <label className="mb-1 block text-sm font-medium text-zinc-700">
-            Beneficiarios de esta jornada
-          </label>
-          <SelectorCatalogo
-            multiple
-            opciones={beneficiarios}
-            value={beneficiarioIds}
-            onChange={setBeneficiarioIds}
-            placeholder="¿A quién se atiende en esta visita?"
-            mensajeVacio="No hay beneficiarios vinculados al proyecto."
-          />
-        </div>
-      ) : null}
-
-      {asociaciones.length ? (
-        <div>
-          <label className="mb-1 block text-sm font-medium text-zinc-700">
-            Asociaciones de esta jornada
-          </label>
-          <SelectorCatalogo
-            multiple
-            opciones={asociaciones}
-            value={asociacionIds}
-            onChange={setAsociacionIds}
-            placeholder="¿Qué asociaciones se atienden?"
-            mensajeVacio="No hay asociaciones vinculadas al proyecto."
-          />
-        </div>
-      ) : null}
+      <AsignacionJornada
+        beneficiarios={beneficiarios}
+        asociaciones={asociaciones}
+        destino={destino}
+        beneficiarioIds={beneficiarioIds}
+        asociacionIds={asociacionIds}
+        disabled={enviando}
+        onDestino={(siguiente) => {
+          setDestino(siguiente);
+          if (siguiente === "beneficiario") setAsociacionIds([]);
+          else setBeneficiarioIds([]);
+        }}
+        onBeneficiarioIds={setBeneficiarioIds}
+        onAsociacionIds={setAsociacionIds}
+      />
 
       <div className="space-y-3 rounded-2xl border border-ruralia-teal-border bg-white p-4">
         <p className="text-sm font-medium text-zinc-800">Meta del plan *</p>

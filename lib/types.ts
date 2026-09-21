@@ -610,6 +610,20 @@ export interface DocumentoVersion {
   snapshot?: Record<string, unknown> | null;
 }
 
+export interface PersonaExpediente {
+  id: string;
+  nombres: string;
+  apellidos: string;
+}
+
+export interface JornadaExpediente {
+  id: string;
+  fecha: string;
+  nombre?: string | null;
+  tecnicoResponsableNombre?: string | null;
+  beneficiarios?: PersonaExpediente[];
+}
+
 export interface DocumentoJornada {
   id: string;
   tipo: string;
@@ -617,7 +631,34 @@ export interface DocumentoJornada {
   estadoFuncional: EstadoFuncional;
   versionVigenteId?: string | null;
   versiones?: DocumentoVersion[];
+  jornada?: JornadaExpediente | null;
   creadoEn: string;
+}
+
+export interface EvidenciaExpediente {
+  id: string;
+  tipo: string;
+  nombreArchivo: string;
+  urlArchivo?: string | null;
+  tipoMime: string;
+  capturadoEn: string;
+  estadoFuncional: EstadoFuncional;
+  jornada: JornadaExpediente;
+}
+
+export interface AdjuntoFormulario {
+  etiqueta: string;
+  tipoCampo: string;
+  url: string;
+}
+
+export interface FormularioExpediente {
+  id: string;
+  enviadoEn: string;
+  plantillaNombre: string;
+  usuarioNombre?: string | null;
+  jornada: JornadaExpediente;
+  adjuntos: AdjuntoFormulario[];
 }
 
 export type TipoDocumentoExterno =
@@ -644,7 +685,7 @@ export interface DocumentoExterno {
   subactividadId?: string | null;
   subactividad?: { id: string; nombre: string } | null;
   jornadaId?: string | null;
-  jornada?: { id: string; nombre: string } | null;
+  jornada?: JornadaExpediente | null;
   beneficiarioId?: string | null;
   beneficiario?: { id: string; nombres: string; apellidos: string } | null;
   asociacionId?: string | null;
@@ -672,9 +713,13 @@ export interface ExpedienteProyecto {
   proyectoId: string;
   documentosGenerados: DocumentoJornada[];
   documentosExternos: DocumentoExterno[];
+  evidencias?: EvidenciaExpediente[];
+  formularios?: FormularioExpediente[];
   totales: {
     generados: number;
     externos: number;
+    evidencias?: number;
+    formularios?: number;
     total: number;
   };
 }

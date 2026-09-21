@@ -162,6 +162,22 @@ function construirQuery(
   return qs ? `?${qs}` : "";
 }
 
+/** El API rechaza `limite` mayor a 100. Recorre las páginas y devuelve el listado completo. */
+export async function listarTodasLasPaginas<T>(
+  cargar: (pagina: number, limite: number) => Promise<RespuestaPaginada<T>>,
+  limite = 100,
+): Promise<T[]> {
+  const primera = await cargar(1, limite);
+  const totalPaginas = primera.totalPaginas ?? 1;
+  if (totalPaginas <= 1) return primera.datos;
+  const resto = await Promise.all(
+    Array.from({ length: totalPaginas - 1 }, (_, indice) =>
+      cargar(indice + 2, limite),
+    ),
+  );
+  return [primera.datos, ...resto.map((pagina) => pagina.datos)].flat();
+}
+
 export async function obtenerUsuarioActual(token: string): Promise<Usuario> {
   return fetchConAuth<Usuario>("/autenticacion/yo", token);
 }
@@ -1946,6 +1962,30 @@ export async function rechazarEntidad(
   });
 }
 
+export async function descargarPdfDocumento(
+  token: string,
+  documentoId: string,
+  versionId?: string,
+): Promise<Blob> {
+  const query = versionId ? `?versionId=${versionId}` : "";
+  const respuesta = await fetch(`${API_URL}/documentos/${documentoId}/archivo${query}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    let mensaje = cuerpo || respuesta.statusText;
+    try {
+      const json = JSON.parse(cuerpo) as { message?: string | string[] };
+      if (typeof json.message === "string") mensaje = json.message;
+      else if (Array.isArray(json.message)) mensaje = json.message.join(". ");
+    } catch {
+      // el cuerpo no era JSON
+    }
+    throw new Error(mensaje);
+  }
+  return respuesta.blob();
+}
+
 export async function listarDocumentosJornada(
   token: string,
   jornadaId: string,
@@ -2091,4 +2131,45 @@ export async function obtenerExpedienteProyecto(
   proyectoId: string,
 ): Promise<ExpedienteProyecto> {
   return fetchConAuth(`/proyectos/${proyectoId}/expediente`, token);
+}
+
+export async function descargarExpedienteZip(
+  token: string,
+  proyectoId: string,
+  filtros: {
+    desde?: string;
+    hasta?: string;
+    procesoId?: string;
+    agenteId?: string;
+  },
+): Promise<{ blob: Blob; nombre: string }> {
+  const respuesta = await fetch(
+    `${API_URL}/proyectos/${proyectoId}/expediente/descarga`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(filtros),
+    },
+  );
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    let mensaje = cuerpo || respuesta.statusText;
+    try {
+      const json = JSON.parse(cuerpo) as { message?: string | string[] };
+      if (typeof json.message === "string") mensaje = json.message;
+      else if (Array.isArray(json.message)) mensaje = json.message.join(" ");
+    } catch {
+      // el cuerpo no era JSON
+    }
+    throw new Error(mensaje);
+  }
+  const disposition = respuesta.headers.get("Content-Disposition") ?? "";
+  const coincidencia = disposition.match(/filename="([^"]+)"/);
+  return {
+    blob: await respuesta.blob(),
+    nombre: coincidencia?.[1] || "expediente.zip",
+  };
 }

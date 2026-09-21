@@ -23,92 +23,126 @@ import { obtenerContadoresAprobacion } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { usePermisos } from "@/lib/use-permisos";
 
-const ITEMS: {
+type ItemNav = {
   href: string;
   etiqueta: string;
   icono: LucideIcon;
   permiso?: string;
   puedeAlgunoDe?: string[];
   badgeKey?: "revision";
-}[] = [
+};
+
+type SeccionNav = {
+  id: string;
+  titulo: string;
+  items: ItemNav[];
+};
+
+const SECCIONES: SeccionNav[] = [
   {
-    href: "/dashboard",
-    etiqueta: "Dashboard",
-    icono: LayoutDashboard,
-    permiso: "dashboard.ver",
-  },
-  {
-    href: "/revision",
-    etiqueta: "Revisión",
-    icono: Inbox,
-    puedeAlgunoDe: [
-      "jornadas.ver",
-      "jornadas.aprobar",
-      "jornadas.enviar_revision",
+    id: "inicio",
+    titulo: "Inicio",
+    items: [
+      {
+        href: "/dashboard",
+        etiqueta: "Dashboard",
+        icono: LayoutDashboard,
+        permiso: "dashboard.ver",
+      },
     ],
-    badgeKey: "revision",
   },
   {
-    href: "/seguimiento",
-    etiqueta: "Seguimiento",
-    icono: Waypoints,
-    puedeAlgunoDe: ["proyectos.ver", "jornadas.ver"],
+    id: "operacion",
+    titulo: "Operación",
+    items: [
+      {
+        href: "/revision",
+        etiqueta: "Revisión",
+        icono: Inbox,
+        puedeAlgunoDe: [
+          "jornadas.ver",
+          "jornadas.aprobar",
+          "jornadas.enviar_revision",
+        ],
+        badgeKey: "revision",
+      },
+      {
+        href: "/seguimiento",
+        etiqueta: "Seguimiento",
+        icono: Waypoints,
+        puedeAlgunoDe: ["proyectos.ver", "jornadas.ver"],
+      },
+      {
+        href: "/evaluaciones",
+        etiqueta: "Evaluaciones",
+        icono: ChartColumn,
+        permiso: "evaluaciones.ver",
+      },
+    ],
   },
   {
-    href: "/evaluaciones",
-    etiqueta: "Evaluaciones",
-    icono: ChartColumn,
-    permiso: "evaluaciones.ver",
+    id: "gestion",
+    titulo: "Gestión",
+    items: [
+      {
+        href: "/proyectos",
+        etiqueta: "Proyectos",
+        icono: FolderKanban,
+        permiso: "proyectos.ver",
+      },
+      {
+        href: "/contrapartes",
+        etiqueta: "Beneficiarios y asociaciones",
+        icono: HeartHandshake,
+        permiso: "contrapartes.ver",
+      },
+      {
+        href: "/territorios",
+        etiqueta: "Territorios",
+        icono: MapPinned,
+        permiso: "territorios.ver",
+      },
+      {
+        href: "/formularios",
+        etiqueta: "Formularios",
+        icono: ClipboardList,
+        permiso: "formularios.ver",
+      },
+    ],
   },
   {
-    href: "/usuarios",
-    etiqueta: "Usuarios",
-    icono: Users,
-    permiso: "usuarios.ver",
-  },
-  {
-    href: "/roles",
-    etiqueta: "Roles y permisos",
-    icono: Shield,
-    permiso: "roles.ver",
-  },
-  {
-    href: "/proyectos",
-    etiqueta: "Proyectos",
-    icono: FolderKanban,
-    permiso: "proyectos.ver",
-  },
-  {
-    href: "/contrapartes",
-    etiqueta: "Beneficiarios y asociaciones",
-    icono: HeartHandshake,
-    permiso: "contrapartes.ver",
-  },
-  {
-    href: "/territorios",
-    etiqueta: "Territorios",
-    icono: MapPinned,
-    permiso: "territorios.ver",
-  },
-  {
-    href: "/formularios",
-    etiqueta: "Formularios",
-    icono: ClipboardList,
-    permiso: "formularios.ver",
-  },
-  {
-    href: "/configuracion",
-    etiqueta: "Configuración",
-    icono: Settings,
-    puedeAlgunoDe: [
-      "configuracion.editar_dashboard",
-      "configuracion.gestionar_plantillas",
+    id: "administracion",
+    titulo: "Administración",
+    items: [
+      {
+        href: "/usuarios",
+        etiqueta: "Usuarios",
+        icono: Users,
+        permiso: "usuarios.ver",
+      },
+      {
+        href: "/roles",
+        etiqueta: "Roles y permisos",
+        icono: Shield,
+        permiso: "roles.ver",
+      },
+      {
+        href: "/configuracion",
+        etiqueta: "Configuración",
+        icono: Settings,
+        puedeAlgunoDe: [
+          "configuracion.editar_dashboard",
+          "configuracion.gestionar_plantillas",
+        ],
+      },
     ],
   },
 ];
 
+const ITEMS = SECCIONES.flatMap((seccion) => seccion.items);
+
 function itemPermitido(
-  item: (typeof ITEMS)[number],
+  item: ItemNav,
   puede: (...c: string[]) => boolean,
   puedeAlguno: (...c: string[]) => boolean,
 ): boolean {
@@ -135,7 +169,12 @@ export function Sidebar({
   const { puede, puedeAlguno } = usePermisos();
   const [badgeRevision, setBadgeRevision] = useState(0);
 
-  const items = ITEMS.filter((item) => itemPermitido(item, puede, puedeAlguno));
+  const secciones = SECCIONES.map((seccion) => ({
+    ...seccion,
+    items: seccion.items.filter((item) =>
+      itemPermitido(item, puede, puedeAlguno),
+    ),
+  })).filter((seccion) => seccion.items.length > 0);
 
   useEffect(() => {
     const itemActual = ITEMS.find(
@@ -201,42 +240,54 @@ export function Sidebar({
   );
 
   const renderNavegacion = () => (
-    <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
-      {items.map((item) => {
-        const activo =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
-        const Icon = item.icono;
-        const badge =
-          item.badgeKey === "revision" && badgeRevision > 0
-            ? badgeRevision
-            : 0;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onCerrarMovil}
-            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-              activo
-                ? "bg-ruralia-teal text-white"
-                : "text-zinc-700 hover:bg-zinc-50"
-            }`}
-          >
-            <Icon className="h-4 w-4 shrink-0" />
-            <span className="flex-1">{item.etiqueta}</span>
-            {badge > 0 && (
-              <span
-                className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold ${
-                  activo
-                    ? "bg-white/20 text-white"
-                    : "bg-rose-500 text-white"
-                }`}
-              >
-                {badge > 99 ? "99+" : badge}
-              </span>
-            )}
-          </Link>
-        );
-      })}
+    <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-3">
+      {secciones.map((seccion, indice) => (
+        <div
+          key={seccion.id}
+          className={indice > 0 ? "mt-4" : ""}
+        >
+          <p className="px-3 pb-1.5 text-[11px] font-semibold tracking-wide text-zinc-400">
+            {seccion.titulo}
+          </p>
+          <div className="flex flex-col gap-0.5">
+            {seccion.items.map((item) => {
+              const activo =
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const Icon = item.icono;
+              const badge =
+                item.badgeKey === "revision" && badgeRevision > 0
+                  ? badgeRevision
+                  : 0;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onCerrarMovil}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                    activo
+                      ? "bg-ruralia-teal text-white"
+                      : "text-zinc-700 hover:bg-ruralia-teal-soft"
+                  }`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="flex-1">{item.etiqueta}</span>
+                  {badge > 0 && (
+                    <span
+                      className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold ${
+                        activo
+                          ? "bg-white/20 text-white"
+                          : "bg-rose-500 text-white"
+                      }`}
+                    >
+                      {badge > 99 ? "99+" : badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </nav>
   );
 

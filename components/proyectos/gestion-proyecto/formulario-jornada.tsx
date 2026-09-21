@@ -5,6 +5,12 @@ import { MapPin } from "lucide-react";
 import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
 import {
+  AsignacionJornada,
+  destinoInicialAsignacion,
+  errorAsignacionJornada,
+  type DestinoAsignacionJornada,
+} from "./asignacion-jornada";
+import {
   fechaFueraDeProyecto,
   SelectorFechaJornada,
 } from "@/components/ui/selector-fecha-jornada";
@@ -77,6 +83,9 @@ export function FormularioJornada({
   );
   const [requiereRevision, setRequiereRevision] = useState(true);
   const [agenteIds, setAgenteIds] = useState<string[]>([]);
+  const [destino, setDestino] = useState<DestinoAsignacionJornada>(
+    destinoInicialAsignacion([], []),
+  );
   const [beneficiarioIds, setBeneficiarioIds] = useState<string[]>([]);
   const [asociacionIds, setAsociacionIds] = useState<string[]>([]);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
@@ -124,6 +133,16 @@ export function FormularioJornada({
       return;
     }
 
+    const errorAsignacion = errorAsignacionJornada(
+      destino,
+      beneficiarioIds,
+      asociacionIds,
+    );
+    if (errorAsignacion) {
+      setErrorLocal(errorAsignacion);
+      return;
+    }
+
     await onSubmit({
       fecha,
       veredaId,
@@ -134,8 +153,8 @@ export function FormularioJornada({
       plantillaFormularioId: seleccion.plantillaFormularioId,
       tecnicoResponsableIds: agenteIds,
       requiereRevision,
-      beneficiarioIds,
-      asociacionIds,
+      beneficiarioIds: destino === "beneficiario" ? beneficiarioIds : [],
+      asociacionIds: destino === "asociacion" ? asociacionIds : [],
     });
 
     setNombre("");
@@ -145,6 +164,7 @@ export function FormularioJornada({
     setClaveFormulario(CLAVE_FORMULARIO_INDIVIDUAL);
     setRequiereRevision(true);
     setAgenteIds([]);
+    setDestino("beneficiario");
     setBeneficiarioIds([]);
     setAsociacionIds([]);
   }
@@ -174,37 +194,21 @@ export function FormularioJornada({
         </p>
       </div>
 
-      {beneficiarios.length ? (
-        <div>
-          <label className="mb-1 block text-sm font-medium text-zinc-700">
-            Beneficiarios de esta jornada
-          </label>
-          <SelectorCatalogo
-            multiple
-            opciones={beneficiarios}
-            value={beneficiarioIds}
-            onChange={setBeneficiarioIds}
-            placeholder="¿A quién se atiende en esta visita?"
-            mensajeVacio="No hay beneficiarios vinculados al proyecto."
-          />
-        </div>
-      ) : null}
-
-      {asociaciones.length ? (
-        <div>
-          <label className="mb-1 block text-sm font-medium text-zinc-700">
-            Asociaciones de esta jornada
-          </label>
-          <SelectorCatalogo
-            multiple
-            opciones={asociaciones}
-            value={asociacionIds}
-            onChange={setAsociacionIds}
-            placeholder="¿Qué asociaciones se atienden?"
-            mensajeVacio="No hay asociaciones vinculadas al proyecto."
-          />
-        </div>
-      ) : null}
+      <AsignacionJornada
+        beneficiarios={beneficiarios}
+        asociaciones={asociaciones}
+        destino={destino}
+        beneficiarioIds={beneficiarioIds}
+        asociacionIds={asociacionIds}
+        disabled={enviando}
+        onDestino={(siguiente) => {
+          setDestino(siguiente);
+          if (siguiente === "beneficiario") setAsociacionIds([]);
+          else setBeneficiarioIds([]);
+        }}
+        onBeneficiarioIds={setBeneficiarioIds}
+        onAsociacionIds={setAsociacionIds}
+      />
 
       <div>
         <label className="mb-1 block text-sm font-medium text-zinc-700">

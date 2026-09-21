@@ -18,6 +18,7 @@ import {
   importarBeneficiariosExcelProyecto,
   listarAsociaciones,
   listarBeneficiarios,
+  listarTodasLasPaginas,
   listarUsuarios,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -75,30 +76,43 @@ export function WizardCrearProyecto() {
     if (!token) return;
     setCargandoOpciones(true);
     void Promise.all([
-      listarUsuarios(token, { limite: 200, estaActivo: true }),
-      listarBeneficiarios(token, { limite: 500 }),
-      listarAsociaciones(token, { limite: 200 }),
+      listarTodasLasPaginas((pagina, limite) =>
+        listarUsuarios(token, { pagina, limite, estaActivo: true }),
+      ),
+      listarTodasLasPaginas((pagina, limite) =>
+        listarBeneficiarios(token, { pagina, limite }),
+      ),
+      listarTodasLasPaginas((pagina, limite) =>
+        listarAsociaciones(token, { pagina, limite }),
+      ),
     ])
       .then(([usuarios, beneficiarios, asociaciones]) => {
         setOpcionesUsuarios(
-          usuarios.datos.map((u) => ({
+          usuarios.map((u) => ({
             id: u.id,
             nombre: u.nombreCompleto,
           })),
         );
         setOpcionesBeneficiarios(
-          beneficiarios.datos.map((b) => ({
+          beneficiarios.map((b) => ({
             id: b.id,
             nombre: `${b.nombres} ${b.apellidos}`,
             subtitulo: b.numeroDocumento,
           })),
         );
         setOpcionesAsociaciones(
-          asociaciones.datos.map((a) => ({ id: a.id, nombre: a.nombre })),
+          asociaciones.map((a) => ({ id: a.id, nombre: a.nombre })),
         );
         if (usuario) {
           setUsuarioIds([usuario.id]);
         }
+      })
+      .catch((err: unknown) => {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "No se pudieron cargar equipo y contraparte",
+        );
       })
       .finally(() => setCargandoOpciones(false));
   }, [token, usuario]);

@@ -1,26 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Download,
+  Eye,
   FileSpreadsheet,
   FileText,
   Image as ImageIcon,
   Trash2,
   Upload,
 } from "lucide-react";
+import { DescargaExpediente } from "@/components/proyectos/gestion-proyecto/descarga-expediente";
 import { Alerta, Spinner } from "@/components/ui/modal";
 import {
   OpcionDesplegable,
   SelectorDesplegable,
 } from "@/components/ui/selector-desplegable";
 import {
+  descargarPdfDocumento,
   eliminarDocumentoExterno,
   obtenerExpedienteProyecto,
   subirDocumentoExterno,
 } from "@/lib/api";
 import type {
+  DocumentoExterno,
+  DocumentoJornada,
+  EvidenciaExpediente,
   ExpedienteProyecto,
+  FormularioExpediente,
+  JornadaExpediente,
+  PersonaExpediente,
   PlanProyecto,
   Proyecto,
   TipoDocumentoExterno,
@@ -43,6 +52,155 @@ function iconoPorTipoMime(tipoMime: string) {
   if (tipoMime.includes("sheet") || tipoMime.includes("excel"))
     return FileSpreadsheet;
   return FileText;
+}
+
+const SIN_JORNADA = "sin-jornada";
+
+interface GrupoExpediente {
+  id: string;
+  titulo: string;
+  detalle: string;
+  orden: string;
+  cantidad: number;
+  documentos: DocumentoJornada[];
+  evidencias: EvidenciaExpediente[];
+  formularios: FormularioExpediente[];
+  externos: DocumentoExterno[];
+}
+
+function formatearFecha(valor?: string | null): string | null {
+  if (!valor) return null;
+  const dia = valor.slice(0, 10);
+  const [anio, mes, fecha] = dia.split("-");
+  if (!anio || !mes || !fecha) return null;
+  return `${Number(fecha)}/${Number(mes)}/${anio}`;
+}
+
+function nombrePersona(persona: PersonaExpediente): string {
+  return `${persona.nombres} ${persona.apellidos}`.trim();
+}
+
+function personasDe(jornada?: JornadaExpediente | null): PersonaExpediente[] {
+  return jornada?.beneficiarios ?? [];
+}
+
+function detallePersonas(jornada?: JornadaExpediente | null): string {
+  const personas = personasDe(jornada).map(nombrePersona).filter(Boolean);
+  if (personas.length) return personas.join(", ");
+  if (jornada?.tecnicoResponsableNombre) {
+    return `Agente ${jornada.tecnicoResponsableNombre}`;
+  }
+  return "Sin persona asignada";
+}
+
+function tituloJornada(jornada?: JornadaExpediente | null): string {
+  const fecha = formatearFecha(jornada?.fecha);
+  if (jornada?.nombre && fecha) return `${fecha} · ${jornada.nombre}`;
+  if (jornada?.nombre) return jornada.nombre;
+  if (fecha) return `Jornada ${fecha}`;
+  return "Jornada";
+}
+
+function urlPublica(ruta: string): string {
+  if (/^https?:\/\//i.test(ruta) || ruta.startsWith("data:")) return ruta;
+  return `${API_URL}/${ruta.replace(/^\//, "")}`;
+}
+
+function esImagen(url: string, mime?: string) {
+  if (mime?.startsWith("image/")) return true;
+  if (url.startsWith("data:image/")) return true;
+  return /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url);
+}
+
+function totalGrupo(grupo: GrupoExpediente) {
+  const adjuntos = grupo.formularios.reduce(
+    (total, formulario) => total + formulario.adjuntos.length,
+    0,
+  );
+  const avisoSinPdf =
+    grupo.documentos.length === 0 &&
+    adjuntos === 0 &&
+    grupo.formularios.length > 0
+      ? 1
+      : 0;
+  return (
+    grupo.documentos.length + grupo.evidencias.length + adjuntos + avisoSinPdf
+  );
+}
+
+function armarGruposJornada(
+  expediente: ExpedienteProyecto | null,
+): GrupoExpediente[] {
+  const mapa = new Map<string, GrupoExpediente>();
+
+  function asegurar(jornada?: JornadaExpediente | null) {
+    const id = jornada?.id ?? SIN_JORNADA;
+    const actual = mapa.get(id);
+    if (actual) return actual;
+    const grupo: GrupoExpediente = {
+      id,
+      titulo: jornada ? tituloJornada(jornada) : "Sin jornada",
+      detalle: jornada ? detallePersonas(jornada) : "Archivos no vinculados",
+      orden: jornada?.fecha?.slice(0, 10) ?? "",
+      cantidad: 0,
+      documentos: [],
+      evidencias: [],
+      formularios: [],
+      externos: [],
+    };
+    mapa.set(id, grupo);
+    return grupo;
+  }
+
+  for (const doc of expediente?.documentosGenerados ?? []) {
+    const grupo = asegurar(doc.jornada);
+    grupo.documentos.push(doc);
+  }
+  for (const evidencia of expediente?.evidencias ?? []) {
+    const grupo = asegurar(evidencia.jornada);
+    grupo.evidencias.push(evidencia);
+  }
+  for (const formulario of expediente?.formularios ?? []) {
+    const grupo = asegurar(formulario.jornada);
+    grupo.formularios.push(formulario);
+  }
+
+  const grupos = [...mapa.values()].filter((g) => totalGrupo(g) > 0);
+  grupos.sort((a, b) => b.orden.localeCompare(a.orden));
+  for (const grupo of grupos) {
+    grupo.cantidad = totalGrupo(grupo);
+  }
+  return grupos;
+}
+
+function detalleExterno(doc: DocumentoExterno): string {
+  const tipo =
+    TIPOS_DOCUMENTO.find((item) => item.id === doc.tipo)?.nombre ?? doc.tipo;
+  const vinculo = [
+    doc.beneficiario ? nombrePersona(doc.beneficiario) : null,
+    doc.asociacion?.nombre,
+    doc.vereda?.nombre,
+    doc.actividad?.nombre,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return vinculo ? `${tipo} · ${vinculo}` : tipo;
+}
+
+function armarMenuExternos(
+  expediente: ExpedienteProyecto | null,
+): GrupoExpediente[] {
+  return (expediente?.documentosExternos ?? []).map((doc) => ({
+    id: doc.id,
+    titulo: doc.titulo,
+    detalle: detalleExterno(doc),
+    orden: doc.creadoEn,
+    cantidad: 1,
+    documentos: [],
+    evidencias: [],
+    formularios: [],
+    externos: [doc],
+  }));
 }
 
 function formatearTamano(bytes: number): string {
@@ -72,6 +230,9 @@ export function PanelExpediente({
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [archivoEnCurso, setArchivoEnCurso] = useState<string | null>(null);
+  const [vista, setVista] = useState<"jornadas" | "externos">("jornadas");
+  const [seleccion, setSeleccion] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -91,6 +252,56 @@ export function PanelExpediente({
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  const gruposJornada = useMemo(
+    () => armarGruposJornada(expediente),
+    [expediente],
+  );
+  const gruposExternos = useMemo(
+    () => armarMenuExternos(expediente),
+    [expediente],
+  );
+  const grupos = vista === "jornadas" ? gruposJornada : gruposExternos;
+  const grupoActivo = grupos.find((grupo) => grupo.id === seleccion) ?? null;
+
+  useEffect(() => {
+    if (!grupos.length) {
+      setSeleccion(null);
+      return;
+    }
+    setSeleccion((actual) =>
+      actual && grupos.some((grupo) => grupo.id === actual)
+        ? actual
+        : grupos[0].id,
+    );
+  }, [grupos]);
+
+  async function abrirDocumento(doc: DocumentoJornada, modo: "ver" | "descargar") {
+    setArchivoEnCurso(`${modo}:${doc.id}`);
+    setError(null);
+    try {
+      const blob = await descargarPdfDocumento(token, doc.id);
+      const url = URL.createObjectURL(blob);
+      if (modo === "ver") {
+        window.open(url, "_blank", "noopener,noreferrer");
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        return;
+      }
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = `${doc.titulo}.pdf`;
+      document.body.appendChild(enlace);
+      enlace.click();
+      enlace.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "No se pudo abrir el documento",
+      );
+    } finally {
+      setArchivoEnCurso(null);
+    }
+  }
 
   async function manejarEliminar(id: string) {
     if (!confirm("¿Eliminar este documento externo del expediente?")) return;
@@ -127,15 +338,16 @@ export function PanelExpediente({
       {error ? <Alerta mensaje={error} /> : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-3 text-sm text-zinc-600">
-          <span className="rounded-full bg-ruralia-teal-soft px-2.5 py-1 text-xs font-semibold text-ruralia-teal-text">
-            {expediente?.totales.generados ?? 0} generados
-          </span>
-          <span className="rounded-full bg-ruralia-teal-soft px-2.5 py-1 text-xs font-semibold text-ruralia-teal-text">
-            {expediente?.totales.externos ?? 0} externos
-          </span>
-        </div>
-        {puedeGestionar ? (
+        <p className="max-w-xl text-sm text-zinc-600">
+          {vista === "jornadas"
+            ? "Elige una jornada para ver su formulario, la evidencia que se cargó al llenarlo y los archivos de la visita."
+            : "Archivos cargados a mano: actas de terceros, escaneos y otros documentos del proyecto."}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {vista === "jornadas" ? (
+            <DescargaExpediente token={token} proyecto={proyecto} plan={plan} />
+          ) : null}
+          {puedeGestionar && vista === "externos" ? (
           <button
             type="button"
             onClick={() => setMostrarFormulario((v) => !v)}
@@ -144,10 +356,11 @@ export function PanelExpediente({
             <Upload className="h-4 w-4" />
             {mostrarFormulario ? "Cancelar" : "Cargar documento"}
           </button>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
-      {mostrarFormulario ? (
+      {mostrarFormulario && vista === "externos" ? (
         <FormularioCargaDocumento
           token={token}
           proyectoId={proyectoId}
@@ -163,122 +376,396 @@ export function PanelExpediente({
         />
       ) : null}
 
-      <div className="rounded-2xl border border-ruralia-teal-border bg-white">
-        <div className="border-b border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-2.5">
-          <p className="text-sm font-semibold text-zinc-900">
-            Documentos generados por la plataforma
-          </p>
+      <div className="inline-flex rounded-xl border border-zinc-200 bg-white p-1">
+        <button
+          type="button"
+          onClick={() => {
+            setVista("jornadas");
+            setMostrarFormulario(false);
+          }}
+          className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
+            vista === "jornadas"
+              ? "bg-ruralia-teal text-white"
+              : "text-zinc-600 hover:bg-ruralia-teal-soft"
+          }`}
+        >
+          Jornadas
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setVista("externos");
+            setMostrarFormulario(false);
+          }}
+          className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
+            vista === "externos"
+              ? "bg-ruralia-teal text-white"
+              : "text-zinc-600 hover:bg-ruralia-teal-soft"
+          }`}
+        >
+          Documentos externos
+        </button>
+      </div>
+
+      {!grupos.length ? (
+        <p className="rounded-2xl border border-ruralia-teal-border bg-white px-4 py-6 text-center text-sm text-zinc-500">
+          {vista === "externos"
+            ? "Todavía no hay documentos externos."
+            : "Todavía no hay jornadas con formulario o evidencia."}
+        </p>
+      ) : (
+        <div className="grid items-start gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+          <nav className="rounded-2xl border border-ruralia-teal-border bg-white p-2">
+            <BloqueMenu
+              grupos={grupos}
+              activoId={grupoActivo?.id ?? null}
+              onElegir={setSeleccion}
+            />
+          </nav>
+          {grupoActivo ? (
+            vista === "externos" && grupoActivo.externos[0] ? (
+              <ArchivoExterno
+                doc={grupoActivo.externos[0]}
+                puedeGestionar={puedeGestionar}
+                onEliminar={() =>
+                  void manejarEliminar(grupoActivo.externos[0].id)
+                }
+              />
+            ) : (
+              <DetalleJornada
+                grupo={grupoActivo}
+                archivoEnCurso={archivoEnCurso}
+                onAbrir={(doc, modo) => void abrirDocumento(doc, modo)}
+              />
+            )
+          ) : null}
         </div>
-        {!expediente?.documentosGenerados.length ? (
-          <p className="px-4 py-6 text-center text-sm text-zinc-500">
-            Aún no hay actas ni informes generados para este proyecto.
-          </p>
-        ) : (
+      )}
+    </div>
+  );
+}
+
+function DetalleJornada({
+  grupo,
+  archivoEnCurso,
+  onAbrir,
+}: {
+  grupo: GrupoExpediente;
+  archivoEnCurso: string | null;
+  onAbrir: (doc: DocumentoJornada, modo: "ver" | "descargar") => void;
+}) {
+  const adjuntos = grupo.formularios.flatMap((formulario) =>
+    formulario.adjuntos.map((adjunto, indice) => ({
+      ...adjunto,
+      clave: `${formulario.id}-${indice}`,
+      formulario: formulario.plantillaNombre,
+    })),
+  );
+
+  const vacio =
+    grupo.documentos.length === 0 &&
+    adjuntos.length === 0 &&
+    grupo.evidencias.length === 0;
+
+  if (vacio) {
+    return (
+      <p className="rounded-2xl border border-ruralia-teal-border bg-white px-4 py-6 text-sm text-zinc-500">
+        Esta jornada no tiene archivos.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {grupo.documentos.length || grupo.formularios.length ? (
+        <SeccionArchivos
+          titulo="Formulario"
+          descripcion="PDF del formulario o del acta de esta jornada."
+        >
+          {!grupo.documentos.length ? (
+            <p className="px-4 py-3 text-sm text-zinc-500">
+              El formulario ya se envió
+              {grupo.formularios[0]?.plantillaNombre
+                ? ` (${grupo.formularios[0].plantillaNombre})`
+                : ""}
+              . El PDF queda disponible cuando la jornada se envía a revisión o
+              se sube al proyecto.
+            </p>
+          ) : null}
+          {grupo.documentos.length ? (
           <ul className="divide-y divide-ruralia-teal-border">
-            {expediente.documentosGenerados.map((doc) => (
+            {grupo.documentos.map((doc) => (
               <li
                 key={doc.id}
-                className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-zinc-900">
-                    {doc.titulo}
-                  </p>
-                  <p className="text-xs text-zinc-500">
-                    {doc.tipo} ·{" "}
-                    {new Date(doc.creadoEn).toLocaleDateString("es-CO")}
-                  </p>
-                </div>
-                <span className="inline-flex w-fit shrink-0 rounded-full border border-ruralia-teal/40 bg-ruralia-teal-soft px-2.5 py-0.5 text-xs font-medium text-ruralia-teal-text">
-                  {doc.estadoFuncional}
-                </span>
+                <p className="min-w-0 truncate text-sm font-medium text-zinc-900">
+                  {doc.titulo}
+                </p>
+                <AccionesPdf
+                  ocupado={
+                    archivoEnCurso === `ver:${doc.id}` ||
+                    archivoEnCurso === `descargar:${doc.id}`
+                  }
+                  onVer={() => onAbrir(doc, "ver")}
+                  onDescargar={() => onAbrir(doc, "descargar")}
+                />
               </li>
             ))}
           </ul>
-        )}
-      </div>
+          ) : null}
+        </SeccionArchivos>
+      ) : null}
 
-      <div className="rounded-2xl border border-ruralia-teal-border bg-white">
-        <div className="border-b border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-2.5">
-          <p className="text-sm font-semibold text-zinc-900">
-            Documentos externos
-          </p>
-          <p className="text-xs text-zinc-500">
-            Actas de terceros, escaneos y archivos cargados manualmente
-          </p>
-        </div>
-        {!expediente?.documentosExternos.length ? (
-          <p className="px-4 py-6 text-center text-sm text-zinc-500">
-            No se han cargado documentos externos todavía.
-          </p>
-        ) : (
-          <ul className="divide-y divide-ruralia-teal-border">
-            {expediente.documentosExternos.map((doc) => {
-              const Icono = iconoPorTipoMime(doc.tipoMime);
-              return (
-                <li
-                  key={doc.id}
-                  className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="flex min-w-0 items-start gap-2.5">
-                    <Icono className="mt-0.5 h-4 w-4 shrink-0 text-ruralia-teal-muted" />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-zinc-900">
-                        {doc.titulo}
-                      </p>
-                      <p className="truncate text-xs text-zinc-500">
-                        {doc.nombreArchivo} · {formatearTamano(doc.tamanoArchivo)}{" "}
-                        · {doc.subidoPor.nombreCompleto} ·{" "}
-                        {new Date(doc.creadoEn).toLocaleDateString("es-CO")}
-                      </p>
-                      {doc.actividad || doc.beneficiario || doc.asociacion || doc.vereda ? (
-                        <p className="mt-0.5 truncate text-xs text-ruralia-teal-text">
-                          {[
-                            doc.actividad?.nombre,
-                            doc.beneficiario
-                              ? `${doc.beneficiario.nombres} ${doc.beneficiario.apellidos}`
-                              : null,
-                            doc.asociacion?.nombre,
-                            doc.vereda?.nombre,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600">
-                      {TIPOS_DOCUMENTO.find((t) => t.id === doc.tipo)?.nombre ??
-                        doc.tipo}
-                    </span>
-                    <a
-                      href={`${API_URL}/${doc.urlArchivo}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-lg p-1.5 text-ruralia-teal-text hover:bg-ruralia-teal-soft"
-                      title="Descargar"
-                    >
-                      <Download className="h-4 w-4" />
-                    </a>
-                    {puedeGestionar ? (
-                      <button
-                        type="button"
-                        onClick={() => void manejarEliminar(doc.id)}
-                        className="rounded-lg p-1.5 text-red-600 hover:bg-red-50"
-                        title="Eliminar"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+      {adjuntos.length ? (
+        <SeccionArchivos
+          titulo="Evidencia del formulario"
+          descripcion="Fotos, firmas y archivos que se cargaron al llenar el formulario."
+        >
+          <div className="grid gap-3 p-4 sm:grid-cols-2">
+            {adjuntos.map((adjunto) => (
+              <div key={adjunto.clave} className="min-w-0">
+                <p className="mb-1 truncate text-sm font-medium text-zinc-800">
+                  {adjunto.etiqueta}
+                </p>
+                <p className="mb-2 truncate text-xs text-zinc-500">
+                  {adjunto.formulario}
+                </p>
+                <VistaAdjunto url={adjunto.url} nombre={adjunto.etiqueta} />
+              </div>
+            ))}
+          </div>
+        </SeccionArchivos>
+      ) : null}
+
+      {grupo.evidencias.length ? (
+        <SeccionArchivos
+          titulo="Archivos de la visita"
+          descripcion="Fotos y archivos capturados durante la jornada, aparte del formulario."
+        >
+          <div className="grid gap-3 p-4 sm:grid-cols-2">
+            {grupo.evidencias.map((evidencia) => (
+              <div key={evidencia.id} className="min-w-0">
+                <p className="mb-1 truncate text-sm font-medium text-zinc-800">
+                  {evidencia.nombreArchivo}
+                </p>
+                <p className="mb-2 text-xs text-zinc-500">{evidencia.tipo}</p>
+                {evidencia.urlArchivo ? (
+                  <VistaAdjunto
+                    url={evidencia.urlArchivo}
+                    mime={evidencia.tipoMime}
+                    nombre={evidencia.nombreArchivo}
+                  />
+                ) : (
+                  <p className="text-xs text-zinc-400">Sin archivo</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </SeccionArchivos>
+      ) : null}
     </div>
+  );
+}
+
+function AccionesPdf({
+  ocupado,
+  onVer,
+  onDescargar,
+}: {
+  ocupado: boolean;
+  onVer: () => void;
+  onDescargar: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <button
+        type="button"
+        disabled={ocupado}
+        onClick={onVer}
+        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft disabled:opacity-50"
+      >
+        <Eye className="h-4 w-4" />
+        Ver
+      </button>
+      <button
+        type="button"
+        disabled={ocupado}
+        onClick={onDescargar}
+        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft disabled:opacity-50"
+      >
+        <Download className="h-4 w-4" />
+        Descargar
+      </button>
+    </div>
+  );
+}
+
+function BloqueMenu({
+  titulo,
+  grupos,
+  activoId,
+  onElegir,
+}: {
+  titulo?: string;
+  grupos: GrupoExpediente[];
+  activoId: string | null;
+  onElegir: (id: string) => void;
+}) {
+  return (
+    <div>
+      {titulo ? (
+        <p className="px-3 pb-1 pt-1 text-xs font-semibold text-zinc-500">
+          {titulo}
+        </p>
+      ) : null}
+      <ul className="space-y-1">
+        {grupos.map((grupo) => {
+          const activo = grupo.id === activoId;
+          return (
+            <li key={grupo.id}>
+              <button
+                type="button"
+                onClick={() => onElegir(grupo.id)}
+                className={`flex w-full items-start justify-between gap-2 rounded-xl px-3 py-2 text-left ${
+                  activo
+                    ? "bg-ruralia-teal text-white"
+                    : "text-zinc-800 hover:bg-ruralia-teal-soft"
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold">
+                    {grupo.titulo}
+                  </span>
+                  <span
+                    className={`block truncate text-xs ${
+                      activo ? "text-white/80" : "text-zinc-500"
+                    }`}
+                  >
+                    {grupo.detalle}
+                  </span>
+                </span>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    activo
+                      ? "bg-white/20 text-white"
+                      : "bg-ruralia-teal-soft text-ruralia-teal-text"
+                  }`}
+                >
+                  {grupo.cantidad}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function ArchivoExterno({
+  doc,
+  puedeGestionar,
+  onEliminar,
+}: {
+  doc: DocumentoExterno;
+  puedeGestionar: boolean;
+  onEliminar: () => void;
+}) {
+  const Icono = iconoPorTipoMime(doc.tipoMime);
+  return (
+    <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
+      <div className="flex items-start gap-3">
+        <Icono className="mt-0.5 h-5 w-5 shrink-0 text-ruralia-teal" />
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-zinc-900">{doc.titulo}</p>
+          <p className="mt-1 text-sm text-zinc-500">{detalleExterno(doc)}</p>
+          <p className="mt-1 text-xs text-zinc-500">
+            {doc.nombreArchivo} · {formatearTamano(doc.tamanoArchivo)} ·{" "}
+            {doc.subidoPor.nombreCompleto} ·{" "}
+            {new Date(doc.creadoEn).toLocaleDateString("es-CO")}
+          </p>
+          {doc.descripcion ? (
+            <p className="mt-3 text-sm text-zinc-700">{doc.descripcion}</p>
+          ) : null}
+        </div>
+      </div>
+      <div className="mt-4 flex items-center gap-2">
+        <a
+          href={urlPublica(doc.urlArchivo)}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-ruralia-teal px-3.5 py-2 text-sm font-semibold text-white hover:bg-ruralia-teal-hover"
+        >
+          <Download className="h-4 w-4" />
+          Descargar
+        </a>
+        {puedeGestionar ? (
+          <button
+            type="button"
+            onClick={onEliminar}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="h-4 w-4" />
+            Eliminar
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function VistaAdjunto({
+  url,
+  mime,
+  nombre,
+}: {
+  url: string;
+  mime?: string;
+  nombre: string;
+}) {
+  const publica = urlPublica(url);
+  if (esImagen(url, mime)) {
+    return (
+      <a href={publica} target="_blank" rel="noreferrer" className="block">
+        <img
+          src={publica}
+          alt={nombre}
+          className="max-h-40 w-full rounded-xl border border-ruralia-teal-border bg-white object-contain"
+        />
+      </a>
+    );
+  }
+  return (
+    <a
+      href={publica}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft"
+    >
+      <Eye className="h-4 w-4" />
+      Ver
+    </a>
+  );
+}
+
+function SeccionArchivos({
+  titulo,
+  descripcion,
+  children,
+}: {
+  titulo: string;
+  descripcion: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-ruralia-teal-border bg-white">
+      <div className="border-b border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-2.5">
+        <p className="text-sm font-semibold text-zinc-900">{titulo}</p>
+        <p className="text-xs text-zinc-500">{descripcion}</p>
+      </div>
+      {children}
+    </section>
   );
 }
 
