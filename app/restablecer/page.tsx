@@ -1,11 +1,11 @@
 import { Suspense } from "react";
-import { AuthPanel } from "@/components/auth-panel";
 import { PantallaAuthCargando } from "@/components/auth/marco-auth";
+import { RestablecerContrasenaPanel } from "@/components/auth/restablecer-contrasena-panel";
 
-export default function Home() {
+export default function RestablecerContrasena() {
   return (
     <Suspense fallback={<PantallaAuthCargando />}>
-      <AuthPanel />
+      <RestablecerContrasenaPanel />
     </Suspense>
   );
 }
