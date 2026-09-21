@@ -7,6 +7,7 @@ import {
   GOOGLE_MAP_ID,
   cargarGoogleMapsDashboard,
   crearContenidoMarcadorCircular,
+  crearContenidoMarcadorPin,
 } from "@/lib/google-maps";
 import type { Geocerca, PuntoGeocerca, VeredaResumen } from "@/lib/types";
 
@@ -17,15 +18,35 @@ interface MapaTerritorioProyectoProps {
   colorBorrador: string;
   geocercaActivaId: string | null;
   modoDibujo: boolean;
+  pinPendiente?: PuntoGeocerca | null;
+  centrarPinKey?: number;
   onClickMapa?: (latitud: number, longitud: number) => void;
   onSeleccionarGeocerca?: (id: string) => void;
   onMoverPunto?: (indice: number, latitud: number, longitud: number) => void;
+  onMoverPin?: (latitud: number, longitud: number) => void;
+  onConfirmarPin?: () => void;
+  onCancelarPin?: () => void;
 }
 
 function puntosAPath(
   puntos: PuntoGeocerca[],
 ): google.maps.LatLngLiteral[] {
   return puntos.map((p) => ({ lat: p.latitud, lng: p.longitud }));
+}
+
+function coordsDePosicion(
+  pos: google.maps.LatLng | google.maps.LatLngLiteral | google.maps.LatLngAltitude,
+): { lat: number; lng: number } | null {
+  const lat =
+    typeof (pos as google.maps.LatLng).lat === "function"
+      ? (pos as google.maps.LatLng).lat()
+      : (pos as google.maps.LatLngLiteral).lat;
+  const lng =
+    typeof (pos as google.maps.LatLng).lng === "function"
+      ? (pos as google.maps.LatLng).lng()
+      : (pos as google.maps.LatLngLiteral).lng;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
 }
 
 export function MapaTerritorioProyecto({
@@ -35,9 +56,14 @@ export function MapaTerritorioProyecto({
   colorBorrador,
   geocercaActivaId,
   modoDibujo,
+  pinPendiente = null,
+  centrarPinKey = 0,
   onClickMapa,
   onSeleccionarGeocerca,
   onMoverPunto,
+  onMoverPin,
+  onConfirmarPin,
+  onCancelarPin,
 }: MapaTerritorioProyectoProps) {
   const contenedorRef = useRef<HTMLDivElement>(null);
   const mapaRef = useRef<google.maps.Map | null>(null);
@@ -57,9 +83,13 @@ export function MapaTerritorioProyecto({
     google.maps.marker.AdvancedMarkerElement[]
   >([]);
   const listenersVerticesRef = useRef<google.maps.MapsEventListener[]>([]);
+  const pinRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const listenersPinRef = useRef<google.maps.MapsEventListener[]>([]);
   const onClickMapaRef = useRef(onClickMapa);
   const onSeleccionarGeocercaRef = useRef(onSeleccionarGeocerca);
   const onMoverPuntoRef = useRef(onMoverPunto);
+  const onMoverPinRef = useRef(onMoverPin);
+  const pinPendienteRef = useRef(pinPendiente);
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState(false);
   const vistaInicialAjustadaRef = useRef(false);
@@ -67,6 +97,8 @@ export function MapaTerritorioProyecto({
   onClickMapaRef.current = onClickMapa;
   onSeleccionarGeocercaRef.current = onSeleccionarGeocerca;
   onMoverPuntoRef.current = onMoverPunto;
+  onMoverPinRef.current = onMoverPin;
+  pinPendienteRef.current = pinPendiente;
 
   useEffect(() => {
     if (!contenedorRef.current) return;
@@ -112,6 +144,12 @@ export function MapaTerritorioProyecto({
       cancelado = true;
       clickListenerRef.current?.remove();
       clickListenerRef.current = null;
+      listenersPinRef.current.forEach((l) => l.remove());
+      listenersPinRef.current = [];
+      if (pinRef.current) {
+        pinRef.current.map = null;
+        pinRef.current = null;
+      }
       mapaRef.current = null;
       libsRef.current = null;
     };
@@ -256,20 +294,77 @@ export function MapaTerritorioProyecto({
       const listener = marker.addListener("dragend", () => {
         const pos = marker.position;
         if (!pos) return;
-        const lat =
-          typeof (pos as google.maps.LatLng).lat === "function"
-            ? (pos as google.maps.LatLng).lat()
-            : (pos as google.maps.LatLngLiteral).lat;
-        const lng =
-          typeof (pos as google.maps.LatLng).lng === "function"
-            ? (pos as google.maps.LatLng).lng()
-            : (pos as google.maps.LatLngLiteral).lng;
-        onMoverPuntoRef.current?.(indice, lat, lng);
+        const coords = coordsDePosicion(pos);
+        if (!coords) return;
+        onMoverPuntoRef.current?.(indice, coords.lat, coords.lng);
       });
       listenersVerticesRef.current.push(listener);
       verticesBorradorRef.current.push(marker);
     });
   }, [puntosBorrador, colorBorrador, modoDibujo, listo]);
+
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    const libs = libsRef.current;
+    if (!mapa || !libs || !listo) return;
+
+    const limpiarPin = () => {
+      listenersPinRef.current.forEach((l) => l.remove());
+      listenersPinRef.current = [];
+      if (pinRef.current) {
+        pinRef.current.map = null;
+        pinRef.current = null;
+      }
+    };
+
+    if (!modoDibujo || !pinPendiente) {
+      limpiarPin();
+      return;
+    }
+
+    const posicion = {
+      lat: pinPendiente.latitud,
+      lng: pinPendiente.longitud,
+    };
+
+    if (pinRef.current) {
+      pinRef.current.position = posicion;
+      return;
+    }
+
+    const marker = new libs.AdvancedMarkerElement({
+      map: mapa,
+      position: posicion,
+      title: "Pin para añadir a la geocerca. Arrástralo para ajustar.",
+      content: crearContenidoMarcadorPin(colorBorrador),
+      gmpDraggable: true,
+      zIndex: 20,
+    });
+    const listener = marker.addListener("dragend", () => {
+      const pos = marker.position;
+      if (!pos) return;
+      const coords = coordsDePosicion(pos);
+      if (!coords) return;
+      onMoverPinRef.current?.(coords.lat, coords.lng);
+    });
+    listenersPinRef.current.push(listener);
+    pinRef.current = marker;
+  }, [pinPendiente, modoDibujo, listo]);
+
+  useEffect(() => {
+    if (!pinRef.current || !modoDibujo) return;
+    pinRef.current.content = crearContenidoMarcadorPin(colorBorrador);
+  }, [colorBorrador, modoDibujo]);
+
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa || !listo || !centrarPinKey) return;
+    const pin = pinPendienteRef.current;
+    if (!pin) return;
+    mapa.panTo({ lat: pin.latitud, lng: pin.longitud });
+    const zoom = mapa.getZoom() ?? 6;
+    if (zoom < 14) mapa.setZoom(14);
+  }, [centrarPinKey, listo]);
 
   useEffect(() => {
     const mapa = mapaRef.current;
@@ -338,6 +433,52 @@ export function MapaTerritorioProyecto({
         className="h-[360px] w-full rounded-xl border border-ruralia-teal-border bg-zinc-100 lg:h-[440px]"
         aria-label="Mapa territorial del proyecto"
       />
+
+      {modoDibujo ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center px-3">
+          <div className="pointer-events-auto w-full max-w-lg rounded-xl border border-ruralia-teal-border bg-white/95 p-3 shadow-lg backdrop-blur-sm">
+            {pinPendiente ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
+                    <MapPin className="h-4 w-4 text-ruralia-teal-text" />
+                    Pin listo para agregar
+                  </p>
+                  <p className="mt-0.5 font-mono text-xs text-zinc-600">
+                    {pinPendiente.latitud.toFixed(6)},{" "}
+                    {pinPendiente.longitud.toFixed(6)}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-zinc-500">
+                    Arrástralo para ajustar y luego añádelo como punto de la
+                    geocerca.
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={onCancelarPin}
+                    className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100"
+                  >
+                    Quitar pin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onConfirmarPin}
+                    className="rounded-lg bg-ruralia-teal px-3 py-1.5 text-sm font-semibold text-white hover:bg-ruralia-teal-hover"
+                  >
+                    Añadir como punto
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-600">
+                Haz clic en el mapa para colocar un pin. Después podrás
+                añadirlo como punto de la geocerca.
+              </p>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

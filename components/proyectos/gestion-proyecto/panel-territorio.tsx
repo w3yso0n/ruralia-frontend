@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   MapPin,
   Pencil,
   Pentagon,
   Plus,
+  Search,
   Trash2,
   Undo2,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import {
   eliminarGeocercaProyecto,
   listarGeocercasProyecto,
 } from "@/lib/api";
+import { cargarGoogleMaps } from "@/lib/google-maps";
 import type { Geocerca, Proyecto, PuntoGeocerca } from "@/lib/types";
 
 const COLORES = [
@@ -73,8 +75,13 @@ export function PanelTerritorio({
   const [descripcion, setDescripcion] = useState("");
   const [color, setColor] = useState<string>(COLORES[0]);
   const [puntos, setPuntos] = useState<PuntoGeocerca[]>([]);
+  const [pinPendiente, setPinPendiente] = useState<PuntoGeocerca | null>(null);
+  const [centrarPinKey, setCentrarPinKey] = useState(0);
+  const [busquedaLugar, setBusquedaLugar] = useState("");
   const [latitudManual, setLatitudManual] = useState("");
   const [longitudManual, setLongitudManual] = useState("");
+  const inputLugarRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   const veredas = proyecto.veredas ?? [];
 
@@ -97,6 +104,48 @@ export function PanelTerritorio({
     void cargar();
   }, [cargar]);
 
+  useEffect(() => {
+    if (!modoDibujo) return;
+    const input = inputLugarRef.current;
+    if (!input) return;
+
+    let cancelado = false;
+
+    void cargarGoogleMaps()
+      .then((googleNs) => {
+        if (cancelado || !inputLugarRef.current) return;
+        if (autocompleteRef.current) {
+          googleNs.maps.event.clearInstanceListeners(autocompleteRef.current);
+        }
+        const autocomplete = new googleNs.maps.places.Autocomplete(input, {
+          componentRestrictions: { country: "co" },
+          fields: ["geometry", "name", "formatted_address"],
+        });
+        autocomplete.addListener("place_changed", () => {
+          const place = autocomplete.getPlace();
+          const loc = place.geometry?.location;
+          if (!loc) return;
+          colocarPin(loc.lat(), loc.lng(), true);
+          setBusquedaLugar(place.formatted_address || place.name || "");
+          setError(null);
+        });
+        autocompleteRef.current = autocomplete;
+      })
+      .catch(() => {
+        /* El pin en el mapa sigue disponible sin autocomplete. */
+      });
+
+    return () => {
+      cancelado = true;
+      if (autocompleteRef.current) {
+        window.google?.maps?.event?.clearInstanceListeners(
+          autocompleteRef.current,
+        );
+        autocompleteRef.current = null;
+      }
+    };
+  }, [modoDibujo]);
+
   function iniciarNueva() {
     setModoDibujo(true);
     setGeocercaEditandoId(null);
@@ -105,6 +154,8 @@ export function PanelTerritorio({
     setDescripcion("");
     setColor(COLORES[0]);
     setPuntos([]);
+    setPinPendiente(null);
+    setBusquedaLugar("");
     setLatitudManual("");
     setLongitudManual("");
     setError(null);
@@ -119,6 +170,8 @@ export function PanelTerritorio({
     setDescripcion(geocerca.descripcion ?? "");
     setColor(geocerca.color);
     setPuntos(geocerca.puntos.map((p) => ({ ...p })));
+    setPinPendiente(null);
+    setBusquedaLugar("");
     setLatitudManual("");
     setLongitudManual("");
     setError(null);
@@ -129,13 +182,29 @@ export function PanelTerritorio({
     setModoDibujo(false);
     setGeocercaEditandoId(null);
     setPuntos([]);
+    setPinPendiente(null);
+    setBusquedaLugar("");
     setNombre("");
     setDescripcion("");
+  }
+
+  function colocarPin(latitud: number, longitud: number, centrar = false) {
+    if (!puntoValido(latitud, longitud)) return;
+    setPinPendiente({ latitud, longitud });
+    if (centrar) setCentrarPinKey((prev) => prev + 1);
   }
 
   function agregarPunto(latitud: number, longitud: number) {
     if (!puntoValido(latitud, longitud)) return;
     setPuntos((prev) => [...prev, { latitud, longitud }]);
+  }
+
+  function agregarDesdePin() {
+    if (!pinPendiente) return;
+    agregarPunto(pinPendiente.latitud, pinPendiente.longitud);
+    setPinPendiente(null);
+    setBusquedaLugar("");
+    setError(null);
   }
 
   function agregarPuntoManual() {
@@ -195,6 +264,8 @@ export function PanelTerritorio({
       setModoDibujo(false);
       setGeocercaEditandoId(null);
       setPuntos([]);
+      setPinPendiente(null);
+      setBusquedaLugar("");
       setNombre("");
       setDescripcion("");
     } catch (err) {
@@ -293,8 +364,8 @@ export function PanelTerritorio({
                 : "Trazando una geocerca"}
             </p>
             <p className="mt-1 text-sm text-zinc-600">
-              Haz clic en el mapa para ir añadiendo vértices, o escribe las
-              coordenadas. Con 3 o más puntos se cierra la zona.
+              Coloca un pin en el mapa (clic o búsqueda), ajústalo y pulsa
+              “Añadir como punto”. Con 3 o más puntos se cierra la zona.
             </p>
 
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -340,6 +411,28 @@ export function PanelTerritorio({
                   />
                 ))}
               </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-zinc-700">
+                  Buscar un lugar para el pin
+                </span>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    ref={inputLugarRef}
+                    value={busquedaLugar}
+                    onChange={(e) => setBusquedaLugar(e.target.value)}
+                    className="w-full rounded-xl border border-zinc-200 py-2 pl-10 pr-3 text-sm"
+                    placeholder="Ej. vereda, predio o municipio"
+                  />
+                </div>
+              </label>
+              <p className="mt-1 text-xs text-zinc-500">
+                Elige un resultado o haz clic en el mapa. El pin no se agrega
+                hasta que pulses “Añadir como punto”.
+              </p>
             </div>
 
             <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
@@ -392,7 +485,8 @@ export function PanelTerritorio({
               </ol>
             ) : (
               <p className="mt-3 text-sm text-zinc-500">
-                Aún no hay puntos. Haz clic en el mapa o captura coordenadas.
+                Aún no hay puntos. Coloca un pin en el mapa o captura
+                coordenadas.
               </p>
             )}
 
@@ -437,7 +531,9 @@ export function PanelTerritorio({
           colorBorrador={color}
           geocercaActivaId={geocercaActivaId}
           modoDibujo={modoDibujo}
-          onClickMapa={modoDibujo ? agregarPunto : undefined}
+          pinPendiente={modoDibujo ? pinPendiente : null}
+          centrarPinKey={centrarPinKey}
+          onClickMapa={modoDibujo ? colocarPin : undefined}
           onSeleccionarGeocerca={
             modoDibujo ? undefined : (id) => setGeocercaActivaId(id)
           }
@@ -447,6 +543,14 @@ export function PanelTerritorio({
                 i === indice ? { latitud, longitud } : punto,
               ),
             );
+          }}
+          onMoverPin={(latitud, longitud) => {
+            setPinPendiente({ latitud, longitud });
+          }}
+          onConfirmarPin={agregarDesdePin}
+          onCancelarPin={() => {
+            setPinPendiente(null);
+            setBusquedaLugar("");
           }}
         />
 
@@ -458,6 +562,10 @@ export function PanelTerritorio({
           <span className="flex items-center gap-1.5">
             <Pentagon className="h-3.5 w-3.5 text-ruralia-teal-text" />
             Geocerca (zona trazada)
+          </span>
+          <span className="flex items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5 text-ruralia-teal-text" />
+            Pin para añadir un punto
           </span>
         </div>
       </section>
