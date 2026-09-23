@@ -7,6 +7,7 @@ import { ArbolJornadas } from "@/components/proyectos/gestion-proyecto/arbol-jor
 import { ControlAsistenciaJornada } from "@/components/proyectos/gestion-proyecto/control-asistencia-jornada";
 import { FormularioJornada } from "@/components/proyectos/gestion-proyecto/formulario-jornada";
 import { FormularioEditarJornada } from "@/components/proyectos/gestion-proyecto/formulario-editar-jornada";
+import { EvidenciasJornada } from "@/components/proyectos/gestion-proyecto/evidencias-jornada";
 import { ResultadosJornada } from "@/components/proyectos/gestion-proyecto/resultados-jornada";
 import {
   actualizarJornada,
@@ -643,6 +644,11 @@ export function PanelJornadas({
                         jornada={jornadaSeleccionada}
                       />
                     )}
+
+                    <EvidenciasJornada
+                      token={token}
+                      jornadaId={jornadaSeleccionada.id}
+                    />
                   </>
                 )}
               </>

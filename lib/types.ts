@@ -512,6 +512,17 @@ export interface HermanoGrupoJornada {
   tecnicoResponsable?: { id: string; nombre: string };
 }
 
+export interface EvidenciaJornada {
+  id: string;
+  tipo: string;
+  nombreArchivo: string;
+  urlArchivo?: string | null;
+  urlMiniatura?: string | null;
+  tipoMime: string;
+  capturadoEn: string;
+  estado?: string;
+}
+
 export interface Jornada {
   id: string;
   fecha: string;
@@ -530,6 +541,7 @@ export interface Jornada {
   asociaciones?: { id: string; nombre: string }[];
   actividades?: JornadaActividadItem[];
   asistentes?: JornadaAsistente[];
+  evidencias?: EvidenciaJornada[];
   grupoJornadaId?: string | null;
   grupo?: HermanoGrupoJornada[];
   plantillaFormulario?: {
