@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarRange, Target } from "lucide-react";
+import { CalendarRange, Sparkles, Target } from "lucide-react";
+import {
+  BarraAvance,
+  formatearNumero,
+} from "@/components/evaluaciones/indicadores-evaluacion";
 import { Alerta, Spinner } from "@/components/ui/modal";
 import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
 import {
@@ -216,13 +220,10 @@ export function PanelAsignaciones({
   return (
     <div className="space-y-5">
       <div className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
-        <h3 className="text-lg font-semibold text-zinc-900">
-          Metas por persona
-        </h3>
-        <p className="mt-1 text-sm text-zinc-500">
-          La cuota personal es independiente de la meta del proyecto. El
-          ejecutado se calcula desde jornadas aprobadas del técnico sobre esa
-          meta.
+        <h3 className="font-semibold text-zinc-900">Reparto de cuotas</h3>
+        <p className="mt-1 text-xs text-zinc-500">
+          Elige una meta y cuánto le toca a cada persona. El avance cuenta sus
+          jornadas aprobadas de esa meta.
         </p>
 
         <div className="mt-4 flex flex-wrap gap-4">
@@ -248,7 +249,7 @@ export function PanelAsignaciones({
 
           <div className="min-w-[220px] flex-1">
             <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Periodo (opcional)
+              Periodo
             </span>
             <SelectorDesplegable
               value={periodoId}
@@ -259,8 +260,8 @@ export function PanelAsignaciones({
                 subtitulo: `Plan ${p.cantidadPlaneada}`,
               }))}
               permitirVacio
-              etiquetaVacio="Meta total"
-              placeholder="Meta total"
+              etiquetaVacio="Cuota total del proyecto"
+              placeholder="Cuota total del proyecto"
               mensajeSinOpciones="Sin periodos definidos"
               icono={CalendarRange}
             />
@@ -269,94 +270,81 @@ export function PanelAsignaciones({
       </div>
 
       {error ? <Alerta mensaje={error} /> : null}
-      {ok ? (
-        <div className="rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-3 text-sm text-ruralia-teal-text">
-          {ok}
-        </div>
-      ) : null}
+      {ok ? <Alerta mensaje={ok} tipo="exito" /> : null}
 
       {cargando ? (
         <Spinner />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-ruralia-teal-border bg-white">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-zinc-100 text-xs uppercase tracking-wide text-zinc-500">
-                <th className="px-4 py-3 font-semibold">Persona</th>
-                <th className="px-4 py-3 font-semibold">Cuota asignada</th>
-                <th className="px-4 py-3 font-semibold">Ejecutado</th>
-                <th className="px-4 py-3 font-semibold">Cumplimiento</th>
-                <th className="px-4 py-3 font-semibold">Jornadas</th>
-                <th className="px-4 py-3 font-semibold">Beneficiarios</th>
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead className="border-b border-zinc-100 bg-ruralia-teal-soft/50 text-xs uppercase tracking-wide text-ruralia-teal-text">
+              <tr>
+                <th className="px-5 py-3 font-semibold">Persona</th>
+                <th className="px-5 py-3 font-semibold">
+                  Cuota{metaSeleccionada ? ` (${metaSeleccionada.unidadMedida})` : ""}
+                </th>
+                <th className="w-2/5 px-5 py-3 font-semibold">Avance</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-zinc-100">
               {filas.map((fila) => {
                 const real = asignaciones.find(
                   (a) => a.usuario.id === fila.usuarioId,
                 );
                 return (
-                  <tr key={fila.usuarioId} className="border-b border-zinc-50">
-                    <td className="px-4 py-3 font-medium text-zinc-800">
-                      {fila.nombreCompleto}
+                  <tr key={fila.usuarioId}>
+                    <td className="px-5 py-3">
+                      <span className="font-medium text-zinc-900">
+                        {fila.nombreCompleto}
+                      </span>
                       {fila.conteoJornadas != null ? (
-                        <span className="ml-2 text-xs text-zinc-400">
-                          ({fila.conteoJornadas} jornadas previas)
+                        <span className="block text-xs text-zinc-500">
+                          {fila.conteoJornadas} jornadas previas en esta meta
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-3">
                       {puedeGestionar ? (
                         <input
                           type="number"
                           min={0}
                           step="0.01"
                           value={fila.cantidadAsignada}
+                          placeholder="Sin cuota"
                           onChange={(e) =>
                             setFilas((prev) =>
                               prev.map((f) =>
                                 f.usuarioId === fila.usuarioId
-                                  ? {
-                                      ...f,
-                                      cantidadAsignada: e.target.value,
-                                    }
+                                  ? { ...f, cantidadAsignada: e.target.value }
                                   : f,
                               ),
                             )
                           }
-                          className="w-28 rounded-lg border border-zinc-200 px-2 py-1.5"
+                          className="w-32 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none transition placeholder:text-zinc-400 hover:border-ruralia-teal-border focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
                         />
                       ) : (
-                        real?.cantidadAsignada ?? "—"
+                        <span className="text-zinc-900">
+                          {real ? formatearNumero(real.cantidadAsignada) : "—"}
+                        </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-zinc-700">
-                      {real?.ejecutado ?? 0}
-                      {metaSeleccionada ? (
+                    <td className="px-5 py-3">
+                      {real && real.cantidadAsignada > 0 ? (
+                        <>
+                          <BarraAvance porcentaje={real.cumplimientoPorcentaje} />
+                          <span className="mt-1 block text-xs text-zinc-500">
+                            <span className="font-semibold text-zinc-900">
+                              {formatearNumero(real.ejecutado)}
+                            </span>{" "}
+                            de {formatearNumero(real.cantidadAsignada)} (
+                            {formatearNumero(real.cumplimientoPorcentaje)}%)
+                          </span>
+                        </>
+                      ) : (
                         <span className="text-xs text-zinc-400">
-                          {" "}
-                          {metaSeleccionada.unidadMedida}
+                          Sin cuota guardada
                         </span>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          (real?.cumplimientoPorcentaje ?? 0) >= 100
-                            ? "bg-ruralia-teal-soft text-ruralia-teal-text"
-                            : (real?.cumplimientoPorcentaje ?? 0) >= 50
-                              ? "bg-amber-50 text-amber-800"
-                              : "bg-zinc-100 text-zinc-600"
-                        }`}
-                      >
-                        {real?.cumplimientoPorcentaje ?? 0}%
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-zinc-600">
-                      {real?.conteoJornadas ?? 0}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-600">
-                      {real?.beneficiariosAtendidos ?? 0}
+                      )}
                     </td>
                   </tr>
                 );
@@ -371,8 +359,9 @@ export function PanelAsignaciones({
           <button
             type="button"
             onClick={() => void manejarSugerir()}
-            className="rounded-xl border border-ruralia-teal-border px-4 py-2 text-sm font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft/50"
+            className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
           >
+            <Sparkles className="h-4 w-4 text-ruralia-teal" />
             Sugerir reparto equitativo
           </button>
           <button

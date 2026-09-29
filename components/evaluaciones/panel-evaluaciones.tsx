@@ -2,10 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CalendarDays, Download, FolderKanban } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FolderKanban,
+} from "lucide-react";
+import { FichaEvaluacion } from "@/components/evaluaciones/ficha-evaluacion";
+import { MESES } from "@/components/evaluaciones/indicadores-evaluacion";
 import { PanelAsignaciones } from "@/components/evaluaciones/panel-asignaciones";
-import { ListaAgentesEficientes } from "@/components/evaluaciones/lista-agentes-eficientes";
-import { RankingProductividad } from "@/components/evaluaciones/ranking-productividad";
+import { VistaEquipo } from "@/components/evaluaciones/vista-equipo";
 import { Alerta, Spinner } from "@/components/ui/modal";
 import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
 import {
@@ -13,7 +19,6 @@ import {
   descargarPdfFichaUsuario,
   listarProyectos,
   obtenerCumplimientoEquipoDashboard,
-  obtenerDesviacionesUsuario,
   obtenerPlanProyecto,
   obtenerProductividadProyecto,
   obtenerProductividadUsuario,
@@ -26,108 +31,61 @@ import type {
   ProductividadPersona,
   ProductividadUsuarioDetalle,
   Proyecto,
-  ResumenDesviaciones,
 } from "@/lib/types";
 
-const MESES = [
-  "Enero",
-  "Febrero",
-  "Marzo",
-  "Abril",
-  "Mayo",
-  "Junio",
-  "Julio",
-  "Agosto",
-  "Septiembre",
-  "Octubre",
-  "Noviembre",
-  "Diciembre",
-];
+type TabEval = "equipo" | "cuotas";
 
-type TabEval = "ranking" | "asignaciones" | "ficha";
+function tabDesdeUrl(valor: string | null): TabEval {
+  // "asignaciones" se mantiene por los enlaces existentes (vista de gestión del proyecto).
+  return valor === "cuotas" || valor === "asignaciones" ? "cuotas" : "equipo";
+}
+
+function descargarBlob(blob: Blob, nombre: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export function PanelEvaluaciones() {
   const { token } = useAuth();
   const { puede } = usePermisos();
   const searchParams = useSearchParams();
-  const usuarioInicial = searchParams.get("usuarioId");
-  const tabInicial = (searchParams.get("tab") as TabEval) || "ranking";
-  const proyectoInicial = searchParams.get("proyectoId") ?? "";
+  const puedeGestionar = puede("evaluaciones.gestionar");
 
   const ahora = new Date();
-  const [tab, setTab] = useState<TabEval>(
-    usuarioInicial ? "ficha" : tabInicial,
-  );
+  const [tab, setTab] = useState<TabEval>(tabDesdeUrl(searchParams.get("tab")));
   const [anio, setAnio] = useState(ahora.getFullYear());
   const [mes, setMes] = useState(ahora.getMonth() + 1);
-  const [proyectoId, setProyectoId] = useState(proyectoInicial);
+  const [proyectoId, setProyectoId] = useState(
+    searchParams.get("proyectoId") ?? "",
+  );
+  const [usuarioId, setUsuarioId] = useState(searchParams.get("usuarioId") ?? "");
+
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
-  const [ranking, setRanking] = useState<ProductividadPersona[]>([]);
+  const [equipo, setEquipo] = useState<ProductividadPersona[]>([]);
   const [detalle, setDetalle] = useState<ProductividadUsuarioDetalle | null>(
     null,
   );
-  const [desviaciones, setDesviaciones] =
-    useState<ResumenDesviaciones | null>(null);
-  const [usuarioId, setUsuarioId] = useState(usuarioInicial ?? "");
-  const [proyectoAsignacion, setProyectoAsignacion] = useState<Proyecto | null>(
-    null,
-  );
-  const [planAsignacion, setPlanAsignacion] = useState<PlanProyecto | null>(null);
+  const [proyectoCuotas, setProyectoCuotas] = useState<Proyecto | null>(null);
+  const [planCuotas, setPlanCuotas] = useState<PlanProyecto | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [descargandoPdf, setDescargandoPdf] = useState(false);
-  const [descargandoPdfFicha, setDescargandoPdfFicha] = useState(false);
 
-  const puedeGestionar = puede("evaluaciones.gestionar");
+  const esMesActual = anio === ahora.getFullYear() && mes === ahora.getMonth() + 1;
 
-  async function descargarPdf() {
-    if (!token) return;
-    setDescargandoPdf(true);
-    setError(null);
-    try {
-      const blob = await descargarPdfEvaluaciones(token, {
-        proyectoId: proyectoId || undefined,
-        anio,
-        mes,
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `evaluaciones-${anio}-${String(mes).padStart(2, "0")}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Error al descargar el PDF",
-      );
-    } finally {
-      setDescargandoPdf(false);
-    }
+  function moverMes(delta: -1 | 1) {
+    const fecha = new Date(anio, mes - 1 + delta, 1);
+    setAnio(fecha.getFullYear());
+    setMes(fecha.getMonth() + 1);
   }
 
-  async function descargarPdfFicha() {
-    if (!token || !usuarioId) return;
-    setDescargandoPdfFicha(true);
-    setError(null);
-    try {
-      const blob = await descargarPdfFichaUsuario(token, usuarioId, {
-        proyectoId: proyectoId || undefined,
-        anio,
-        mes,
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `ficha-${usuarioId.slice(0, 8)}-${anio}-${String(mes).padStart(2, "0")}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Error al descargar el PDF",
-      );
-    } finally {
-      setDescargandoPdfFicha(false);
-    }
+  function irACuotas() {
+    setUsuarioId("");
+    setTab("cuotas");
   }
 
   useEffect(() => {
@@ -138,155 +96,145 @@ export function PanelEvaluaciones() {
   }, [token]);
 
   useEffect(() => {
-    if (!token || (tab !== "ranking" && tab !== "ficha")) return;
+    if (!token || tab !== "equipo") return;
     let cancelado = false;
-
-    async function cargar() {
-      if (!token) return;
+    async function cargarEquipo(tk: string) {
       setCargando(true);
       setError(null);
       try {
         const datos = proyectoId
-          ? await obtenerProductividadProyecto(token, proyectoId, { anio, mes })
-          : await obtenerCumplimientoEquipoDashboard(token, { anio, mes });
-        if (!cancelado) setRanking(datos);
+          ? await obtenerProductividadProyecto(tk, proyectoId, { anio, mes })
+          : await obtenerCumplimientoEquipoDashboard(tk, { anio, mes });
+        if (!cancelado) setEquipo(datos);
       } catch (err) {
         if (!cancelado) {
           setError(
-            err instanceof Error
-              ? err.message
-              : "Error al cargar el ranking",
+            err instanceof Error ? err.message : "Error al cargar el equipo",
           );
         }
       } finally {
         if (!cancelado) setCargando(false);
       }
     }
-
-    void cargar();
+    void cargarEquipo(token);
     return () => {
       cancelado = true;
     };
-  }, [token, anio, mes, proyectoId, tab]);
+  }, [token, tab, anio, mes, proyectoId]);
 
   useEffect(() => {
-    if (!token || tab !== "ficha") return;
-    if (!usuarioId) {
-      setDetalle(null);
-      setDesviaciones(null);
-      return;
-    }
-
+    if (!token || tab !== "equipo" || !usuarioId) return;
     let cancelado = false;
-
-    async function cargarFicha() {
-      if (!token || !usuarioId) return;
-      setError(null);
+    async function cargarFicha(tk: string, id: string) {
+      setDetalle(null);
       try {
-        const [ficha, desv] = await Promise.all([
-          obtenerProductividadUsuario(token, usuarioId, {
-            proyectoId: proyectoId || undefined,
-            anio,
-            mes,
-          }),
-          obtenerDesviacionesUsuario(token, usuarioId, {
-            proyectoId: proyectoId || undefined,
-            anio,
-            mes,
-          }),
-        ]);
-        if (!cancelado) {
-          setDetalle(ficha);
-          setDesviaciones(desv);
-        }
+        const datos = await obtenerProductividadUsuario(tk, id, {
+          proyectoId: proyectoId || undefined,
+          anio,
+          mes,
+        });
+        if (!cancelado) setDetalle(datos);
       } catch (err) {
         if (!cancelado) {
+          setUsuarioId("");
           setError(
-            err instanceof Error
-              ? err.message
-              : "Error al cargar la ficha de evaluación",
+            err instanceof Error ? err.message : "Error al cargar la ficha",
           );
         }
       }
     }
-
-    void cargarFicha();
+    void cargarFicha(token, usuarioId);
     return () => {
       cancelado = true;
     };
   }, [token, tab, usuarioId, anio, mes, proyectoId]);
 
   useEffect(() => {
-    if (!token || tab !== "asignaciones" || !proyectoId) {
-      setProyectoAsignacion(null);
-      setPlanAsignacion(null);
-      return;
-    }
+    if (!token || tab !== "cuotas" || !proyectoId) return;
     let cancelado = false;
-
-    async function cargarProyecto() {
-      if (!token) return;
+    async function cargarProyecto(tk: string) {
       setCargando(true);
       setError(null);
       try {
-        const [p, plan] = await Promise.all([
-          obtenerProyecto(token, proyectoId),
-          obtenerPlanProyecto(token, proyectoId),
+        const [proyecto, plan] = await Promise.all([
+          obtenerProyecto(tk, proyectoId),
+          obtenerPlanProyecto(tk, proyectoId),
         ]);
         if (!cancelado) {
-          setProyectoAsignacion(p);
-          setPlanAsignacion(plan);
+          setProyectoCuotas(proyecto);
+          setPlanCuotas(plan);
         }
       } catch (err) {
         if (!cancelado) {
           setError(
-            err instanceof Error
-              ? err.message
-              : "Error al cargar el proyecto",
+            err instanceof Error ? err.message : "Error al cargar el proyecto",
           );
         }
       } finally {
         if (!cancelado) setCargando(false);
       }
     }
-
-    void cargarProyecto();
+    void cargarProyecto(token);
     return () => {
       cancelado = true;
     };
   }, [token, tab, proyectoId]);
 
-  function abrirFicha(id: string) {
-    setUsuarioId(id);
-    setTab("ficha");
+  async function descargarPdf() {
+    if (!token) return;
+    setDescargandoPdf(true);
+    setError(null);
+    const sufijo = `${anio}-${String(mes).padStart(2, "0")}`;
+    try {
+      if (usuarioId) {
+        const blob = await descargarPdfFichaUsuario(token, usuarioId, {
+          proyectoId: proyectoId || undefined,
+          anio,
+          mes,
+        });
+        descargarBlob(blob, `ficha-${usuarioId.slice(0, 8)}-${sufijo}.pdf`);
+      } else {
+        const blob = await descargarPdfEvaluaciones(token, {
+          proyectoId: proyectoId || undefined,
+          anio,
+          mes,
+        });
+        descargarBlob(blob, `evaluaciones-${sufijo}.pdf`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al descargar el PDF");
+    } finally {
+      setDescargandoPdf(false);
+    }
   }
 
   const tabs: { id: TabEval; etiqueta: string }[] = [
-    { id: "ranking", etiqueta: "Ranking" },
-    { id: "asignaciones", etiqueta: "Asignar metas" },
-    { id: "ficha", etiqueta: "Ficha individual" },
+    { id: "equipo", etiqueta: "Equipo" },
+    { id: "cuotas", etiqueta: "Cuotas por meta" },
   ];
 
   return (
     <>
-      <div className="mb-8">
+      <div className="mb-6">
         <h2 className="text-2xl font-semibold text-zinc-900">Evaluaciones</h2>
         <p className="mt-1 text-zinc-600">
-          Gestión interna del equipo: cuotas personales, cumplimiento,
-          desviaciones frente a la planeación y evaluación individual
+          Desempeño mensual del equipo de campo frente a sus cuotas.
         </p>
       </div>
 
-      <div className="mb-6 flex gap-2 overflow-x-auto border-b border-zinc-200">
+      <div className="mb-6 flex gap-6 border-b border-ruralia-teal-border">
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
-            onClick={() => setTab(t.id)}
-            className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium ${
+            onClick={() => {
+              setTab(t.id);
+              setUsuarioId("");
+            }}
+            className={`-mb-px border-b-2 px-1 pb-3 text-sm font-medium transition ${
               tab === t.id
                 ? "border-ruralia-teal text-ruralia-teal-text"
-                : "border-transparent text-zinc-500 hover:text-zinc-800"
+                : "border-transparent text-zinc-500 hover:text-zinc-700"
             }`}
           >
             {t.etiqueta}
@@ -294,351 +242,101 @@ export function PanelEvaluaciones() {
         ))}
       </div>
 
-      <div className="mb-6 flex flex-wrap gap-4 rounded-2xl border border-ruralia-teal-border bg-white p-4">
-        <div className="w-24">
-          <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-            Año
-          </span>
-          <input
-            type="number"
-            value={anio}
-            onChange={(e) => setAnio(Number(e.target.value))}
-            className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm transition hover:border-ruralia-teal-border focus:border-ruralia-teal focus:outline-none focus:ring-2 focus:ring-ruralia-teal/20"
-          />
-        </div>
-        <div className="w-44">
-          <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-            Mes
-          </span>
-          <SelectorDesplegable
-            value={String(mes)}
-            onChange={(id) => setMes(Number(id))}
-            opciones={MESES.map((nombre, i) => ({
-              id: String(i + 1),
-              nombre,
-            }))}
-            icono={CalendarDays}
-          />
-        </div>
-        <div className="min-w-[240px] flex-1">
-          <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-            Proyecto
-          </span>
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        {tab === "equipo" ? (
+          <div className="flex items-center rounded-xl border border-zinc-200 bg-white">
+            <button
+              type="button"
+              onClick={() => moverMes(-1)}
+              aria-label="Mes anterior"
+              className="rounded-l-xl px-2.5 py-2.5 text-zinc-500 transition hover:bg-ruralia-teal-soft hover:text-ruralia-teal-text"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="min-w-[150px] px-2 text-center text-sm font-semibold text-zinc-900">
+              {MESES[mes - 1]} {anio}
+            </span>
+            <button
+              type="button"
+              onClick={() => moverMes(1)}
+              disabled={esMesActual}
+              aria-label="Mes siguiente"
+              className="rounded-r-xl px-2.5 py-2.5 text-zinc-500 transition hover:bg-ruralia-teal-soft hover:text-ruralia-teal-text disabled:cursor-not-allowed disabled:text-zinc-300 disabled:hover:bg-transparent"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
+        <div className="w-full min-w-[220px] sm:w-72">
           <SelectorDesplegable
             value={proyectoId}
-            onChange={setProyectoId}
+            onChange={(id) => {
+              setProyectoId(id);
+              setUsuarioId("");
+            }}
             opciones={proyectos.map((p) => ({ id: p.id, nombre: p.nombre }))}
-            permitirVacio
-            etiquetaVacio={
-              tab === "asignaciones"
-                ? "Selecciona un proyecto"
-                : "Todos los activos"
-            }
+            permitirVacio={tab === "equipo"}
+            etiquetaVacio="Todos los proyectos activos"
             placeholder={
-              tab === "asignaciones"
-                ? "Selecciona un proyecto"
-                : "Todos los activos"
+              tab === "cuotas" ? "Selecciona un proyecto" : "Todos los proyectos activos"
             }
             mensajeSinOpciones="Sin proyectos activos"
             icono={FolderKanban}
           />
         </div>
+        {tab === "equipo" && !usuarioId ? (
+          <button
+            type="button"
+            disabled={descargandoPdf || equipo.length === 0}
+            onClick={() => void descargarPdf()}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            {descargandoPdf ? "Generando…" : "Descargar PDF"}
+          </button>
+        ) : null}
       </div>
 
       {error ? <Alerta mensaje={error} /> : null}
 
-      {tab === "ranking" ? (
-        cargando ? (
+      {tab === "equipo" ? (
+        usuarioId ? (
+          <FichaEvaluacion
+            detalle={detalle}
+            resumen={equipo.find((p) => p.usuarioId === usuarioId)}
+            anio={anio}
+            mes={mes}
+            descargandoPdf={descargandoPdf}
+            onDescargarPdf={() => void descargarPdf()}
+            onVolver={() => setUsuarioId("")}
+            onIrACuotas={puedeGestionar ? irACuotas : undefined}
+          />
+        ) : cargando ? (
           <Spinner />
         ) : (
-          <section className="space-y-6">
-            <div className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
-              <ListaAgentesEficientes
-                personas={ranking}
-                onSeleccionar={abrirFicha}
-                limite={9}
-              />
-            </div>
-            <div className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-zinc-900">
-                  Tabla detallada — {MESES[mes - 1]} {anio}
-                </h3>
-                <button
-                  type="button"
-                  disabled={descargandoPdf || ranking.length === 0}
-                  onClick={() => void descargarPdf()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {descargandoPdf ? "Generando…" : "Descargar PDF"}
-                </button>
-              </div>
-              <RankingProductividad
-                personas={ranking}
-                mostrarProyecto={!proyectoId}
-                onSeleccionar={abrirFicha}
-              />
-            </div>
-          </section>
-        )
-      ) : null}
-
-      {tab === "asignaciones" ? (
-        !proyectoId ? (
-          <div className="rounded-2xl border border-zinc-200 bg-white p-6 text-sm text-zinc-600">
-            Selecciona un proyecto para repartir cuotas personales de sus metas.
-          </div>
-        ) : cargando || !proyectoAsignacion ? (
-          <Spinner />
-        ) : (
-          <PanelAsignaciones
-            token={token!}
-            proyectoId={proyectoId}
-            proyecto={proyectoAsignacion}
-            plan={planAsignacion}
-            puedeGestionar={puedeGestionar}
+          <VistaEquipo
+            personas={equipo}
+            mostrarProyecto={!proyectoId}
+            onSeleccionar={setUsuarioId}
+            onIrACuotas={puedeGestionar ? irACuotas : undefined}
           />
         )
-      ) : null}
-
-      {tab === "ficha" ? (
-        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-          <aside className="rounded-2xl border border-ruralia-teal-border bg-white p-4 shadow-sm">
-            <h3 className="mb-1 text-sm font-semibold text-zinc-900">
-              Agentes de campo
-            </h3>
-            <p className="mb-3 text-xs text-zinc-500">
-              Elige a alguien para ver su evaluación del periodo
-            </p>
-            {cargando && ranking.length === 0 ? (
-              <Spinner />
-            ) : ranking.length === 0 ? (
-              <p className="text-sm text-zinc-500">
-                No hay agentes con actividad o cuotas en este periodo
-                {proyectoId ? " / proyecto" : ""}. Prueba otro mes o asigna
-                metas en la pestaña Asignar metas.
-              </p>
-            ) : (
-              <ul className="max-h-[70vh] space-y-1 overflow-y-auto">
-                {ranking.map((p) => {
-                  const activo = p.usuarioId === usuarioId;
-                  return (
-                    <li key={p.usuarioId}>
-                      <button
-                        type="button"
-                        onClick={() => setUsuarioId(p.usuarioId)}
-                        className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition ${
-                          activo
-                            ? "bg-ruralia-teal text-white"
-                            : "hover:bg-ruralia-teal-soft/60 text-zinc-800"
-                        }`}
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate font-medium">
-                            {p.nombreCompleto}
-                          </span>
-                          {p.proyectoNombre && !proyectoId ? (
-                            <span
-                              className={`block truncate text-xs ${
-                                activo ? "text-white/80" : "text-zinc-500"
-                              }`}
-                            >
-                              {p.proyectoNombre}
-                            </span>
-                          ) : null}
-                        </span>
-                        <span
-                          className={`shrink-0 text-xs font-bold ${
-                            activo ? "text-white" : "text-ruralia-teal-text"
-                          }`}
-                        >
-                          {p.indiceEficiencia ?? 0}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </aside>
-
-          <div className="min-w-0">
-            {!usuarioId ? (
-              <div className="rounded-2xl border border-dashed border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500">
-                Selecciona un agente de la lista para ver su ficha: cumplimiento,
-                metas asignadas y desviaciones vs planeación.
-              </div>
-            ) : !detalle ? (
-              <Spinner />
-            ) : (
-              <div className="space-y-6">
-                <section className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
-                  <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-zinc-900">
-                        {detalle.usuario.nombreCompleto}
-                      </h3>
-                      <p className="text-sm text-zinc-500">
-                        {detalle.usuario.correo}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={descargandoPdfFicha}
-                      onClick={() => void descargarPdfFicha()}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      {descargandoPdfFicha ? "Generando…" : "Descargar PDF"}
-                    </button>
-                  </div>
-
-                  <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                    <Metrica
-                      etiqueta="Cumplimiento promedio"
-                      valor={`${detalle.cumplimientoPromedio}%`}
-                    />
-                    <Metrica
-                      etiqueta="Asignado / Ejecutado"
-                      valor={`${detalle.totalAsignado} / ${detalle.totalEjecutado}`}
-                    />
-                    <Metrica
-                      etiqueta="Jornadas"
-                      valor={String(detalle.conteoJornadas)}
-                    />
-                    <Metrica
-                      etiqueta="Beneficiarios / Veredas"
-                      valor={`${detalle.beneficiariosAtendidos} / ${detalle.veredasCubiertas}`}
-                    />
-                    <Metrica
-                      etiqueta="Rechazos en revisión"
-                      valor={String(detalle.rechazosRevision ?? 0)}
-                    />
-                  </div>
-
-                  {detalle.asignaciones.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[520px] text-left text-sm">
-                        <thead>
-                          <tr className="border-b border-zinc-100 text-xs uppercase text-zinc-500">
-                            <th className="pb-2 pr-3 font-semibold">Meta</th>
-                            <th className="pb-2 pr-3 font-semibold">Periodo</th>
-                            <th className="pb-2 pr-3 font-semibold">Asignado</th>
-                            <th className="pb-2 pr-3 font-semibold">Ejecutado</th>
-                            <th className="pb-2 font-semibold">%</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {detalle.asignaciones.map((a) => (
-                            <tr key={a.id} className="border-b border-zinc-50">
-                              <td className="py-2 pr-3">
-                                <span className="font-medium text-zinc-800">
-                                  {a.metaNombre}
-                                </span>
-                                <span className="ml-1 text-xs text-zinc-400">
-                                  ({a.unidadMedida})
-                                </span>
-                              </td>
-                              <td className="py-2 pr-3 text-zinc-600">
-                                {a.anio && a.mes
-                                  ? `${MESES[a.mes - 1]} ${a.anio}`
-                                  : "Total"}
-                              </td>
-                              <td className="py-2 pr-3">{a.cantidadAsignada}</td>
-                              <td className="py-2 pr-3">{a.ejecutado}</td>
-                              <td className="py-2 font-semibold">
-                                {a.cumplimientoPorcentaje}%
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-zinc-500">
-                      Esta persona no tiene cuotas asignadas en el filtro
-                      actual. Sus jornadas y cobertura sí se muestran arriba.
-                    </p>
-                  )}
-                </section>
-
-                {desviaciones ? (
-                  <section className="rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-sm">
-                    <h3 className="mb-1 text-lg font-semibold text-zinc-900">
-                      Desviaciones vs planeación
-                    </h3>
-                    <p className="mb-4 text-sm text-zinc-500">
-                      {MESES[desviaciones.mes - 1]} {desviaciones.anio} — cuántas
-                      metas personales no se cumplieron
-                    </p>
-                    <div className="mb-5 grid gap-3 sm:grid-cols-3">
-                      <Metrica
-                        etiqueta="Metas con cuota"
-                        valor={String(desviaciones.metasConCuota)}
-                      />
-                      <Metrica
-                        etiqueta="Fallos sin ejecución"
-                        valor={String(desviaciones.fallosSinEjecucion)}
-                      />
-                      <Metrica
-                        etiqueta="Incumplimientos (<100%)"
-                        valor={String(desviaciones.incumplimientos)}
-                      />
-                    </div>
-                    {desviaciones.detalle.length > 0 ? (
-                      <ul className="space-y-2 text-sm">
-                        {desviaciones.detalle.map((d) => (
-                          <li
-                            key={d.metaId}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-100 px-3 py-2"
-                          >
-                            <span className="font-medium text-zinc-800">
-                              {d.metaNombre}
-                            </span>
-                            <span className="text-zinc-600">
-                              {d.ejecutado}/{d.cantidadAsignada} {d.unidadMedida}{" "}
-                              ({d.cumplimientoPorcentaje}%)
-                            </span>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                                d.sinEjecucion
-                                  ? "bg-red-50 text-red-700"
-                                  : d.incumplida
-                                    ? "bg-amber-50 text-amber-800"
-                                    : "bg-ruralia-teal-soft text-ruralia-teal-text"
-                              }`}
-                            >
-                              {d.sinEjecucion
-                                ? "Sin ejecución"
-                                : d.incumplida
-                                  ? "Incumplida"
-                                  : "Cumplida"}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-zinc-500">
-                        Sin cuotas en este periodo para calcular desviaciones.
-                      </p>
-                    )}
-                  </section>
-                ) : null}
-              </div>
-            )}
-          </div>
+      ) : !proyectoId ? (
+        <div className="rounded-2xl border border-dashed border-ruralia-teal-border bg-white px-6 py-12 text-center text-sm text-zinc-600">
+          Selecciona un proyecto para repartir las cuotas de sus metas entre el
+          equipo.
         </div>
-      ) : null}
+      ) : cargando || !proyectoCuotas ? (
+        <Spinner />
+      ) : (
+        <PanelAsignaciones
+          token={token!}
+          proyectoId={proyectoId}
+          proyecto={proyectoCuotas}
+          plan={planCuotas}
+          puedeGestionar={puedeGestionar}
+        />
+      )}
     </>
-  );
-}
-
-function Metrica({ etiqueta, valor }: { etiqueta: string; valor: string }) {
-  return (
-    <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3">
-      <p className="text-xs text-zinc-500">{etiqueta}</p>
-      <p className="mt-1 text-xl font-bold text-zinc-900">{valor}</p>
-    </div>
   );
 }

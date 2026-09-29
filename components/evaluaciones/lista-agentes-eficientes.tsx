@@ -10,6 +10,7 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import { nivelIndice } from "@/components/evaluaciones/indicadores-evaluacion";
 import type { ProductividadPersona } from "@/lib/types";
 
 interface ListaAgentesEficientesProps {
@@ -33,25 +34,6 @@ function medalla(puesto: number): string {
   if (puesto === 2) return "2.º";
   if (puesto === 3) return "3.º";
   return `${puesto}.º`;
-}
-
-function etiquetaEficiencia(indice: number): {
-  texto: string;
-  clase: string;
-} {
-  if (indice >= 80)
-    return {
-      texto: "Elite de campo",
-      clase: "bg-ruralia-teal-soft text-ruralia-teal-text",
-    };
-  if (indice >= 60)
-    return {
-      texto: "Alto rendimiento",
-      clase: "bg-emerald-50 text-emerald-800",
-    };
-  if (indice >= 40)
-    return { texto: "En ritmo", clase: "bg-amber-50 text-amber-800" };
-  return { texto: "Por impulsar", clase: "bg-zinc-100 text-zinc-600" };
 }
 
 export function ListaAgentesEficientes({
@@ -95,7 +77,7 @@ export function ListaAgentesEficientes({
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {top.map((p, i) => {
-          const badge = etiquetaEficiencia(p.indiceEficiencia);
+          const badge = nivelIndice(p.indiceEficiencia);
           const Nombre = onSeleccionar ? (
             <button
               type="button"

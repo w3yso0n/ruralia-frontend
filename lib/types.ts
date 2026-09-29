@@ -1311,7 +1311,10 @@ export interface ProductividadPersona {
   nombreCompleto: string;
   cantidadAsignada: number;
   ejecutado: number;
+  /** Promedio del cumplimiento de cada cuota (cada meta pesa igual). */
   cumplimientoPorcentaje: number;
+  /** Cuotas personales evaluadas en el periodo. */
+  cuotasAsignadas: number;
   indiceEficiencia: number;
   conteoJornadas: number;
   jornadasAprobadas: number;
