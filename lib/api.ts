@@ -16,6 +16,8 @@ import type {
   AvancePeriodo,
   BandejaAprobacion,
   Beneficiario,
+  EstadoFiltroBeneficiario,
+  UsoBeneficiario,
   CompletarNodoPayload,
   ContadoresAprobacion,
   CrearActividadPayload,
@@ -180,6 +182,47 @@ export async function listarTodasLasPaginas<T>(
 
 export async function obtenerUsuarioActual(token: string): Promise<Usuario> {
   return fetchConAuth<Usuario>("/autenticacion/yo", token);
+}
+
+/** Convierte rutas relativas del API (`subidas/...`) en URL absolutas; deja intactas las externas. */
+export function urlPublicaArchivo(ruta: string): string {
+  if (/^https?:\/\//i.test(ruta) || ruta.startsWith("data:")) return ruta;
+  return `${API_URL}/${ruta.replace(/^\//, "")}`;
+}
+
+export async function subirFotoPerfil(
+  token: string,
+  archivo: File,
+): Promise<Usuario> {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  const respuesta = await fetch(`${API_URL}/autenticacion/yo/foto`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    let mensaje = cuerpo || respuesta.statusText;
+    try {
+      const json = JSON.parse(cuerpo) as { message?: string | string[] };
+      if (json.message) {
+        mensaje = Array.isArray(json.message)
+          ? json.message.join(" ")
+          : json.message;
+      }
+    } catch {
+      // texto crudo
+    }
+    throw new ErrorApi(mensaje, respuesta.status);
+  }
+  return respuesta.json() as Promise<Usuario>;
+}
+
+export async function eliminarFotoPerfil(token: string): Promise<Usuario> {
+  return fetchConAuth<Usuario>("/autenticacion/yo/foto", token, {
+    method: "DELETE",
+  });
 }
 
 export async function listarUsuarios(
@@ -465,13 +508,102 @@ export async function descargarPlantillaBeneficiarios(
   );
 }
 
+export async function descargarPlantillaBeneficiariosCatalogo(
+  token: string,
+): Promise<void> {
+  const respuesta = await fetch(
+    `${API_URL}/beneficiarios/plantilla-excel`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    throw new ErrorApi(
+      cuerpo || respuesta.statusText,
+      respuesta.status,
+    );
+  }
+  dispararDescargaBlob(
+    await respuesta.blob(),
+    "plantilla-beneficiarios.xlsx",
+  );
+}
+
+export async function importarBeneficiariosExcelCatalogo(
+  token: string,
+  archivo: File,
+  veredaId: string,
+): Promise<ResultadoCargaMasivaBeneficiarios> {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  formData.append("veredaId", veredaId);
+  const respuesta = await fetch(`${API_URL}/beneficiarios/importar`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    let mensaje = cuerpo || respuesta.statusText;
+    try {
+      const json = JSON.parse(cuerpo) as { message?: string | string[] };
+      if (json.message) {
+        mensaje = Array.isArray(json.message)
+          ? json.message.join(". ")
+          : json.message;
+      }
+    } catch {
+      /* el cuerpo no es JSON */
+    }
+    throw new ErrorApi(mensaje, respuesta.status);
+  }
+  return respuesta.json() as Promise<ResultadoCargaMasivaBeneficiarios>;
+}
+
+export async function previsualizarBeneficiariosExcel(
+  token: string,
+  archivo: File,
+  contexto: "proyecto" | "catalogo",
+): Promise<FilaExcelBeneficiarioPreview[]> {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  const ruta =
+    contexto === "catalogo"
+      ? `${API_URL}/beneficiarios/previsualizar`
+      : `${API_URL}/proyectos/beneficiarios-excel/previsualizar`;
+  const respuesta = await fetch(ruta, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.text();
+    throw new ErrorApi(cuerpo || respuesta.statusText, respuesta.status);
+  }
+  const json = (await respuesta.json()) as {
+    filas: FilaExcelBeneficiarioPreview[];
+  };
+  return json.filas;
+}
+
+export interface FilaExcelBeneficiarioPreview {
+  fila: number;
+  nombres: string;
+  apellidos: string;
+  identificador: string;
+  tipoDocumento: string;
+  telefono?: string;
+  correo?: string;
+}
+
 export async function importarBeneficiariosExcelProyecto(
   token: string,
   proyectoId: string,
   archivo: File,
+  veredaId: string,
 ): Promise<ResultadoCargaMasivaBeneficiarios> {
   const formData = new FormData();
   formData.append("archivo", archivo);
+  formData.append("veredaId", veredaId);
   const respuesta = await fetch(
     `${API_URL}/proyectos/${proyectoId}/beneficiarios/importar`,
     {
@@ -985,7 +1117,13 @@ export async function descargarPdfFormularioJornada(
 
 export async function listarBeneficiarios(
   token: string,
-  params?: { busqueda?: string; veredaId?: string; pagina?: number; limite?: number },
+  params?: {
+    busqueda?: string;
+    veredaId?: string;
+    estado?: EstadoFiltroBeneficiario;
+    pagina?: number;
+    limite?: number;
+  },
 ): Promise<RespuestaPaginada<Beneficiario>> {
   return fetchConAuth<RespuestaPaginada<Beneficiario>>(
     `/beneficiarios${construirQuery(params)}`,
@@ -1031,6 +1169,33 @@ export async function actualizarBeneficiario(
   });
 }
 
+/** Reversible: se puede reactivar desde la pestaña Desactivados. */
+export async function desactivarBeneficiario(
+  token: string,
+  id: string,
+): Promise<Beneficiario> {
+  return fetchConAuth<Beneficiario>(`/beneficiarios/${id}/desactivar`, token, {
+    method: "POST",
+  });
+}
+
+export async function reactivarBeneficiario(
+  token: string,
+  id: string,
+): Promise<Beneficiario> {
+  return fetchConAuth<Beneficiario>(`/beneficiarios/${id}/reactivar`, token, {
+    method: "POST",
+  });
+}
+
+export async function obtenerUsoBeneficiario(
+  token: string,
+  id: string,
+): Promise<UsoBeneficiario> {
+  return fetchConAuth<UsoBeneficiario>(`/beneficiarios/${id}/uso`, token);
+}
+
+/** No reversible. */
 export async function eliminarBeneficiario(
   token: string,
   id: string,
@@ -1075,7 +1240,12 @@ export async function eliminarAsociacion(
 
 export async function listarVeredas(
   token: string,
-  params?: { busqueda?: string; pagina?: number; limite?: number },
+  params?: {
+    busqueda?: string;
+    pagina?: number;
+    limite?: number;
+    soloDane?: boolean;
+  },
 ): Promise<RespuestaPaginada<Vereda>> {
   return fetchConAuth<RespuestaPaginada<Vereda>>(
     `/territorios/veredas${construirQuery(params)}`,
@@ -2141,6 +2311,7 @@ export async function descargarExpedienteZip(
     hasta?: string;
     procesoId?: string;
     agenteId?: string;
+    incluirExternos?: boolean;
   },
 ): Promise<{ blob: Blob; nombre: string }> {
   const respuesta = await fetch(

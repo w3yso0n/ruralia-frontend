@@ -130,10 +130,6 @@ const SECCIONES: SeccionNav[] = [
         href: "/configuracion",
         etiqueta: "Configuración",
         icono: Settings,
-        puedeAlgunoDe: [
-          "configuracion.editar_dashboard",
-          "configuracion.gestionar_plantillas",
-        ],
       },
     ],
   },

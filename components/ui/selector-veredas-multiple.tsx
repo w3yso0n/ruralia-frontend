@@ -26,6 +26,7 @@ type ModoSeleccion = "maps" | "dane";
 interface VeredaOpcion {
   id: string;
   nombre: string;
+  codigo?: string;
   municipioNombre?: string;
   departamentoNombre?: string;
   latitud?: number;
@@ -36,6 +37,7 @@ interface SelectorVeredasMultipleProps {
   token: string;
   value: string[];
   onChange: (ids: string[]) => void;
+  onSeleccion?: (veredas: VeredaOpcion[]) => void;
   veredasIniciales?: (Vereda | VeredaResumen)[];
   placeholder?: string;
 }
@@ -51,6 +53,7 @@ function aOpcion(v: Vereda | VeredaResumen): VeredaOpcion {
   return {
     id: v.id,
     nombre: v.nombre,
+    codigo: v.codigo,
     municipioNombre: "municipioNombre" in v ? v.municipioNombre : undefined,
     departamentoNombre:
       "departamentoNombre" in v ? v.departamentoNombre : undefined,
@@ -72,6 +75,7 @@ export function SelectorVeredasMultiple({
   token,
   value,
   onChange,
+  onSeleccion,
   veredasIniciales = [],
   placeholder = "Buscar vereda, municipio o departamento…",
 }: SelectorVeredasMultipleProps) {
@@ -89,6 +93,8 @@ export function SelectorVeredasMultiple({
   const listenersMapaRef = useRef<google.maps.MapsEventListener[]>([]);
   const valueRef = useRef(value);
   valueRef.current = value;
+  const onSeleccionRef = useRef(onSeleccion);
+  onSeleccionRef.current = onSeleccion;
 
   const [modo, setModo] = useState<ModoSeleccion>("dane");
   const [busqueda, setBusqueda] = useState("");
@@ -150,6 +156,14 @@ export function SelectorVeredasMultiple({
       return siguiente;
     });
   }, [veredasIniciales]);
+
+  useEffect(() => {
+    onSeleccionRef.current?.(
+      value
+        .map((id) => catalogo.get(id))
+        .filter((vereda): vereda is VeredaOpcion => Boolean(vereda)),
+    );
+  }, [catalogo, value]);
 
   useEffect(() => {
     function cerrarSiClickFuera(evento: MouseEvent) {
@@ -544,6 +558,7 @@ export function SelectorVeredasMultiple({
     agregarVereda({
       id: nodo.id,
       nombre: nodo.nombre,
+      codigo: nodo.codigo,
       municipioNombre: mun?.nombre,
       departamentoNombre: dept?.nombre,
     });

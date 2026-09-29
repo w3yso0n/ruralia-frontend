@@ -1,12 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Users } from "lucide-react";
 import { Alerta, Modal, Spinner } from "@/components/ui/modal";
+import {
+  SelectorCatalogo,
+  type OpcionCatalogo,
+} from "@/components/ui/selector-catalogo";
 import {
   actualizarAsociacion,
   crearAsociacion,
   eliminarAsociacion,
   listarAsociaciones,
+  listarBeneficiarios,
+  listarTodasLasPaginas,
   obtenerAsociacion,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -27,6 +34,7 @@ interface FormularioAsociacion {
   veredaId: string;
   telefono: string;
   correo: string;
+  beneficiarioIds: string[];
 }
 
 const FORM_VACIO: FormularioAsociacion = {
@@ -36,7 +44,12 @@ const FORM_VACIO: FormularioAsociacion = {
   veredaId: "",
   telefono: "",
   correo: "",
+  beneficiarioIds: [],
 };
+
+function nombreBeneficiario(b: { nombres: string; apellidos: string }) {
+  return `${b.nombres} ${b.apellidos}`.trim();
+}
 
 interface GestionAsociacionesProps {
   puedeGestionar: boolean;
@@ -62,7 +75,41 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
     null,
   );
 
+  const [opcionesBeneficiarios, setOpcionesBeneficiarios] = useState<
+    OpcionCatalogo[] | null
+  >(null);
+  const [cargandoBeneficiarios, setCargandoBeneficiarios] = useState(false);
+
   const limite = 10;
+
+  /** Catálogo de beneficiarios activos para agrupar; se carga una sola vez al abrir el formulario. */
+  async function asegurarOpcionesBeneficiarios() {
+    if (!token || opcionesBeneficiarios || cargandoBeneficiarios) return;
+    setCargandoBeneficiarios(true);
+    try {
+      const beneficiarios = await listarTodasLasPaginas((pag, lim) =>
+        listarBeneficiarios(token, { pagina: pag, limite: lim }),
+      );
+      setOpcionesBeneficiarios(
+        beneficiarios.map((b) => ({
+          id: b.id,
+          nombre: nombreBeneficiario(b),
+          subtitulo: [
+            `${b.tipoDocumento} ${b.numeroDocumento}`,
+            b.vereda?.nombre,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        })),
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Error al cargar beneficiarios",
+      );
+    } finally {
+      setCargandoBeneficiarios(false);
+    }
+  }
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -94,6 +141,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
     setVeredaSeleccionada(null);
     setSeleccionado(null);
     setModo("crear");
+    void asegurarOpcionesBeneficiarios();
   }
 
   async function abrirVer(id: string) {
@@ -128,8 +176,10 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
         veredaId: item.vereda?.id ?? "",
         telefono: item.telefono ?? "",
         correo: item.correo ?? "",
+        beneficiarioIds: (item.beneficiarios ?? []).map((b) => b.id),
       });
       setModo("editar");
+      void asegurarOpcionesBeneficiarios();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar");
     }
@@ -150,6 +200,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
       veredaId: formulario.veredaId,
       telefono: formulario.telefono.trim() || undefined,
       correo: formulario.correo.trim() || undefined,
+      beneficiarioIds: formulario.beneficiarioIds,
     };
   }
 
@@ -197,7 +248,8 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
     <>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-zinc-600">
-          Organizaciones que pueden vincularse como contraparte de un proyecto.
+          Organizaciones que agrupan beneficiarios y pueden vincularse como
+          contraparte de un proyecto.
         </p>
         {puedeGestionar ? (
           <button
@@ -238,6 +290,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                   <th className="px-5 py-3 font-semibold">NIT</th>
                   <th className="px-5 py-3 font-semibold">Representante</th>
                   <th className="px-5 py-3 font-semibold">Vereda</th>
+                  <th className="px-5 py-3 font-semibold">Beneficiarios</th>
                   <th className="px-5 py-3 font-semibold">Estado</th>
                   <th className="px-5 py-3 font-semibold">Acciones</th>
                 </tr>
@@ -245,7 +298,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
               <tbody className="divide-y divide-zinc-100">
                 {asociaciones.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-zinc-500">
+                    <td colSpan={7} className="px-5 py-8 text-center text-zinc-500">
                       No se encontraron asociaciones
                     </td>
                   </tr>
@@ -261,6 +314,12 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                       </td>
                       <td className="px-5 py-3 text-zinc-600">
                         {a.vereda?.nombre ?? "—"}
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs font-semibold text-ruralia-teal-text">
+                          <Users className="h-3.5 w-3.5" />
+                          {a.totalBeneficiarios ?? 0}
+                        </span>
                       </td>
                       <td className="px-5 py-3">
                         <span
@@ -347,7 +406,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
         }
         abierto={modo !== null}
         onCerrar={cerrarModal}
-        ancho={modo === "ver" ? "lg" : "md"}
+        ancho="lg"
       >
         {modo === "ver" && seleccionado ? (
           <dl className="grid gap-4 text-sm sm:grid-cols-2">
@@ -381,6 +440,35 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                 {seleccionado.estaActivo ? "Activa" : "Inactiva"}
               </dd>
             </div>
+            <div className="sm:col-span-2">
+              <dt className="mb-2 text-zinc-500">
+                Beneficiarios ({seleccionado.beneficiarios?.length ?? 0})
+              </dt>
+              <dd>
+                {seleccionado.beneficiarios?.length ? (
+                  <ul className="max-h-64 divide-y divide-zinc-100 overflow-y-auto rounded-xl border border-ruralia-teal-border">
+                    {seleccionado.beneficiarios.map((b) => (
+                      <li
+                        key={b.id}
+                        className="flex items-center justify-between gap-3 px-3 py-2"
+                      >
+                        <span className="truncate font-medium text-zinc-900">
+                          {nombreBeneficiario(b)}
+                        </span>
+                        <span className="shrink-0 text-xs text-zinc-500">
+                          {b.tipoDocumento} {b.numeroDocumento}
+                          {b.vereda?.nombre ? ` · ${b.vereda.nombre}` : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-zinc-500">
+                    Esta asociación todavía no agrupa beneficiarios.
+                  </p>
+                )}
+              </dd>
+            </div>
           </dl>
         ) : (
           <form onSubmit={manejarSubmit} className="space-y-4">
@@ -394,7 +482,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                 onChange={(e) =>
                   setFormulario((f) => ({ ...f, nombre: e.target.value }))
                 }
-                className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+                className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm"
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -408,7 +496,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                   onChange={(e) =>
                     setFormulario((f) => ({ ...f, nit: e.target.value }))
                   }
-                  className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm"
                 />
               </div>
               <div>
@@ -424,7 +512,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                       nombreRepresentante: e.target.value,
                     }))
                   }
-                  className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm"
                 />
               </div>
             </div>
@@ -450,7 +538,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                   onChange={(e) =>
                     setFormulario((f) => ({ ...f, telefono: e.target.value }))
                   }
-                  className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm"
                 />
               </div>
               <div>
@@ -463,9 +551,32 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                   onChange={(e) =>
                     setFormulario((f) => ({ ...f, correo: e.target.value }))
                   }
-                  className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm"
                 />
               </div>
+            </div>
+            <div className="rounded-2xl border border-ruralia-teal-border bg-ruralia-teal-soft/30 p-4">
+              <p className="text-sm font-medium text-zinc-700">
+                Beneficiarios de la asociación
+              </p>
+              <p className="mb-3 text-xs text-zinc-500">
+                Elige beneficiarios ya registrados. Uno puede pertenecer a varias
+                asociaciones.
+              </p>
+              {cargandoBeneficiarios || !opcionesBeneficiarios ? (
+                <Spinner className="py-6" />
+              ) : (
+                <SelectorCatalogo
+                  multiple
+                  opciones={opcionesBeneficiarios}
+                  value={formulario.beneficiarioIds}
+                  onChange={(beneficiarioIds) =>
+                    setFormulario((f) => ({ ...f, beneficiarioIds }))
+                  }
+                  placeholder="Buscar por nombre o documento..."
+                  mensajeVacio="Sin beneficiarios agrupados todavía."
+                />
+              )}
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button

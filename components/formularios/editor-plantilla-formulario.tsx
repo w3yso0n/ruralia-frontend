@@ -33,34 +33,19 @@ import { Alerta, Spinner } from "@/components/ui/modal";
 import {
   actualizarPlantillaFormulario,
   crearPlantillaFormulario,
-  listarProyectos,
-  listarUsuarios,
-  obtenerPlanProyecto,
   obtenerPlantillaFormulario,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type {
   CampoFormularioPayload,
   ColumnaCampoTabla,
-  Proyecto,
   TipoCampoColumnaTabla,
   TipoCampoFormulario,
   TipoPlantillaFormulario,
-  Usuario,
 } from "@/lib/types";
 
 interface EditorPlantillaFormularioProps {
   plantillaId?: string;
-}
-
-interface OpcionProceso {
-  id: string;
-  etiqueta: string;
-}
-
-interface GrupoProyecto {
-  proyecto: Proyecto;
-  procesos: OpcionProceso[];
 }
 
 interface ColumnaEnEdicion extends ColumnaCampoTabla {
@@ -409,52 +394,7 @@ export function EditorPlantillaFormulario({
     useState<TipoPlantillaFormulario>("INDIVIDUAL");
   const [estaActivo, setEstaActivo] = useState(false);
 
-  const [grupos, setGrupos] = useState<GrupoProyecto[]>([]);
-  const [procesoIds, setProcesoIds] = useState<string[]>([]);
-
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
-
   const [campos, setCampos] = useState<CampoEnEdicion[]>([campoVacio(0)]);
-  const [mostrarAsignacion, setMostrarAsignacion] = useState(false);
-
-  useEffect(() => {
-    if (!token) return;
-    listarProyectos(token, { limite: 100 })
-      .then(async (respuesta) => {
-        const gruposCargados: GrupoProyecto[] = [];
-        for (const proyecto of respuesta.datos) {
-          const plan = await obtenerPlanProyecto(token, proyecto.id);
-          const procesos: OpcionProceso[] = [];
-          for (const actividad of plan.actividades) {
-            for (const sub of actividad.subactividades ?? []) {
-              for (const proceso of sub.procesos ?? []) {
-                procesos.push({
-                  id: proceso.id,
-                  etiqueta: `${actividad.nombre} — ${sub.nombre} — ${proceso.nombre}`,
-                });
-              }
-            }
-          }
-          if (procesos.length) {
-            gruposCargados.push({ proyecto, procesos });
-          }
-        }
-        setGrupos(gruposCargados);
-      })
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Error al cargar proyectos"),
-      );
-  }, [token]);
-
-  useEffect(() => {
-    if (!token) return;
-    listarUsuarios(token, { limite: 100, estaActivo: true })
-      .then((r) => setUsuarios(r.datos))
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Error al cargar usuarios"),
-      );
-  }, [token]);
 
   useEffect(() => {
     if (!esEdicion || !token || !plantillaId) return;
@@ -465,14 +405,6 @@ export function EditorPlantillaFormulario({
         setDescripcion(plantilla.descripcion ?? "");
         setTipoPlantilla(plantilla.tipoPlantilla ?? "INDIVIDUAL");
         setEstaActivo(plantilla.estaActivo);
-        setProcesoIds(plantilla.procesoIds ?? []);
-        setUsuarioIds(plantilla.usuarioIds ?? []);
-        if (
-          (plantilla.procesoIds?.length ?? 0) > 0 ||
-          (plantilla.usuarioIds?.length ?? 0) > 0
-        ) {
-          setMostrarAsignacion(true);
-        }
         setCampos(
           (plantilla.campos ?? [])
             .slice()
@@ -505,18 +437,6 @@ export function EditorPlantillaFormulario({
       )
       .finally(() => setCargando(false));
   }, [esEdicion, token, plantillaId]);
-
-  function alternarProceso(id: string) {
-    setProcesoIds((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
-    );
-  }
-
-  function alternarUsuario(id: string) {
-    setUsuarioIds((prev) =>
-      prev.includes(id) ? prev.filter((u) => u !== id) : [...prev, id],
-    );
-  }
 
   function actualizarCampo(indice: number, cambios: Partial<CampoEnEdicion>) {
     setCampos((prev) => {
@@ -699,8 +619,6 @@ export function EditorPlantillaFormulario({
           nombre,
           descripcion: descripcion || undefined,
           tipoPlantilla,
-          procesoIds,
-          usuarioIds,
           campos: camposPayload,
         });
       } else {
@@ -708,8 +626,6 @@ export function EditorPlantillaFormulario({
           nombre,
           descripcion: descripcion || undefined,
           tipoPlantilla,
-          procesoIds,
-          usuarioIds,
           campos: camposPayload,
         });
       }
@@ -1083,104 +999,6 @@ export function EditorPlantillaFormulario({
           </div>
         </section>
 
-        <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
-          <button
-            type="button"
-            onClick={() => setMostrarAsignacion((v) => !v)}
-            className="flex w-full items-center justify-between gap-3 text-left"
-          >
-            <span>
-              <span className="block text-base font-semibold text-zinc-900">
-                3. Dónde se usa{" "}
-                <span className="font-normal text-zinc-400">(opcional)</span>
-              </span>
-              <span className="mt-0.5 block text-sm text-zinc-500">
-                Si lo dejas vacío, luego lo asignas desde la lista de formularios.
-              </span>
-            </span>
-            <ChevronDown
-              className={`h-5 w-5 shrink-0 text-zinc-400 transition ${
-                mostrarAsignacion ? "rotate-180" : ""
-              }`}
-            />
-          </button>
-
-          {mostrarAsignacion ? (
-            <div className="mt-5 space-y-6 border-t border-zinc-100 pt-5">
-              <div>
-                <p className="mb-1 text-sm font-medium text-zinc-800">
-                  Procesos del plan
-                </p>
-                <p className="mb-3 text-xs text-zinc-500">
-                  El técnico lo verá al registrar jornadas de esos procesos.
-                </p>
-                {grupos.length === 0 ? (
-                  <p className="text-sm text-zinc-500">
-                    Todavía no hay procesos en los proyectos. Se configuran en
-                    Plan del proyecto.
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {grupos.map((grupo) => (
-                      <div key={grupo.proyecto.id}>
-                        <p className="mb-2 text-xs font-semibold text-zinc-500">
-                          {grupo.proyecto.nombre}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {grupo.procesos.map((proceso) => (
-                            <button
-                              key={proceso.id}
-                              type="button"
-                              onClick={() => alternarProceso(proceso.id)}
-                              className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                                procesoIds.includes(proceso.id)
-                                  ? "bg-ruralia-teal text-white"
-                                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                              }`}
-                            >
-                              {proceso.etiqueta}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <p className="mb-1 text-sm font-medium text-zinc-800">
-                  Personas concretas
-                </p>
-                <p className="mb-3 text-xs text-zinc-500">
-                  Para encuestas que no van ligadas a una jornada.
-                </p>
-                {usuarios.length === 0 ? (
-                  <p className="text-sm text-zinc-500">
-                    No hay usuarios activos todavía.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {usuarios.map((usuario) => (
-                      <button
-                        key={usuario.id}
-                        type="button"
-                        onClick={() => alternarUsuario(usuario.id)}
-                        className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                          usuarioIds.includes(usuario.id)
-                            ? "bg-ruralia-teal text-white"
-                            : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                        }`}
-                      >
-                        {usuario.nombreCompleto}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : null}
-        </section>
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button

@@ -21,9 +21,8 @@ export function GestionContrapartes() {
           Beneficiarios y asociaciones
         </h2>
         <p className="mt-1 text-zinc-600">
-          Catálogo general. Un proyecto puede tener varios beneficiarios y
-          varias asociaciones a la vez; la carga masiva por Excel se hace al
-          crear o editar el proyecto.
+          Catálogo general. Aquí puedes dar de alta beneficiarios por Excel.
+          En cada proyecto se elige cuáles de ellos participan.
         </p>
       </div>
 

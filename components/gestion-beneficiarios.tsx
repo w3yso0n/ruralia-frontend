@@ -1,15 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AlertTriangle, EyeOff, Trash2 } from "lucide-react";
 import { Alerta, Modal, Spinner } from "@/components/ui/modal";
 import {
   actualizarBeneficiario,
   crearBeneficiario,
+  desactivarBeneficiario,
   eliminarBeneficiario,
+  importarBeneficiariosExcelCatalogo,
   listarBeneficiarios,
   obtenerBeneficiario,
+  obtenerUsoBeneficiario,
+  reactivarBeneficiario,
 } from "@/lib/api";
+import { CargaExcelBeneficiarios } from "@/components/proyectos/carga-excel-beneficiarios";
 import { useAuth } from "@/lib/auth-context";
+import { usePermisos } from "@/lib/use-permisos";
 import { SelectorVereda } from "@/components/ui/selector-vereda";
 import {
   btnAccionPeligro,
@@ -19,8 +26,10 @@ import {
 import type {
   Beneficiario,
   CrearBeneficiarioPayload,
+  EstadoFiltroBeneficiario,
   Genero,
   TipoDocumento,
+  UsoBeneficiario,
   Vereda,
 } from "@/lib/types";
 
@@ -67,8 +76,16 @@ interface GestionBeneficiariosProps {
   puedeGestionar: boolean;
 }
 
+const PESTANAS: { valor: EstadoFiltroBeneficiario; etiqueta: string }[] = [
+  { valor: "activos", etiqueta: "Activos" },
+  { valor: "desactivados", etiqueta: "Desactivados" },
+];
+
 export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosProps) {
   const { token } = useAuth();
+  const { puede } = usePermisos();
+  const puedeEliminar = puede("contrapartes.eliminar");
+  const [estado, setEstado] = useState<EstadoFiltroBeneficiario>("activos");
   const [beneficiarios, setBeneficiarios] = useState<Beneficiario[]>([]);
   const [veredaSeleccionada, setVeredaSeleccionada] = useState<Vereda | null>(
     null,
@@ -83,9 +100,13 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
   const [seleccionado, setSeleccionado] = useState<Beneficiario | null>(null);
   const [formulario, setFormulario] = useState<FormularioBeneficiario>(FORM_VACIO);
   const [enviando, setEnviando] = useState(false);
+  const [confirmarDesactivar, setConfirmarDesactivar] =
+    useState<Beneficiario | null>(null);
   const [confirmarEliminar, setConfirmarEliminar] = useState<Beneficiario | null>(
     null,
   );
+  const [archivoExcel, setArchivoExcel] = useState<File | null>(null);
+  const [importando, setImportando] = useState(false);
 
   const limite = 10;
 
@@ -98,6 +119,7 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
         pagina,
         limite,
         busqueda: busqueda || undefined,
+        estado,
       });
       setBeneficiarios(respuesta.datos);
       setTotal(respuesta.total);
@@ -108,7 +130,7 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
     } finally {
       setCargando(false);
     }
-  }, [token, pagina, busqueda]);
+  }, [token, pagina, busqueda, estado]);
 
   useEffect(() => {
     void cargar();
@@ -206,20 +228,88 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
     }
   }
 
-  async function manejarEliminar() {
-    if (!confirmarEliminar || !token) return;
-    setEnviando(true);
+  async function importarExcel(archivo: File, veredaId: string) {
+    if (!token) return;
+    setImportando(true);
     setError(null);
+    setExito(null);
     try {
-      await eliminarBeneficiario(token, confirmarEliminar.id);
-      setExito("Beneficiario desactivado correctamente");
-      setConfirmarEliminar(null);
+      const resultado = await importarBeneficiariosExcelCatalogo(
+        token,
+        archivo,
+        veredaId,
+      );
+      setExito(
+        `Carga lista: ${resultado.creados} dadas de alta, ${resultado.asignadosExistentes} ya estaban activas${
+          resultado.errores ? `, ${resultado.errores} con error` : ""
+        }.`,
+      );
+      setArchivoExcel(null);
+      setPagina(1);
       await cargar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al eliminar");
+      setError(err instanceof Error ? err.message : "No se pudo cargar el Excel");
+    } finally {
+      setImportando(false);
+    }
+  }
+
+  async function ejecutarAccion(
+    accion: () => Promise<unknown>,
+    mensajeExito: string,
+    mensajeError: string,
+  ) {
+    setEnviando(true);
+    setError(null);
+    setExito(null);
+    try {
+      await accion();
+      setExito(mensajeExito);
+      await cargar();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : mensajeError);
+      return false;
     } finally {
       setEnviando(false);
     }
+  }
+
+  async function manejarDesactivar() {
+    if (!confirmarDesactivar || !token) return;
+    const b = confirmarDesactivar;
+    const ok = await ejecutarAccion(
+      () => desactivarBeneficiario(token, b.id),
+      `${b.nombres} ${b.apellidos} quedó desactivado. Lo encuentras en la pestaña Desactivados.`,
+      "Error al desactivar",
+    );
+    if (ok) setConfirmarDesactivar(null);
+  }
+
+  async function manejarReactivar(b: Beneficiario) {
+    if (!token) return;
+    await ejecutarAccion(
+      () => reactivarBeneficiario(token, b.id),
+      `${b.nombres} ${b.apellidos} volvió a estar activo.`,
+      "Error al reactivar",
+    );
+  }
+
+  async function manejarEliminar() {
+    if (!confirmarEliminar || !token) return;
+    const b = confirmarEliminar;
+    const ok = await ejecutarAccion(
+      () => eliminarBeneficiario(token, b.id),
+      `${b.nombres} ${b.apellidos} fue eliminado definitivamente.`,
+      "Error al eliminar",
+    );
+    if (ok) setConfirmarEliminar(null);
+  }
+
+  function cambiarPestana(valor: EstadoFiltroBeneficiario) {
+    setEstado(valor);
+    setPagina(1);
+    setExito(null);
   }
 
   const totalPaginas = Math.ceil(total / limite) || 1;
@@ -232,18 +322,55 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
           proyecto.
         </p>
         {puedeGestionar ? (
-          <button
-            type="button"
-            onClick={abrirCrear}
-            className="rounded-xl bg-ruralia-teal px-4 py-2.5 text-sm font-semibold text-white hover:bg-ruralia-teal-hover"
-          >
-            + Nuevo beneficiario
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {token ? (
+              <CargaExcelBeneficiarios
+                token={token}
+                contexto="catalogo"
+                variante="boton"
+                archivo={archivoExcel}
+                onArchivo={setArchivoExcel}
+                importando={importando}
+                disabled={importando}
+                onImportar={importarExcel}
+              />
+            ) : null}
+            <button
+              type="button"
+              onClick={abrirCrear}
+              className="rounded-xl bg-ruralia-teal px-4 py-2.5 text-sm font-semibold text-white hover:bg-ruralia-teal-hover"
+            >
+              + Nuevo beneficiario
+            </button>
+          </div>
         ) : null}
       </div>
 
       {error ? <Alerta mensaje={error} /> : null}
       {exito ? <Alerta mensaje={exito} tipo="exito" /> : null}
+
+      <div className="mb-4 flex gap-6 border-b border-ruralia-teal-border">
+        {PESTANAS.map((p) => (
+          <button
+            key={p.valor}
+            type="button"
+            onClick={() => cambiarPestana(p.valor)}
+            className={`-mb-px border-b-2 px-1 pb-3 text-sm font-medium transition ${
+              estado === p.valor
+                ? "border-ruralia-teal text-ruralia-teal-text"
+                : "border-transparent text-zinc-500 hover:text-zinc-700"
+            }`}
+          >
+            {p.etiqueta}
+          </button>
+        ))}
+      </div>
+
+      <p className="mb-4 text-xs text-zinc-500">
+        {estado === "activos"
+          ? "Desactivar oculta al beneficiario de listados y selectores, pero se puede reactivar. Eliminar es definitivo."
+          : "Beneficiarios ocultos temporalmente. Puedes reactivarlos cuando quieras; conservan sus proyectos, jornadas y asociaciones."}
+      </p>
 
       <div className="mb-4">
         <input
@@ -254,7 +381,7 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
             setBusqueda(e.target.value);
             setPagina(1);
           }}
-          className="w-full max-w-sm rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal focus:ring-4 focus:ring-ruralia-teal/10"
+          className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm outline-none hover:border-ruralia-teal-border focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
         />
       </div>
 
@@ -277,7 +404,9 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
                 {beneficiarios.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-5 py-8 text-center text-zinc-500">
-                      No se encontraron beneficiarios
+                      {estado === "activos"
+                        ? "No se encontraron beneficiarios"
+                        : "No hay beneficiarios desactivados"}
                     </td>
                   </tr>
                 ) : (
@@ -300,7 +429,7 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
                               : "bg-zinc-100 text-zinc-500"
                           }`}
                         >
-                          {b.estaActivo ? "Activo" : "Inactivo"}
+                          {b.estaActivo ? "Activo" : "Desactivado"}
                         </span>
                       </td>
                       <td className="px-5 py-3">
@@ -323,12 +452,31 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setConfirmarEliminar(b)}
-                                className={btnAccionPeligro}
+                                onClick={() => setConfirmarDesactivar(b)}
+                                className={btnAccionSecundaria}
                               >
-                                Eliminar
+                                Desactivar
                               </button>
                             </>
+                          ) : null}
+                          {puedeGestionar && !b.estaActivo ? (
+                            <button
+                              type="button"
+                              disabled={enviando}
+                              onClick={() => void manejarReactivar(b)}
+                              className={btnAccionPrimaria}
+                            >
+                              Reactivar
+                            </button>
+                          ) : null}
+                          {puedeEliminar ? (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmarEliminar(b)}
+                              className={btnAccionPeligro}
+                            >
+                              Eliminar
+                            </button>
                           ) : null}
                         </div>
                       </td>
@@ -414,7 +562,7 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
             <div>
               <dt className="text-zinc-500">Estado</dt>
               <dd className="font-medium">
-                {seleccionado.estaActivo ? "Activo" : "Inactivo"}
+                {seleccionado.estaActivo ? "Activo" : "Desactivado"}
               </dd>
             </div>
           </dl>
@@ -588,35 +736,268 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
       </Modal>
 
       <Modal
-        titulo="Confirmar eliminación"
-        abierto={confirmarEliminar !== null}
-        onCerrar={() => setConfirmarEliminar(null)}
+        titulo="Desactivar beneficiario"
+        abierto={confirmarDesactivar !== null}
+        onCerrar={() => setConfirmarDesactivar(null)}
       >
-        <p className="text-sm text-zinc-600">
-          ¿Desactivar a{" "}
-          <strong>
-            {confirmarEliminar?.nombres} {confirmarEliminar?.apellidos}
-          </strong>
-          ? No se podrá vincular a nuevos proyectos.
-        </p>
+        <div className="space-y-3 text-sm text-zinc-600">
+          <p>
+            ¿Desactivar a{" "}
+            <strong className="text-zinc-900">
+              {confirmarDesactivar?.nombres} {confirmarDesactivar?.apellidos}
+            </strong>
+            ?
+          </p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Deja de aparecer en listados y al vincular beneficiarios.</li>
+            <li>Conserva su historial en proyectos, jornadas y asociaciones.</li>
+            <li>Puedes reactivarlo en cualquier momento desde la pestaña Desactivados.</li>
+          </ul>
+        </div>
         <div className="mt-6 flex justify-end gap-3">
           <button
             type="button"
-            onClick={() => setConfirmarEliminar(null)}
-            className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold"
+            onClick={() => setConfirmarDesactivar(null)}
+            className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
           >
             Cancelar
           </button>
           <button
             type="button"
             disabled={enviando}
-            onClick={() => void manejarEliminar()}
-            className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            onClick={() => void manejarDesactivar()}
+            className="inline-flex items-center gap-2 rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white hover:bg-ruralia-teal-hover disabled:opacity-50"
           >
-            {enviando ? "Eliminando..." : "Desactivar"}
+            <EyeOff className="h-4 w-4" />
+            {enviando ? "Desactivando..." : "Desactivar"}
           </button>
         </div>
       </Modal>
+
+      {confirmarEliminar && token ? (
+        <ModalEliminarBeneficiario
+          key={confirmarEliminar.id}
+          token={token}
+          beneficiario={confirmarEliminar}
+          enviando={enviando}
+          puedeDesactivar={puedeGestionar}
+          onCerrar={() => setConfirmarEliminar(null)}
+          onDesactivarEnSuLugar={() => {
+            setConfirmarDesactivar(confirmarEliminar);
+            setConfirmarEliminar(null);
+          }}
+          onConfirmar={() => void manejarEliminar()}
+        />
+      ) : null}
     </>
+  );
+}
+
+/**
+ * Eliminación en dos pasos: primero advierte qué se pierde (con el uso real del
+ * beneficiario) y ofrece desactivar en su lugar; después exige escribir el
+ * documento y marcar la casilla de entendimiento.
+ */
+function ModalEliminarBeneficiario({
+  token,
+  beneficiario,
+  enviando,
+  puedeDesactivar,
+  onCerrar,
+  onDesactivarEnSuLugar,
+  onConfirmar,
+}: {
+  token: string;
+  beneficiario: Beneficiario;
+  enviando: boolean;
+  puedeDesactivar: boolean;
+  onCerrar: () => void;
+  onDesactivarEnSuLugar: () => void;
+  onConfirmar: () => void;
+}) {
+  const [paso, setPaso] = useState<1 | 2>(1);
+  const [uso, setUso] = useState<UsoBeneficiario | null>(null);
+  const [errorUso, setErrorUso] = useState<string | null>(null);
+  const [documentoEscrito, setDocumentoEscrito] = useState("");
+  const [entiende, setEntiende] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    obtenerUsoBeneficiario(token, beneficiario.id)
+      .then((datos) => {
+        if (vivo) setUso(datos);
+      })
+      .catch((err) => {
+        if (vivo) {
+          setErrorUso(
+            err instanceof Error ? err.message : "No se pudo consultar su uso",
+          );
+        }
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [token, beneficiario.id]);
+
+  const nombre = `${beneficiario.nombres} ${beneficiario.apellidos}`;
+  const documentoCoincide =
+    documentoEscrito.trim() === beneficiario.numeroDocumento.trim();
+  const usos = uso
+    ? [
+        { total: uso.proyectos, singular: "proyecto", plural: "proyectos" },
+        { total: uso.jornadas, singular: "jornada", plural: "jornadas" },
+        { total: uso.asociaciones, singular: "asociación", plural: "asociaciones" },
+        { total: uso.documentos, singular: "documento", plural: "documentos" },
+      ]
+    : [];
+  const tieneUso = usos.some((u) => u.total > 0);
+
+  return (
+    <Modal titulo="Eliminar beneficiario" abierto onCerrar={onCerrar}>
+      {paso === 1 ? (
+        <div className="space-y-4 text-sm">
+          <div className="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Esta acción no se puede deshacer</p>
+              <p className="mt-1">
+                Vas a eliminar a <strong>{nombre}</strong> ({beneficiario.tipoDocumento}{" "}
+                {beneficiario.numeroDocumento}) de forma definitiva.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <p className="font-medium text-zinc-700">Qué pasará:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-zinc-600">
+              <li>Desaparece de todos los listados, incluida la pestaña Desactivados.</li>
+              <li>Se quita de todas las asociaciones que lo agrupan.</li>
+              <li>No se puede reactivar ni volver a registrar con el mismo documento.</li>
+              <li>
+                Los proyectos, jornadas y documentos donde ya aparece conservan su
+                nombre como historial.
+              </li>
+            </ul>
+          </div>
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+            <p className="font-medium">Dónde aparece hoy</p>
+            {errorUso ? (
+              <p className="mt-1 text-red-700">{errorUso}</p>
+            ) : !uso ? (
+              <Spinner className="py-3" />
+            ) : tieneUso ? (
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {usos
+                  .filter((u) => u.total > 0)
+                  .map((u) => (
+                    <li
+                      key={u.singular}
+                      className="rounded-full border border-amber-200 bg-white px-2.5 py-0.5 text-xs font-semibold text-amber-800"
+                    >
+                      {u.total} {u.total === 1 ? u.singular : u.plural}
+                    </li>
+                  ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-amber-800">
+                No está vinculado a proyectos, jornadas, asociaciones ni documentos.
+              </p>
+            )}
+          </div>
+
+          {puedeDesactivar && beneficiario.estaActivo ? (
+            <div className="rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft p-4 text-ruralia-teal-text">
+              <p className="font-medium">¿Solo quieres ocultarlo?</p>
+              <p className="mt-1">
+                Desactívalo: deja de aparecer, pero puedes recuperarlo cuando quieras.
+              </p>
+              <button
+                type="button"
+                onClick={onDesactivarEnSuLugar}
+                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white hover:bg-ruralia-teal-hover"
+              >
+                <EyeOff className="h-4 w-4" />
+                Desactivar en su lugar
+              </button>
+            </div>
+          ) : null}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onCerrar}
+              className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={!uso && !errorUso}
+              onClick={() => setPaso(2)}
+              className="rounded-xl bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+            >
+              Continuar con la eliminación
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4 text-sm">
+          <div className="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <p>
+              Último paso. Una vez eliminado, <strong>{nombre}</strong> no se podrá
+              recuperar.
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-1 block font-medium text-zinc-700">
+              Escribe el número de documento{" "}
+              <span className="font-semibold text-zinc-900">
+                {beneficiario.numeroDocumento}
+              </span>{" "}
+              para confirmar
+            </label>
+            <input
+              value={documentoEscrito}
+              onChange={(e) => setDocumentoEscrito(e.target.value)}
+              autoFocus
+              autoComplete="off"
+              className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm outline-none hover:border-ruralia-teal-border focus:border-red-400 focus:ring-2 focus:ring-red-200"
+            />
+          </div>
+
+          <label className="flex items-start gap-2 text-zinc-700">
+            <input
+              type="checkbox"
+              checked={entiende}
+              onChange={(e) => setEntiende(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-red-600"
+            />
+            Entiendo que esta eliminación es definitiva y no se puede deshacer.
+          </label>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setPaso(1)}
+              className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
+            >
+              Volver
+            </button>
+            <button
+              type="button"
+              disabled={!documentoCoincide || !entiende || enviando}
+              onClick={onConfirmar}
+              className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              {enviando ? "Eliminando..." : "Eliminar definitivamente"}
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }

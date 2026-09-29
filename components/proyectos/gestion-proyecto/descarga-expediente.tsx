@@ -27,6 +27,7 @@ export function DescargaExpediente({ token, proyecto, plan }: Props) {
   const [procesoId, setProcesoId] = useState("");
   const [agentes, setAgentes] = useState<"todos" | "uno">("todos");
   const [agenteId, setAgenteId] = useState("");
+  const [externos, setExternos] = useState<"incluir" | "omitir">("incluir");
   const [error, setError] = useState<string | null>(null);
   const [descargando, setDescargando] = useState(false);
 
@@ -61,14 +62,14 @@ export function DescargaExpediente({ token, proyecto, plan }: Props) {
       setError("Elige un proceso.");
       return;
     }
+    if (paso === 2 && agentes === "uno" && !agenteId) {
+      setError("Elige un agente.");
+      return;
+    }
     setPaso((actual) => actual + 1);
   }
 
   async function descargar() {
-    if (agentes === "uno" && !agenteId) {
-      setError("Elige un agente.");
-      return;
-    }
     setDescargando(true);
     setError(null);
     try {
@@ -77,6 +78,7 @@ export function DescargaExpediente({ token, proyecto, plan }: Props) {
         hasta: alcance === "fechas" ? hasta : undefined,
         procesoId: procesos === "uno" ? procesoId : undefined,
         agenteId: agentes === "uno" ? agenteId : undefined,
+        incluirExternos: externos === "incluir",
       });
       const url = URL.createObjectURL(blob);
       const enlace = document.createElement("a");
@@ -120,7 +122,7 @@ export function DescargaExpediente({ token, proyecto, plan }: Props) {
           />
           <div className="relative max-h-[min(90vh,40rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-ruralia-teal-border bg-white p-6 shadow-lg shadow-zinc-900/10">
             <h2 className="text-lg font-semibold text-zinc-900">Descargar expediente</h2>
-            <p className="mt-1 text-sm text-zinc-500">Paso {paso + 1} de 3</p>
+            <p className="mt-1 text-sm text-zinc-500">Paso {paso + 1} de 4</p>
             <div className="mt-5 space-y-3">
               {paso === 0 ? (
                 <>
@@ -215,6 +217,23 @@ export function DescargaExpediente({ token, proyecto, plan }: Props) {
                       mensajeSinOpciones="Este proyecto no tiene agentes asignados"
                     />
                   ) : null}
+                </>
+              ) : null}
+              {paso === 3 ? (
+                <>
+                  <p className="text-sm font-medium text-zinc-800">Documentos externos</p>
+                  <Opcion
+                    activa={externos === "incluir"}
+                    titulo="Incluir documentos externos"
+                    detalle="Se agregan todos los del proyecto en la carpeta documentos-externos, fuera de las jornadas."
+                    onElegir={() => setExternos("incluir")}
+                  />
+                  <Opcion
+                    activa={externos === "omitir"}
+                    titulo="Solo evidencias de jornadas"
+                    detalle="El ZIP no lleva los documentos externos."
+                    onElegir={() => setExternos("omitir")}
+                  />
                   <p className="text-xs text-zinc-500">
                     El ZIP queda ordenado en actividad, subactividad, proceso, meta y,
                     dentro de cada meta, una carpeta por jornada.
@@ -232,7 +251,7 @@ export function DescargaExpediente({ token, proyecto, plan }: Props) {
               >
                 {paso === 0 ? "Cancelar" : "Atrás"}
               </button>
-              {paso < 2 ? (
+              {paso < 3 ? (
                 <button
                   type="button"
                   onClick={siguiente}

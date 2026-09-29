@@ -172,7 +172,7 @@ export function EquipoVinculos({
     }
   }
 
-  async function importarExcel(archivo: File) {
+  async function importarExcel(archivo: File, veredaId: string) {
     setImportando(true);
     setError(null);
     setExito(null);
@@ -181,6 +181,7 @@ export function EquipoVinculos({
         token,
         proyectoId,
         archivo,
+        veredaId,
       );
       setResultadoCarga(resultado);
       setArchivoExcel(null);
@@ -457,6 +458,13 @@ export function EquipoVinculos({
             disabled={enviando || importando}
             importando={importando}
             onImportar={importarExcel}
+            veredas={(proyecto.veredas ?? [])
+              .filter((vereda) => !!vereda.codigo && /^[0-9]+$/.test(vereda.codigo))
+              .map((vereda) => ({
+                id: vereda.id,
+                nombre: vereda.nombre,
+                subtitulo: `DANE ${vereda.codigo}`,
+              }))}
           />
         </div>
         {resultadoCarga ? (

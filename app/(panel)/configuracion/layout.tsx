@@ -5,7 +5,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { usePermisos } from "@/lib/use-permisos";
 
-const TABS: { href: string; etiqueta: string; permiso: string }[] = [
+const TABS: { href: string; etiqueta: string; permiso?: string }[] = [
+  {
+    href: "/configuracion/perfil",
+    etiqueta: "Mi perfil",
+  },
   {
     href: "/configuracion/dashboard",
     etiqueta: "Mi dashboard",
@@ -26,12 +30,12 @@ export default function LayoutConfiguracion({
   const pathname = usePathname();
   const router = useRouter();
   const { puede } = usePermisos();
-  const tabs = TABS.filter((t) => puede(t.permiso));
+  const tabs = TABS.filter((t) => !t.permiso || puede(t.permiso));
 
   useEffect(() => {
     if (pathname === "/configuracion") return; // la propia page.tsx resuelve el redirect inicial
     const tabActual = TABS.find((t) => pathname.startsWith(t.href));
-    if (tabActual && !puede(tabActual.permiso)) {
+    if (tabActual?.permiso && !puede(tabActual.permiso)) {
       router.replace("/dashboard");
     }
   }, [pathname, puede, router]);

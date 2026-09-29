@@ -765,6 +765,28 @@ export interface Asociacion {
   correo?: string;
   estaActivo: boolean;
   vereda?: VeredaResumen;
+  totalBeneficiarios?: number;
+  /** Solo viene al consultar una asociación por ID. */
+  beneficiarios?: BeneficiarioAsociacion[];
+}
+
+export type EstadoFiltroBeneficiario = "activos" | "desactivados";
+
+/** Dónde se usa un beneficiario; se muestra antes de eliminarlo. */
+export interface UsoBeneficiario {
+  proyectos: number;
+  jornadas: number;
+  asociaciones: number;
+  documentos: number;
+}
+
+export interface BeneficiarioAsociacion {
+  id: string;
+  nombres: string;
+  apellidos: string;
+  tipoDocumento: TipoDocumento;
+  numeroDocumento: string;
+  vereda?: VeredaResumen;
 }
 
 export type TipoDocumento = "CC" | "CE" | "PASAPORTE" | "TI";
@@ -801,6 +823,7 @@ export interface CrearAsociacionPayload {
   veredaId: string;
   telefono?: string;
   correo?: string;
+  beneficiarioIds?: string[];
 }
 
 export interface ActualizarAsociacionPayload {
@@ -810,6 +833,7 @@ export interface ActualizarAsociacionPayload {
   veredaId?: string;
   telefono?: string;
   correo?: string;
+  beneficiarioIds?: string[];
 }
 
 export interface Vereda {

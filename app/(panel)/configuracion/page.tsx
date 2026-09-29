@@ -14,7 +14,7 @@ export default function PaginaConfiguracion() {
     } else if (puede("configuracion.gestionar_plantillas")) {
       router.replace("/configuracion/plantillas");
     } else {
-      router.replace("/dashboard");
+      router.replace("/configuracion/perfil");
     }
   }, [puede, router]);
 

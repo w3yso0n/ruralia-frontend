@@ -1,10 +1,12 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { Menu } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
+import { AvatarUsuario } from "@/components/ui/avatar-usuario";
 import { useAuth } from "@/lib/auth-context";
 
 export function PanelLayout({ children }: { children: React.ReactNode }) {
@@ -77,12 +79,22 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
               <p className="truncate font-semibold text-zinc-900">Ruralia</p>
             </div>
             <div className="ml-auto flex min-w-0 items-center gap-3 sm:gap-4">
-              <div className="hidden min-w-0 text-right sm:block">
-                <p className="truncate text-sm font-medium text-zinc-900">
-                  {usuario.nombreCompleto}
-                </p>
-                <p className="truncate text-xs text-zinc-500">{roles}</p>
-              </div>
+              <Link
+                href="/configuracion/perfil"
+                title="Mi perfil"
+                className="flex min-w-0 items-center gap-3 rounded-xl p-1 transition hover:bg-ruralia-teal-soft"
+              >
+                <div className="hidden min-w-0 text-right sm:block">
+                  <p className="truncate text-sm font-medium text-zinc-900">
+                    {usuario.nombreCompleto}
+                  </p>
+                  <p className="truncate text-xs text-zinc-500">{roles}</p>
+                </div>
+                <AvatarUsuario
+                  nombre={usuario.nombreCompleto}
+                  urlFoto={usuario.urlFoto}
+                />
+              </Link>
               <button
                 type="button"
                 onClick={() => void cerrarSesion()}

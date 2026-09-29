@@ -6,7 +6,10 @@ import Link from "next/link";
 import { Alerta, Spinner } from "@/components/ui/modal";
 import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 import { SelectorVeredasMultiple } from "@/components/ui/selector-veredas-multiple";
-import { CargaExcelBeneficiarios } from "@/components/proyectos/carga-excel-beneficiarios";
+import {
+  CargaExcelBeneficiarios,
+  type VeredaCargaOpcion,
+} from "@/components/proyectos/carga-excel-beneficiarios";
 import {
   asignarAsociacionesProyecto,
   asignarBeneficiariosProyecto,
@@ -56,6 +59,8 @@ export function WizardCrearProyecto() {
     fechaFin: "",
   });
   const [veredaIds, setVeredaIds] = useState<string[]>([]);
+  const [veredasDane, setVeredasDane] = useState<VeredaCargaOpcion[]>([]);
+  const [veredaCargaId, setVeredaCargaId] = useState("");
   const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
   const [beneficiarioIds, setBeneficiarioIds] = useState<string[]>([]);
   const [asociacionIds, setAsociacionIds] = useState<string[]>([]);
@@ -159,6 +164,10 @@ export function WizardCrearProyecto() {
 
   async function finalizar() {
     if (!token) return;
+    if (archivoExcel && !veredaCargaId) {
+      setError("Revisa la carga masiva y elige la vereda DANE antes de crear el proyecto");
+      return;
+    }
     setEnviando(true);
     setError(null);
     try {
@@ -184,10 +193,15 @@ export function WizardCrearProyecto() {
         });
       }
       if (archivoExcel) {
+        if (!veredaCargaId) {
+          setError("Revisa la carga masiva y elige la vereda DANE");
+          return;
+        }
         await importarBeneficiariosExcelProyecto(
           token,
           proyecto.id,
           archivoExcel,
+          veredaCargaId,
         );
       }
 
@@ -338,6 +352,23 @@ export function WizardCrearProyecto() {
               token={token}
               value={veredaIds}
               onChange={setVeredaIds}
+              onSeleccion={(lista) =>
+                setVeredasDane(
+                  lista
+                    .filter(
+                      (vereda) =>
+                        !!vereda.codigo && /^[0-9]+$/.test(vereda.codigo),
+                    )
+                    .map((vereda) => ({
+                      id: vereda.id,
+                      nombre: vereda.nombre,
+                      subtitulo:
+                        [vereda.municipioNombre, vereda.departamentoNombre]
+                          .filter(Boolean)
+                          .join(", ") || `DANE ${vereda.codigo}`,
+                    })),
+                )
+              }
             />
           </div>
         ) : null}
@@ -384,8 +415,16 @@ export function WizardCrearProyecto() {
               <CargaExcelBeneficiarios
                 token={token}
                 archivo={archivoExcel}
-                onArchivo={setArchivoExcel}
+                onArchivo={(archivo) => {
+                  setArchivoExcel(archivo);
+                  setVeredaCargaId("");
+                }}
                 disabled={enviando}
+                veredas={veredasDane}
+                onImportar={async (archivo, veredaId) => {
+                  setArchivoExcel(archivo);
+                  setVeredaCargaId(veredaId);
+                }}
               />
             ) : null}
             <div>
