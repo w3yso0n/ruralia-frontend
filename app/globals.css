@@ -116,45 +116,4 @@ code {
   .auth-wave-layer {
     animation: none;
   }
-
-  .auth-offline-badge,
-  .auth-offline-dot {
-    animation: none;
-  }
-}
-
-@keyframes auth-offline-glow {
-  0%,
-  100% {
-    box-shadow:
-      0 20px 40px -12px rgb(66 130 122 / 0.35),
-      0 0 0 1px rgb(66 130 122 / 0.25);
-  }
-  50% {
-    box-shadow:
-      0 24px 48px -10px rgb(66 130 122 / 0.5),
-      0 0 0 1px rgb(66 130 122 / 0.45);
-  }
-}
-
-@keyframes auth-offline-dot-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgb(66 130 122 / 0.55);
-  }
-  50% {
-    opacity: 0.85;
-    transform: scale(1.15);
-    box-shadow: 0 0 0 4px rgb(66 130 122 / 0);
-  }
-}
-
-.auth-offline-badge {
-  animation: auth-offline-glow 4s ease-in-out infinite;
-}
-
-.auth-offline-dot {
-  animation: auth-offline-dot-pulse 2.4s ease-in-out infinite;
 }

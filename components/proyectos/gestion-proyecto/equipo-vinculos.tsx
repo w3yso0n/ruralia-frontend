@@ -33,6 +33,8 @@ interface EquipoVinculosProps {
   onActualizar: () => Promise<void>;
 }
 
+const LIMITE_LISTA_BENEFICIARIOS = 5;
+
 function etiquetaBeneficiario(b: {
   nombres: string;
   apellidos: string;
@@ -71,6 +73,7 @@ export function EquipoVinculos({
   const [error, setError] = useState<string | null>(null);
 
   const [reemplazoId, setReemplazoId] = useState<string | null>(null);
+  const [verListaBeneficiarios, setVerListaBeneficiarios] = useState(false);
   const [modoReemplazo, setModoReemplazo] = useState<"existente" | "nuevo">(
     "nuevo",
   );
@@ -260,6 +263,64 @@ export function EquipoVinculos({
   const opcionesReemplazo = opcionesBeneficiarios.filter(
     (b) => b.id !== reemplazoId,
   );
+  const beneficiariosVinculados = proyecto.beneficiarios ?? [];
+  const beneficiariosVisibles = beneficiariosVinculados.slice(
+    0,
+    LIMITE_LISTA_BENEFICIARIOS,
+  );
+
+  function filaBeneficiario(
+    b: (typeof beneficiariosVinculados)[number],
+    conAcciones: boolean,
+  ) {
+    return (
+      <li
+        key={b.id}
+        className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5"
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-zinc-800">
+            {etiquetaBeneficiario(b)}
+          </p>
+          {b.reemplazaA ? (
+            <p className="text-xs text-amber-800">
+              Entra como reemplazo de {b.reemplazaA.nombres}{" "}
+              {b.reemplazaA.apellidos}
+              {b.reemplazaA.numeroDocumento
+                ? ` (${b.reemplazaA.numeroDocumento})`
+                : ""}
+            </p>
+          ) : null}
+        </div>
+        {conAcciones ? (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void abrirHistorial(b.id)}
+              className="rounded-lg px-2 py-1 text-xs font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft"
+            >
+              Historial
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setVerListaBeneficiarios(false);
+                setReemplazoId(b.id);
+                setModoReemplazo("nuevo");
+                setNuevoBeneficiarioId("");
+                setNombresNuevo("");
+                setDocumentoNuevo("");
+                setNotaReemplazo("");
+              }}
+              className="rounded-lg px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50"
+            >
+              Reemplazar
+            </button>
+          </div>
+        ) : null}
+      </li>
+    );
+  }
 
   if (!puedeGestionar) {
     return (
@@ -409,53 +470,21 @@ export function EquipoVinculos({
           </p>
         ) : null}
 
-        {(proyecto.beneficiarios?.length ?? 0) > 0 ? (
-          <ul className="mt-4 divide-y divide-zinc-100 rounded-xl border border-zinc-100">
-            {proyecto.beneficiarios!.map((b) => (
-              <li
-                key={b.id}
-                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5"
+        {beneficiariosVinculados.length > 0 ? (
+          <div className="mt-4">
+            <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-100">
+              {beneficiariosVisibles.map((b) => filaBeneficiario(b, true))}
+            </ul>
+            {beneficiariosVinculados.length > LIMITE_LISTA_BENEFICIARIOS ? (
+              <button
+                type="button"
+                onClick={() => setVerListaBeneficiarios(true)}
+                className="mt-2 rounded-lg px-2 py-1 text-sm font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft"
               >
-                <div>
-                  <p className="text-sm font-medium text-zinc-800">
-                    {etiquetaBeneficiario(b)}
-                  </p>
-                  {b.reemplazaA ? (
-                    <p className="text-xs text-amber-800">
-                      Entra como reemplazo de {b.reemplazaA.nombres}{" "}
-                      {b.reemplazaA.apellidos}
-                      {b.reemplazaA.numeroDocumento
-                        ? ` (${b.reemplazaA.numeroDocumento})`
-                        : ""}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void abrirHistorial(b.id)}
-                    className="rounded-lg px-2 py-1 text-xs font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft"
-                  >
-                    Historial
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReemplazoId(b.id);
-                      setModoReemplazo("nuevo");
-                      setNuevoBeneficiarioId("");
-                      setNombresNuevo("");
-                      setDocumentoNuevo("");
-                      setNotaReemplazo("");
-                    }}
-                    className="rounded-lg px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50"
-                  >
-                    Reemplazar
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+                Ver todos ({beneficiariosVinculados.length})
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         {(proyecto.beneficiariosReemplazados?.length ?? 0) > 0 ? (
@@ -536,6 +565,17 @@ export function EquipoVinculos({
           veredasIniciales={proyecto.veredas}
         />
       </section>
+
+      <Modal
+        abierto={verListaBeneficiarios}
+        onCerrar={() => setVerListaBeneficiarios(false)}
+        titulo={`Beneficiarios (${beneficiariosVinculados.length})`}
+        ancho="lg"
+      >
+        <ul className="max-h-[60vh] divide-y divide-zinc-100 overflow-y-auto rounded-xl border border-zinc-100">
+          {beneficiariosVinculados.map((b) => filaBeneficiario(b, true))}
+        </ul>
+      </Modal>
 
       <Modal
         abierto={!!reemplazoId}

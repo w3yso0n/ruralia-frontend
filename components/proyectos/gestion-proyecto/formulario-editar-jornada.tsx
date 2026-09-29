@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapPin } from "lucide-react";
-import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
+import { SelectorLugarJornada, type TipoLugarJornada } from "./selector-lugar-jornada";
 import {
   AsignacionJornada,
   destinoInicialAsignacion,
@@ -17,6 +16,7 @@ import { listarCatalogoFormulariosJornada } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type {
   ActividadPlan,
+  Geocerca,
   Jornada,
   PlantillaFormularioCatalogo,
   TipoJornada,
@@ -32,6 +32,7 @@ import {
 interface FormularioEditarJornadaProps {
   jornada: Jornada;
   veredas: VeredaResumen[];
+  geocercas: Geocerca[];
   actividadesPlan: ActividadPlan[];
   beneficiarios?: { id: string; nombre: string; subtitulo?: string }[];
   asociaciones?: { id: string; nombre: string }[];
@@ -41,7 +42,8 @@ interface FormularioEditarJornadaProps {
   tamanoGrupo?: number;
   onSubmit: (datos: {
     fecha: string;
-    veredaId: string;
+    veredaId?: string | null;
+    geocercaId?: string | null;
     nombre?: string;
     observaciones?: string;
     metaId: string;
@@ -60,6 +62,7 @@ function fechaParaInput(fecha: string) {
 export function FormularioEditarJornada({
   jornada,
   veredas,
+  geocercas,
   actividadesPlan,
   beneficiarios = [],
   asociaciones = [],
@@ -73,7 +76,15 @@ export function FormularioEditarJornada({
   const { token } = useAuth();
   const [nombre, setNombre] = useState(jornada.nombre ?? "");
   const [fecha, setFecha] = useState(fechaParaInput(jornada.fecha));
-  const [veredaId, setVeredaId] = useState(jornada.vereda?.id ?? veredas[0]?.id ?? "");
+  const [tipoLugar, setTipoLugar] = useState<TipoLugarJornada>(
+    jornada.geocerca?.id ? "geocerca" : "vereda",
+  );
+  const [veredaId, setVeredaId] = useState(
+    jornada.vereda?.id ?? veredas[0]?.id ?? "",
+  );
+  const [geocercaId, setGeocercaId] = useState(
+    jornada.geocerca?.id ?? geocercas[0]?.id ?? "",
+  );
   const [observaciones, setObservaciones] = useState(jornada.observaciones ?? "");
   const [metaId, setMetaId] = useState(jornada.meta?.id ?? "");
   const [claveFormulario, setClaveFormulario] = useState(
@@ -124,8 +135,12 @@ export function FormularioEditarJornada({
     evento.preventDefault();
     setErrorLocal(null);
 
-    if (!fecha || !veredaId) {
-      setErrorLocal("Fecha y vereda son obligatorias");
+    if (!fecha || (tipoLugar === "vereda" ? !veredaId : !geocercaId)) {
+      setErrorLocal(
+        tipoLugar === "vereda"
+          ? "Fecha y vereda son obligatorias"
+          : "Fecha y geocerca son obligatorias",
+      );
       return;
     }
 
@@ -159,7 +174,8 @@ export function FormularioEditarJornada({
     const seleccion = resolverSeleccionFormulario(claveFormulario, plantillas);
     await onSubmit({
       fecha,
-      veredaId,
+      veredaId: tipoLugar === "vereda" ? veredaId : null,
+      geocercaId: tipoLugar === "geocerca" ? geocercaId : null,
       nombre: nombre.trim(),
       observaciones: observaciones.trim() || undefined,
       metaId,
@@ -211,21 +227,17 @@ export function FormularioEditarJornada({
         />
       </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-zinc-700">
-          Vereda *
-        </label>
-        <SelectorDesplegable
-          required
-          value={veredaId}
-          onChange={setVeredaId}
-          opciones={veredas.map((v) => ({ id: v.id, nombre: v.nombre }))}
-          placeholder="Seleccionar vereda"
-          mensajeSinOpciones="Sin veredas asignadas al proyecto"
-          icono={MapPin}
-          disabled={enviando}
-        />
-      </div>
+      <SelectorLugarJornada
+        tipo={tipoLugar}
+        onTipo={setTipoLugar}
+        veredas={veredas}
+        geocercas={geocercas}
+        veredaId={veredaId}
+        geocercaId={geocercaId}
+        onVeredaId={setVeredaId}
+        onGeocercaId={setGeocercaId}
+        disabled={enviando}
+      />
 
       <AsignacionJornada
         beneficiarios={beneficiarios}

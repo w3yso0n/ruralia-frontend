@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapPin } from "lucide-react";
 import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
-import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
+import { SelectorLugarJornada, type TipoLugarJornada } from "./selector-lugar-jornada";
 import {
   AsignacionJornada,
   destinoInicialAsignacion,
@@ -18,6 +17,7 @@ import { listarCatalogoFormulariosJornada } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type {
   ActividadPlan,
+  Geocerca,
   PlantillaFormularioCatalogo,
   TipoJornada,
   VeredaResumen,
@@ -36,6 +36,7 @@ interface AgenteOpcion {
 
 interface FormularioJornadaProps {
   veredas: VeredaResumen[];
+  geocercas: Geocerca[];
   actividadesPlan: ActividadPlan[];
   agentes: AgenteOpcion[];
   beneficiarios?: AgenteOpcion[];
@@ -45,7 +46,8 @@ interface FormularioJornadaProps {
   enviando: boolean;
   onSubmit: (datos: {
     fecha: string;
-    veredaId: string;
+    veredaId?: string | null;
+    geocercaId?: string | null;
     nombre?: string;
     observaciones?: string;
     metaId: string;
@@ -60,6 +62,7 @@ interface FormularioJornadaProps {
 
 export function FormularioJornada({
   veredas,
+  geocercas,
   actividadesPlan,
   agentes,
   beneficiarios = [],
@@ -72,7 +75,9 @@ export function FormularioJornada({
   const { token } = useAuth();
   const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState("");
+  const [tipoLugar, setTipoLugar] = useState<TipoLugarJornada>("vereda");
   const [veredaId, setVeredaId] = useState(veredas[0]?.id ?? "");
+  const [geocercaId, setGeocercaId] = useState(geocercas[0]?.id ?? "");
   const [observaciones, setObservaciones] = useState("");
   const [metaId, setMetaId] = useState("");
   const [claveFormulario, setClaveFormulario] = useState(
@@ -104,8 +109,12 @@ export function FormularioJornada({
     evento.preventDefault();
     setErrorLocal(null);
 
-    if (!fecha || !veredaId) {
-      setErrorLocal("Fecha y vereda son obligatorias");
+    if (!fecha || (tipoLugar === "vereda" ? !veredaId : !geocercaId)) {
+      setErrorLocal(
+        tipoLugar === "vereda"
+          ? "Fecha y vereda son obligatorias"
+          : "Fecha y geocerca son obligatorias",
+      );
       return;
     }
 
@@ -145,7 +154,8 @@ export function FormularioJornada({
 
     await onSubmit({
       fecha,
-      veredaId,
+      veredaId: tipoLugar === "vereda" ? veredaId : null,
+      geocercaId: tipoLugar === "geocerca" ? geocercaId : null,
       nombre: nombre.trim() || undefined,
       observaciones: observaciones.trim() || undefined,
       metaId,
@@ -241,21 +251,17 @@ export function FormularioJornada({
         />
       </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-zinc-700">
-          Vereda *
-        </label>
-        <SelectorDesplegable
-          required
-          value={veredaId}
-          onChange={setVeredaId}
-          opciones={veredas.map((v) => ({ id: v.id, nombre: v.nombre }))}
-          placeholder="Seleccionar vereda"
-          mensajeSinOpciones="Sin veredas asignadas al proyecto"
-          icono={MapPin}
-          disabled={enviando}
-        />
-      </div>
+      <SelectorLugarJornada
+        tipo={tipoLugar}
+        onTipo={setTipoLugar}
+        veredas={veredas}
+        geocercas={geocercas}
+        veredaId={veredaId}
+        geocercaId={geocercaId}
+        onVeredaId={setVeredaId}
+        onGeocercaId={setGeocercaId}
+        disabled={enviando}
+      />
 
       <div className="space-y-3 rounded-2xl border border-ruralia-teal-border bg-white p-4">
         <p className="text-sm font-medium text-zinc-800">Meta del plan *</p>

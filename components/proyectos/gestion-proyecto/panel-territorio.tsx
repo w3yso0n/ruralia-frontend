@@ -573,8 +573,8 @@ export function PanelTerritorio({
       <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
         <h3 className="font-semibold text-zinc-900">Geocercas del proyecto</h3>
         <p className="mt-1 text-sm text-zinc-500">
-          Estas zonas quedan guardadas solo en este proyecto. Más adelante
-          servirán de base para croquis de campo.
+          Estas zonas quedan en este proyecto y se pueden elegir como lugar de
+          una jornada, en lugar de una vereda.
         </p>
 
         {geocercas.length ? (

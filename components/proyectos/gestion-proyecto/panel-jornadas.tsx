@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { nombreLugarJornada } from "@/components/proyectos/gestion-proyecto/selector-lugar-jornada";
 import { Alerta } from "@/components/ui/modal";
 import { ArbolJornadas } from "@/components/proyectos/gestion-proyecto/arbol-jornadas";
 import { ControlAsistenciaJornada } from "@/components/proyectos/gestion-proyecto/control-asistencia-jornada";
@@ -15,13 +16,14 @@ import {
   crearJornada,
   eliminarJornada,
   ErrorApi,
+  listarGeocercasProyecto,
 } from "@/lib/api";
 import {
   confirmarEliminacionForzada,
   confirmarEliminacionSimple,
   mostrarErrorApi,
 } from "@/lib/swal";
-import type { Jornada, PlanProyecto, Proyecto, TipoJornada } from "@/lib/types";
+import type { Geocerca, Jornada, PlanProyecto, Proyecto, TipoJornada } from "@/lib/types";
 
 interface PanelJornadasProps {
   token: string;
@@ -82,6 +84,13 @@ export function PanelJornadas({
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [geocercas, setGeocercas] = useState<Geocerca[]>([]);
+
+  useEffect(() => {
+    void listarGeocercasProyecto(token, proyectoId)
+      .then(setGeocercas)
+      .catch(() => setGeocercas([]));
+  }, [token, proyectoId]);
 
   useEffect(() => {
     if (jornadaIdQuery && jornadas.some((j) => j.id === jornadaIdQuery)) {
@@ -136,7 +145,8 @@ export function PanelJornadas({
 
   async function manejarCrearJornada(datos: {
     fecha: string;
-    veredaId: string;
+    veredaId?: string | null;
+    geocercaId?: string | null;
     nombre?: string;
     observaciones?: string;
     metaId: string;
@@ -154,6 +164,7 @@ export function PanelJornadas({
         proyectoId,
         fecha: datos.fecha,
         veredaId: datos.veredaId,
+        geocercaId: datos.geocercaId,
         nombre: datos.nombre,
         observaciones: datos.observaciones,
         metaId: datos.metaId,
@@ -188,7 +199,8 @@ export function PanelJornadas({
     jornadaId: string,
     datos: {
       fecha: string;
-      veredaId: string;
+      veredaId?: string | null;
+      geocercaId?: string | null;
       nombre?: string;
       observaciones?: string;
       metaId: string;
@@ -326,6 +338,7 @@ export function PanelJornadas({
           <h3 className="mb-4 font-semibold text-zinc-900">Nueva jornada</h3>
           <FormularioJornada
             veredas={proyecto.veredas ?? []}
+            geocercas={geocercas}
             actividadesPlan={plan?.actividades ?? []}
             agentes={agentes}
             beneficiarios={opcionesBeneficiarios}
@@ -382,7 +395,7 @@ export function PanelJornadas({
                       </p>
                     ) : null}
                     <p className="mt-1 text-sm text-zinc-500">
-                      {jornadaSeleccionada.vereda?.nombre ?? "Sin vereda"} ·{" "}
+                      {nombreLugarJornada(jornadaSeleccionada)} ·{" "}
                       {jornadaSeleccionada.tecnicoResponsable?.nombre ?? "—"} ·{" "}
                       <span className="font-medium">
                         {jornadaSeleccionada.estado}
@@ -518,6 +531,7 @@ export function PanelJornadas({
                     key={jornadaSeleccionada.id}
                     jornada={jornadaSeleccionada}
                     veredas={proyecto.veredas ?? []}
+                    geocercas={geocercas}
                     actividadesPlan={plan?.actividades ?? []}
                     beneficiarios={opcionesBeneficiarios}
                     asociaciones={opcionesAsociaciones}

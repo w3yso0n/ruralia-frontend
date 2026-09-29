@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, CalendarDays, ChevronRight, ListFilter, Search } from "lucide-react";
 import { Alerta, Spinner } from "@/components/ui/modal";
+import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
 import {
   listarActoresCronologia,
   listarCronologiaActor,
@@ -23,6 +25,37 @@ type ModoSeguimiento = "persona" | "proyecto";
 type PeriodoFiltro = "7" | "30" | "90" | "todo";
 
 const LIMITE_PAGINA = 30;
+
+const OPCIONES_PERIODO = [
+  { id: "7", nombre: "Últimos 7 días" },
+  { id: "30", nombre: "Últimos 30 días" },
+  { id: "90", nombre: "Últimos 90 días" },
+  { id: "todo", nombre: "Todo el historial" },
+];
+
+const OPCIONES_TIPO_ACCION = [
+  { id: "JORNADA_CREADA", nombre: "Jornada creada" },
+  { id: "JORNADA_ESTADO_CAMBIADO", nombre: "Estado jornada" },
+  { id: "JORNADA_CANCELADA", nombre: "Jornada cancelada" },
+  { id: "FORMULARIO_ENVIADO", nombre: "Formulario" },
+  { id: "ACTIVIDAD_COMPLETADA", nombre: "Actividad" },
+  { id: "SUBACTIVIDAD_COMPLETADA", nombre: "Subactividad" },
+];
+
+function etiquetaEstadoProyecto(estado: string): string {
+  switch (estado) {
+    case "ACTIVO":
+      return "Activo";
+    case "BORRADOR":
+      return "Borrador";
+    case "SUSPENDIDO":
+      return "Suspendido";
+    case "COMPLETADO":
+      return "Completado";
+    default:
+      return estado;
+  }
+}
 
 type ActorSeguimiento = {
   id: string;
@@ -48,6 +81,8 @@ function etiquetaAccion(accion: string): string {
       return "Enviada a revisión";
     case "JORNADA_REENVIADA_REVISION":
       return "Reenviada a revisión";
+    case "JORNADA_SUBIDA_PROYECTO":
+      return "Subida al proyecto";
     case "JORNADA_APROBADA":
       return "Aprobada";
     case "JORNADA_RECHAZADA":
@@ -55,8 +90,42 @@ function etiquetaAccion(accion: string): string {
     case "DOCUMENTO_VERSION_CREADA":
       return "Nueva versión doc.";
     default:
-      return accion;
+      return accion
+        .toLowerCase()
+        .split("_")
+        .map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1))
+        .join(" ");
   }
+}
+
+function EstadoVacio({
+  titulo,
+  detalle,
+  onAccion,
+  etiquetaBoton,
+}: {
+  titulo: string;
+  detalle: string;
+  onAccion?: () => void;
+  etiquetaBoton?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-ruralia-teal-border bg-ruralia-teal-soft/30 px-6 py-10 text-center">
+      <p className="text-sm font-semibold text-zinc-900">{titulo}</p>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-zinc-500">
+        {detalle}
+      </p>
+      {onAccion && etiquetaBoton ? (
+        <button
+          type="button"
+          onClick={onAccion}
+          className="mt-4 rounded-xl bg-ruralia-teal px-4 py-2.5 text-sm font-semibold text-white hover:bg-ruralia-teal-hover"
+        >
+          {etiquetaBoton}
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 function formatearFechaEvento(iso: string): string {
@@ -211,6 +280,7 @@ export function PanelSeguimiento() {
   const [periodo, setPeriodo] = useState<PeriodoFiltro>("30");
   const [filtroAccion, setFiltroAccion] = useState("");
   const [filtroActorId, setFiltroActorId] = useState("");
+  const [busqueda, setBusqueda] = useState("");
 
   const sincronizarUrl = useCallback(
     (siguienteModo: ModoSeguimiento, siguienteId: string) => {
@@ -335,6 +405,7 @@ export function PanelSeguimiento() {
     setFiltroAccion("");
     setFiltroActorId("");
     setPeriodo("30");
+    setBusqueda("");
     sincronizarUrl(siguiente, "");
   }
 
@@ -362,7 +433,6 @@ export function PanelSeguimiento() {
 
   const grupos = useMemo(() => agruparPorDia(eventos), [eventos]);
   const hayMas = pagina < totalPaginas;
-  const filtrosProyectoActivos = Boolean(filtroAccion || filtroActorId);
 
   if (!puedeSeguimiento) {
     return (
@@ -375,327 +445,421 @@ export function PanelSeguimiento() {
 
   if (cargando) return <Spinner />;
 
+  const sinActividadProyecto =
+    modo === "proyecto" &&
+    Boolean(seleccionId) &&
+    !cargandoResumen &&
+    resumen !== null &&
+    resumen.totalEventos === 0;
+
+  const hayFiltros =
+    Boolean(filtroAccion || filtroActorId) || periodo !== "30";
+
+  function limpiarFiltros() {
+    setFiltroAccion("");
+    setFiltroActorId("");
+    setPeriodo("30");
+  }
+
+  function verTodoElHistorial() {
+    setFiltroAccion("");
+    setFiltroActorId("");
+    setPeriodo("todo");
+  }
+
+  const etiquetaPeriodo =
+    OPCIONES_PERIODO.find((opcion) => opcion.id === periodo)?.nombre ??
+    "este periodo";
+
+  const textoBusqueda = busqueda.trim().toLowerCase();
+  const proyectosVisibles = proyectos.filter((proyecto) =>
+    proyecto.nombre.toLowerCase().includes(textoBusqueda),
+  );
+  const agentesVisibles = agentes.filter(
+    (agente) =>
+      agente.nombreCompleto.toLowerCase().includes(textoBusqueda) ||
+      agente.correo.toLowerCase().includes(textoBusqueda),
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-semibold text-zinc-900">Seguimiento</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          {modo === "proyecto"
-            ? "Vista de proyecto a escala: primero el resumen y filtros, después el detalle."
-            : "Cronología de un agente de campo: qué hizo y cuándo."}
+          Qué ocurrió en campo, por proyecto o por persona.
         </p>
       </div>
 
       {error ? <Alerta mensaje={error} /> : null}
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => cambiarModo("persona")}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-            modo === "persona"
-              ? "bg-ruralia-teal text-white"
-              : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
-          }`}
-        >
-          Por persona
-        </button>
-        <button
-          type="button"
-          onClick={() => cambiarModo("proyecto")}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-            modo === "proyecto"
-              ? "bg-ruralia-teal text-white"
-              : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
-          }`}
-        >
-          Por proyecto
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => cambiarModo("persona")}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              modo === "persona"
+                ? "bg-ruralia-teal text-white"
+                : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+            }`}
+          >
+            Por persona
+          </button>
+          <button
+            type="button"
+            onClick={() => cambiarModo("proyecto")}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              modo === "proyecto"
+                ? "bg-ruralia-teal text-white"
+                : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+            }`}
+          >
+            Por proyecto
+          </button>
+        </div>
+
+        {seleccionId ? (
+          <button
+            type="button"
+            onClick={() => cambiarSeleccion("")}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            {modo === "persona" ? "Todas las personas" : "Todos los proyectos"}
+          </button>
+        ) : (
+          <div className="relative w-full sm:w-72">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ruralia-teal-muted" />
+            <input
+              type="search"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder={
+                modo === "persona" ? "Buscar persona" : "Buscar proyecto"
+              }
+              className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-9 pr-4 text-sm text-zinc-900 outline-none transition hover:border-ruralia-teal-border focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
+            />
+          </div>
+        )}
       </div>
 
-      <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
-        <label className="mb-2 block text-sm font-medium text-zinc-700">
-          {modo === "persona" ? "Agente de campo" : "Proyecto"}
-        </label>
-        {modo === "persona" ? (
-          <select
-            value={seleccionId}
-            onChange={(e) => cambiarSeleccion(e.target.value)}
-            className="w-full max-w-lg rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal focus:ring-4 focus:ring-ruralia-teal/10"
-          >
-            <option value="">Selecciona un agente…</option>
-            {agentes.map((agente) => (
-              <option key={agente.id} value={agente.id}>
-                {agente.nombreCompleto} ({agente.correo})
-              </option>
-            ))}
-          </select>
-        ) : (
-          <select
-            value={seleccionId}
-            onChange={(e) => cambiarSeleccion(e.target.value)}
-            className="w-full max-w-lg rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal focus:ring-4 focus:ring-ruralia-teal/10"
-          >
-            <option value="">Selecciona un proyecto…</option>
-            {proyectos.map((proyecto) => (
-              <option key={proyecto.id} value={proyecto.id}>
-                {proyecto.nombre}
-                {proyecto.estado ? ` · ${proyecto.estado}` : ""}
-              </option>
-            ))}
-          </select>
-        )}
-      </section>
-
       {!seleccionId ? (
-        <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
-          <p className="text-sm text-zinc-500">
-            Selecciona {modo === "persona" ? "un agente" : "un proyecto"} para
-            abrir su seguimiento.
-          </p>
-        </section>
-      ) : (
-        <>
-          {modo === "proyecto" ? (
-            <section className="space-y-4 rounded-2xl border border-ruralia-teal-border bg-white p-5">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-ruralia-teal-text">
-                    Panorama del proyecto
-                  </p>
-                  <h2 className="mt-1 text-lg font-semibold text-zinc-900">
-                    {tituloSeleccion}
-                  </h2>
-                  {resumen?.ultimaActividadEn ? (
-                    <p className="mt-1 text-xs text-zinc-500">
-                      Última actividad:{" "}
-                      {formatearFechaEvento(resumen.ultimaActividadEn)}
-                    </p>
-                  ) : null}
-                </div>
-                <p className="text-sm font-semibold tabular-nums text-zinc-800">
-                  {cargandoResumen
-                    ? "…"
-                    : `${resumen?.totalEventos ?? 0} eventos totales`}
-                </p>
-              </div>
-
-              {cargandoResumen ? (
-                <Spinner />
-              ) : resumen && resumen.totalEventos > 0 ? (
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div>
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                      Por tipo de acción
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {resumen.porAccion.map((item) => {
-                        const activo = filtroAccion === item.accion;
-                        return (
-                          <button
-                            key={item.accion}
-                            type="button"
-                            onClick={() =>
-                              setFiltroAccion(activo ? "" : item.accion)
-                            }
-                            className={`rounded-lg px-3 py-1.5 text-left text-xs transition ${
-                              activo
-                                ? "bg-ruralia-teal text-white"
-                                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-                            }`}
-                          >
-                            <span className="font-medium">
-                              {etiquetaAccion(item.accion)}
-                            </span>
-                            <span className="ml-2 tabular-nums opacity-80">
-                              {item.total}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                      Quién más actúa (clic para filtrar)
-                    </p>
-                    <ul className="max-h-40 space-y-1 overflow-y-auto pr-1">
-                      {resumen.porActor.map((item) => {
-                        const activo = filtroActorId === item.actorId;
-                        return (
-                          <li key={item.actorId}>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setFiltroActorId(activo ? "" : item.actorId)
-                              }
-                              className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition ${
-                                activo
-                                  ? "bg-ruralia-teal text-white"
-                                  : "hover:bg-zinc-50"
-                              }`}
-                            >
-                              <span className="truncate font-medium">
-                                {item.actorNombre}
-                              </span>
-                              <span className="shrink-0 tabular-nums text-xs opacity-80">
-                                {item.total}
-                              </span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-zinc-500">
-                  Aún no hay actividad registrada en este proyecto.
-                </p>
-              )}
-            </section>
-          ) : null}
-
-          <section className="space-y-4 rounded-2xl border border-ruralia-teal-border bg-white p-5">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-ruralia-teal-text">
-                  {modo === "persona"
-                    ? "Cronología del agente"
-                    : "Actividad filtrada"}
-                </p>
-                <h2 className="mt-1 text-lg font-semibold text-zinc-900">
-                  {modo === "persona" ? tituloSeleccion : "Detalle"}
-                </h2>
-              </div>
-              {!cargandoCronologia && !errorCronologia ? (
-                <p className="text-xs text-zinc-500">
-                  {totalEventos.toLocaleString("es-CO")} resultado
-                  {totalEventos === 1 ? "" : "s"}
-                  {modo === "proyecto" && filtrosProyectoActivos
-                    ? " con filtros"
-                    : ""}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="flex flex-wrap items-end gap-3 border-b border-zinc-100 pb-4">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-500">
-                  Periodo
-                </label>
-                <select
-                  value={periodo}
-                  onChange={(e) =>
-                    setPeriodo(e.target.value as PeriodoFiltro)
+        <ul className="space-y-2">
+          {modo === "persona" ? (
+            agentesVisibles.length === 0 ? (
+              <li>
+                <EstadoVacio
+                  titulo="No hay personas para mostrar"
+                  detalle={
+                    textoBusqueda
+                      ? "Prueba con otro nombre o correo."
+                      : "Cuando haya agentes con acceso a campo, aparecerán aquí."
                   }
-                  className="rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
-                >
-                  <option value="7">Últimos 7 días</option>
-                  <option value="30">Últimos 30 días</option>
-                  <option value="90">Últimos 90 días</option>
-                  <option value="todo">Todo el historial</option>
-                </select>
-              </div>
-
-              {modo === "persona" ? (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-500">
-                    Tipo
-                  </label>
-                  <select
-                    value={filtroAccion}
-                    onChange={(e) => setFiltroAccion(e.target.value)}
-                    className="rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-ruralia-teal"
+                />
+              </li>
+            ) : (
+              agentesVisibles.map((agente) => (
+                <li key={agente.id}>
+                  <button
+                    type="button"
+                    onClick={() => cambiarSeleccion(agente.id)}
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl border border-ruralia-teal-border bg-white px-4 py-3.5 text-left transition hover:bg-ruralia-teal-soft"
                   >
-                    <option value="">Todas las acciones</option>
-                    <option value="JORNADA_CREADA">Jornada creada</option>
-                    <option value="JORNADA_ESTADO_CAMBIADO">
-                      Estado jornada
-                    </option>
-                    <option value="JORNADA_CANCELADA">Jornada cancelada</option>
-                    <option value="FORMULARIO_ENVIADO">Formulario</option>
-                    <option value="ACTIVIDAD_COMPLETADA">Actividad</option>
-                    <option value="SUBACTIVIDAD_COMPLETADA">
-                      Subactividad
-                    </option>
-                  </select>
-                </div>
-              ) : null}
-
-              {(filtroAccion || filtroActorId || periodo !== "30") && (
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold text-zinc-900">
+                        {agente.nombreCompleto}
+                      </span>
+                      <span className="mt-0.5 block truncate text-sm text-zinc-500">
+                        {agente.correo}
+                      </span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-ruralia-teal-muted" />
+                  </button>
+                </li>
+              ))
+            )
+          ) : proyectosVisibles.length === 0 ? (
+            <li>
+              <EstadoVacio
+                titulo="No hay proyectos para mostrar"
+                detalle={
+                  textoBusqueda
+                    ? "Prueba con otro nombre."
+                    : "Cuando haya proyectos, aparecerán aquí para abrir su seguimiento."
+                }
+              />
+            </li>
+          ) : (
+            proyectosVisibles.map((proyecto) => (
+              <li key={proyecto.id}>
                 <button
                   type="button"
-                  onClick={() => {
-                    setFiltroAccion("");
-                    setFiltroActorId("");
-                    setPeriodo("30");
-                  }}
-                  className="rounded-lg px-3 py-2 text-sm text-zinc-600 underline-offset-2 hover:underline"
+                  onClick={() => cambiarSeleccion(proyecto.id)}
+                  className="flex w-full items-center justify-between gap-3 rounded-2xl border border-ruralia-teal-border bg-white px-4 py-3.5 text-left transition hover:bg-ruralia-teal-soft"
                 >
-                  Limpiar filtros
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold text-zinc-900">
+                      {proyecto.nombre}
+                    </span>
+                    <span className="mt-0.5 block text-sm text-zinc-500">
+                      {etiquetaEstadoProyecto(proyecto.estado)}
+                    </span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-ruralia-teal-muted" />
                 </button>
-              )}
+              </li>
+            ))
+          )}
+        </ul>
+      ) : null}
+
+      {seleccionId && modo === "proyecto" ? (
+        <section className="space-y-5 rounded-2xl border border-ruralia-teal-border bg-white p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wide text-ruralia-teal-text">
+                Resumen
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-zinc-900">
+                {tituloSeleccion}
+              </h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                {cargandoResumen
+                  ? "Cargando resumen…"
+                  : resumen?.ultimaActividadEn
+                    ? `Última actividad: ${formatearFechaEvento(resumen.ultimaActividadEn)}`
+                    : "Sin actividad registrada"}
+              </p>
+            </div>
+            <div className="rounded-xl bg-ruralia-teal-soft px-4 py-3 text-right">
+              <p className="text-2xl font-semibold tabular-nums text-zinc-900">
+                {cargandoResumen ? "…" : (resumen?.totalEventos ?? 0)}
+              </p>
+              <p className="text-xs font-medium text-ruralia-teal-text">
+                {(resumen?.totalEventos ?? 0) === 1
+                  ? "evento en total"
+                  : "eventos en total"}
+              </p>
+            </div>
+          </div>
+
+          {cargandoResumen ? (
+            <Spinner />
+          ) : sinActividadProyecto ? (
+            <EstadoVacio
+              titulo="Este proyecto aún no tiene actividad"
+              detalle="Cuando haya jornadas, formularios o cambios de estado, el resumen y la cronología aparecerán aquí."
+            />
+          ) : resumen ? (
+            <div className="grid gap-5 lg:grid-cols-2">
+              <div>
+                <p className="mb-2 text-sm font-medium text-zinc-700">
+                  Acciones
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {resumen.porAccion.map((item) => {
+                    const activo = filtroAccion === item.accion;
+                    return (
+                      <button
+                        key={item.accion}
+                        type="button"
+                        onClick={() =>
+                          setFiltroAccion(activo ? "" : item.accion)
+                        }
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                          activo
+                            ? "bg-ruralia-teal text-white"
+                            : "border border-ruralia-teal-border bg-white text-ruralia-teal-text hover:bg-ruralia-teal-soft"
+                        }`}
+                      >
+                        {etiquetaAccion(item.accion)}
+                        <span className="ml-1.5 tabular-nums opacity-80">
+                          {item.total}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-1 text-sm font-medium text-zinc-700">
+                  Personas
+                </p>
+                <p className="mb-2 text-xs text-zinc-500">
+                  Clic para ver solo lo que hizo esa persona.
+                </p>
+                <ul className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
+                  {resumen.porActor.map((item) => {
+                    const activo = filtroActorId === item.actorId;
+                    return (
+                      <li key={item.actorId}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFiltroActorId(activo ? "" : item.actorId)
+                          }
+                          className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm transition ${
+                            activo
+                              ? "border-ruralia-teal bg-ruralia-teal text-white"
+                              : "border-zinc-200 bg-white text-zinc-900 hover:bg-ruralia-teal-soft"
+                          }`}
+                        >
+                          <span className="truncate font-medium">
+                            {item.actorNombre}
+                          </span>
+                          <span className="shrink-0 tabular-nums text-xs opacity-80">
+                            {item.total}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {seleccionId && !sinActividadProyecto ? (
+        <section className="space-y-4 rounded-2xl border border-ruralia-teal-border bg-white p-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-900">
+                Cronología
+              </h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                {modo === "persona"
+                  ? (tituloSeleccion ?? "Agente")
+                  : "Movimientos del periodo seleccionado"}
+              </p>
+            </div>
+            {!cargandoCronologia && !errorCronologia ? (
+              <p className="text-sm font-medium tabular-nums text-zinc-700">
+                {totalEventos.toLocaleString("es-CO")}{" "}
+                {totalEventos === 1 ? "resultado" : "resultados"}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="w-56">
+              <span className="mb-1.5 block text-xs font-medium text-zinc-500">
+                Periodo
+              </span>
+              <SelectorDesplegable
+                value={periodo}
+                onChange={(id) => setPeriodo(id as PeriodoFiltro)}
+                opciones={OPCIONES_PERIODO}
+                icono={CalendarDays}
+              />
             </div>
 
-            {errorCronologia ? <Alerta mensaje={errorCronologia} /> : null}
-
-            {cargandoCronologia ? (
-              <Spinner />
-            ) : !errorCronologia && eventos.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-8 text-center">
-                <p className="text-sm font-medium text-zinc-700">
-                  Sin eventos en este recorte
-                </p>
-                <p className="mt-2 text-sm text-zinc-500">
-                  {modo === "proyecto"
-                    ? "Prueba ampliar el periodo o quitar filtros. El panorama de arriba muestra el volumen total del proyecto."
-                    : "Prueba ampliar el periodo o cambiar el tipo de acción."}
-                </p>
+            {modo === "persona" ? (
+              <div className="w-56">
+                <span className="mb-1.5 block text-xs font-medium text-zinc-500">
+                  Tipo
+                </span>
+                <SelectorDesplegable
+                  value={filtroAccion}
+                  onChange={setFiltroAccion}
+                  opciones={OPCIONES_TIPO_ACCION}
+                  permitirVacio
+                  etiquetaVacio="Todas las acciones"
+                  placeholder="Todas las acciones"
+                  icono={ListFilter}
+                />
               </div>
-            ) : (
-              <div className="space-y-8">
-                {grupos.map((grupo) => (
-                  <div key={grupo.dia}>
-                    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                      {grupo.etiqueta}
-                      <span className="ml-2 font-normal normal-case text-zinc-400">
-                        · {grupo.eventos.length}
-                      </span>
-                    </h3>
-                    <ol className="relative border-l border-ruralia-teal-border pl-6">
-                      {grupo.eventos.map((evento) => (
-                        <ItemEvento
-                          key={evento.id}
-                          evento={evento}
-                          mostrarProyecto={modo === "persona"}
-                          mostrarActor={modo === "proyecto"}
-                        />
-                      ))}
-                    </ol>
-                  </div>
-                ))}
+            ) : null}
 
-                {hayMas ? (
-                  <div className="flex justify-center pt-2">
-                    <button
-                      type="button"
-                      disabled={cargandoMas}
-                      onClick={() => void cargarCronologia(pagina + 1, true)}
-                      className="rounded-xl border border-zinc-200 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
-                    >
-                      {cargandoMas
-                        ? "Cargando…"
-                        : `Cargar más (${pagina}/${totalPaginas})`}
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </section>
-        </>
-      )}
+            {hayFiltros ? (
+              <button
+                type="button"
+                onClick={limpiarFiltros}
+                className="rounded-lg px-3 py-2 text-sm font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft"
+              >
+                Limpiar filtros
+              </button>
+            ) : null}
+          </div>
+
+          {errorCronologia ? <Alerta mensaje={errorCronologia} /> : null}
+
+          {cargandoCronologia ? (
+            <Spinner />
+          ) : !errorCronologia && eventos.length === 0 ? (
+            <EstadoVacio
+              titulo={
+                modo === "proyecto" && (resumen?.totalEventos ?? 0) > 0
+                  ? `Nada en ${etiquetaPeriodo.toLowerCase()}`
+                  : "Sin movimientos en este periodo"
+              }
+              detalle={
+                modo === "proyecto" && (resumen?.totalEventos ?? 0) > 0
+                  ? `Este proyecto tiene ${resumen?.totalEventos} eventos en total. El recorte actual no incluye ninguno.`
+                  : periodo === "todo"
+                    ? modo === "persona"
+                      ? "Este agente aún no tiene actividad registrada."
+                      : "No hay movimientos que coincidan con los filtros."
+                    : "Amplía el periodo o quita filtros para ver si hay actividad anterior."
+              }
+              onAccion={
+                modo === "proyecto" && (resumen?.totalEventos ?? 0) > 0
+                  ? verTodoElHistorial
+                  : periodo !== "todo" || filtroAccion || filtroActorId
+                    ? verTodoElHistorial
+                    : undefined
+              }
+              etiquetaBoton={
+                modo === "proyecto" && (resumen?.totalEventos ?? 0) > 0
+                  ? "Ver todo el historial"
+                  : periodo !== "todo" || filtroAccion || filtroActorId
+                    ? "Ver todo el historial"
+                    : undefined
+              }
+            />
+          ) : (
+            <div className="space-y-8">
+              {grupos.map((grupo) => (
+                <div key={grupo.dia}>
+                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    {grupo.etiqueta}
+                    <span className="ml-2 font-normal normal-case text-zinc-400">
+                      · {grupo.eventos.length}
+                    </span>
+                  </h3>
+                  <ol className="relative border-l border-ruralia-teal-border pl-6">
+                    {grupo.eventos.map((evento) => (
+                      <ItemEvento
+                        key={evento.id}
+                        evento={evento}
+                        mostrarProyecto={modo === "persona"}
+                        mostrarActor={modo === "proyecto"}
+                      />
+                    ))}
+                  </ol>
+                </div>
+              ))}
+
+              {hayMas ? (
+                <div className="flex justify-center pt-2">
+                  <button
+                    type="button"
+                    disabled={cargandoMas}
+                    onClick={() => void cargarCronologia(pagina + 1, true)}
+                    className="rounded-xl border border-zinc-200 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                  >
+                    {cargandoMas
+                      ? "Cargando…"
+                      : `Cargar más (${pagina}/${totalPaginas})`}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }

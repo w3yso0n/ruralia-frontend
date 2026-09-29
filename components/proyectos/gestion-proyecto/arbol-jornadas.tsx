@@ -1,5 +1,6 @@
 "use client";
 
+import { nombreLugarJornada } from "@/components/proyectos/gestion-proyecto/selector-lugar-jornada";
 import type { Jornada } from "@/lib/types";
 
 interface ArbolJornadasProps {
@@ -84,7 +85,7 @@ function FilaJornada({
         <span
           className={`ml-2 text-xs ${activa ? "text-white/85" : "text-zinc-400"}`}
         >
-          {jornada.vereda?.nombre ?? "Sin vereda"}
+          {nombreLugarJornada(jornada)}
         </span>
         {jornada.tipo === "GRUPAL" ? (
           <span
@@ -199,7 +200,7 @@ export function ArbolJornadas({
                   </span>
                 ) : null}
                 <span className="ml-2 text-xs text-zinc-400">
-                  {representativa.vereda?.nombre ?? "Sin vereda"}
+                  {nombreLugarJornada(representativa)}
                 </span>
               </span>
               <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-600">

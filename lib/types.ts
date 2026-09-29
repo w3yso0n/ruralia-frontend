@@ -536,6 +536,7 @@ export interface Jornada {
   proyecto?: { id: string; nombre: string };
   meta?: MetaResumenJornada;
   vereda?: { id: string; nombre: string };
+  geocerca?: { id: string; nombre: string };
   tecnicoResponsable?: { id: string; nombre: string };
   beneficiarios?: { id: string; nombre: string }[];
   asociaciones?: { id: string; nombre: string }[];
@@ -970,7 +971,8 @@ export interface CrearJornadaPayload {
   proyectoId: string;
   metaId: string;
   actividades?: ActividadJornadaPayload[];
-  veredaId: string;
+  veredaId?: string | null;
+  geocercaId?: string | null;
   tecnicoResponsableId?: string;
   tecnicoResponsableIds?: string[];
   tipo?: TipoJornada;
@@ -984,7 +986,8 @@ export interface ActualizarJornadaPayload {
   fecha?: string;
   nombre?: string;
   observaciones?: string;
-  veredaId?: string;
+  veredaId?: string | null;
+  geocercaId?: string | null;
   metaId?: string;
   cantidadEjecutada?: number;
   tipo?: TipoJornada;
