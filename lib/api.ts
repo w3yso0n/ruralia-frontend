@@ -268,6 +268,58 @@ export async function actualizarUsuario(
   });
 }
 
+export type TipoAlcanceTerritorial =
+  | "REGION"
+  | "DEPARTAMENTO"
+  | "MUNICIPIO"
+  | "VEREDA";
+
+export interface AlcanceTerritorialItem {
+  tipo: TipoAlcanceTerritorial;
+  referenciaId: string;
+  nombre?: string;
+}
+
+export async function listarAlcanceUsuario(
+  token: string,
+  usuarioId: string,
+): Promise<AlcanceTerritorialItem[]> {
+  return fetchConAuth<AlcanceTerritorialItem[]>(
+    `/usuarios/${usuarioId}/alcance`,
+    token,
+  );
+}
+
+export async function guardarAlcanceUsuario(
+  token: string,
+  usuarioId: string,
+  items: Array<{ tipo: TipoAlcanceTerritorial; referenciaId: string }>,
+): Promise<AlcanceTerritorialItem[]> {
+  return fetchConAuth<AlcanceTerritorialItem[]>(
+    `/usuarios/${usuarioId}/alcance`,
+    token,
+    { method: "PUT", body: JSON.stringify({ items }) },
+  );
+}
+
+export async function desactivarUsuario(
+  token: string,
+  id: string,
+): Promise<Usuario> {
+  return fetchConAuth<Usuario>(`/usuarios/${id}/desactivar`, token, {
+    method: "POST",
+  });
+}
+
+export async function reactivarUsuario(
+  token: string,
+  id: string,
+): Promise<Usuario> {
+  return fetchConAuth<Usuario>(`/usuarios/${id}/reactivar`, token, {
+    method: "POST",
+  });
+}
+
 export async function eliminarUsuario(
   token: string,
   id: string,

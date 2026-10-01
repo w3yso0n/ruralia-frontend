@@ -476,6 +476,14 @@ export function GestionRoles() {
                             completo
                           </span>
                         ) : null}
+                        {modulo.modulo === "proyectos" ||
+                        modulo.modulo === "actividades" ? (
+                          <p className="mt-1 max-w-[14rem] text-[11px] font-normal leading-snug text-zinc-500">
+                            Los coordinadores aplican estos permisos solo en
+                            proyectos de su territorio o de su equipo. El
+                            administrador, en todos.
+                          </p>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2">
                         <input

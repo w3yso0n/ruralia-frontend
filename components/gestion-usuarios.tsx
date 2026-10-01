@@ -5,12 +5,20 @@ import { Alerta, Modal, Spinner } from "@/components/ui/modal";
 import {
   actualizarUsuario,
   crearUsuario,
+  desactivarUsuario,
   eliminarUsuario,
+  guardarAlcanceUsuario,
+  listarAlcanceUsuario,
   listarRoles,
   listarUsuarios,
   obtenerUsuario,
+  reactivarUsuario,
+  type AlcanceTerritorialItem,
 } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
+import {
+  EditorAlcanceTerritorial,
+  PillsAlcance,
+} from "@/components/usuarios/editor-alcance-territorial";
 import {
   btnAccionPeligro,
   btnAccionPrimaria,
@@ -18,6 +26,7 @@ import {
 } from "@/lib/estilos-boton";
 import { etiquetaRol, type RolDetalle, type Usuario } from "@/lib/types";
 import { usePermisos } from "@/lib/use-permisos";
+import { useAuth } from "@/lib/auth-context";
 
 type ModoModal = "crear" | "editar" | "ver" | null;
 
@@ -67,7 +76,7 @@ function MatrizPermisosSoloLectura({ claves }: { claves: string[] }) {
 }
 
 export function GestionUsuarios() {
-  const { token, refrescarUsuario } = useAuth();
+  const { token, usuario: usuarioActual, refrescarUsuario } = useAuth();
   const { puede } = usePermisos();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [rolesDisponibles, setRolesDisponibles] = useState<RolDetalle[]>([]);
@@ -81,11 +90,18 @@ export function GestionUsuarios() {
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<Usuario | null>(
     null,
   );
+  const [alcanceItems, setAlcanceItems] = useState<AlcanceTerritorialItem[] | null>(
+    null,
+  );
   const [formulario, setFormulario] = useState<FormularioUsuario>(FORM_VACIO);
   const [enviando, setEnviando] = useState(false);
+  const [confirmarDesactivar, setConfirmarDesactivar] = useState<Usuario | null>(
+    null,
+  );
   const [confirmarEliminar, setConfirmarEliminar] = useState<Usuario | null>(
     null,
   );
+  const [correoEliminar, setCorreoEliminar] = useState("");
 
   const limite = 10;
   const puedeVerUsuarios = puede("usuarios.ver");
@@ -140,6 +156,14 @@ export function GestionUsuarios() {
     try {
       const usuario = await obtenerUsuario(token, id);
       setUsuarioSeleccionado(usuario);
+      const esCoordinador = usuario.roles.some(
+        (rol) =>
+          rol.nombre === "COORDINADOR_ZONA" ||
+          rol.nombre === "COORDINADOR_DEPARTAMENTAL",
+      );
+      setAlcanceItems(
+        esCoordinador ? await listarAlcanceUsuario(token, id) : null,
+      );
       setModo("ver");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar usuario");
@@ -167,7 +191,21 @@ export function GestionUsuarios() {
   function cerrarModal() {
     setModo(null);
     setUsuarioSeleccionado(null);
+    setAlcanceItems(null);
     setFormulario(FORM_VACIO);
+  }
+
+  const recordarAlcance = useCallback((items: AlcanceTerritorialItem[]) => {
+    setAlcanceItems(items);
+  }, []);
+
+  function esCoordinadorTerritorial(rolIds: string[]) {
+    return rolesDisponibles.some(
+      (rol) =>
+        rolIds.includes(rol.id) &&
+        (rol.nombre === "COORDINADOR_ZONA" ||
+          rol.nombre === "COORDINADOR_DEPARTAMENTAL"),
+    );
   }
 
   function toggleRol(rolId: string) {
@@ -203,6 +241,19 @@ export function GestionUsuarios() {
           rolIds: formulario.rolIds,
           estaActivo: formulario.estaActivo,
         });
+        if (
+          esCoordinadorTerritorial(formulario.rolIds) &&
+          alcanceItems
+        ) {
+          await guardarAlcanceUsuario(
+            token,
+            usuarioSeleccionado.id,
+            alcanceItems.map((item) => ({
+              tipo: item.tipo,
+              referenciaId: item.referenciaId,
+            })),
+          );
+        }
         setExito("Usuario actualizado correctamente");
       }
       cerrarModal();
@@ -215,14 +266,50 @@ export function GestionUsuarios() {
     }
   }
 
+  async function manejarDesactivar() {
+    if (!confirmarDesactivar || !token) return;
+    setEnviando(true);
+    setError(null);
+    try {
+      await desactivarUsuario(token, confirmarDesactivar.id);
+      setExito(
+        `${confirmarDesactivar.nombreCompleto} quedó desactivado. Puedes volver a activarlo desde el listado.`,
+      );
+      setConfirmarDesactivar(null);
+      await cargar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al desactivar");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function manejarReactivar(usuario: Usuario) {
+    if (!token) return;
+    setEnviando(true);
+    setError(null);
+    try {
+      await reactivarUsuario(token, usuario.id);
+      setExito(`${usuario.nombreCompleto} volvió a estar activo.`);
+      await cargar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al activar");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   async function manejarEliminar() {
     if (!confirmarEliminar || !token) return;
     setEnviando(true);
     setError(null);
     try {
       await eliminarUsuario(token, confirmarEliminar.id);
-      setExito("Usuario desactivado correctamente");
+      setExito(
+        `${confirmarEliminar.nombreCompleto} se eliminó de forma definitiva.`,
+      );
       setConfirmarEliminar(null);
+      setCorreoEliminar("");
       await cargar();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al eliminar");
@@ -245,8 +332,8 @@ export function GestionUsuarios() {
             Gestión de usuarios
           </h2>
           <p className="mt-1 text-zinc-600">
-            Crear, editar y asignar roles del equipo. La matriz de permisos está
-            en Roles y permisos.
+            Crear, editar, activar o eliminar usuarios del equipo. La matriz de
+            permisos está en Roles y permisos.
           </p>
         </div>
         {puede("usuarios.crear") ? (
@@ -351,10 +438,35 @@ export function GestionUsuarios() {
                                   Editar
                                 </button>
                               ) : null}
-                              {usuario.estaActivo && puede("usuarios.eliminar") ? (
+                              {puede("usuarios.eliminar") &&
+                              usuario.id !== usuarioActual?.id ? (
+                                usuario.estaActivo ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmarDesactivar(usuario)}
+                                    className={btnAccionSecundaria}
+                                  >
+                                    Desactivar
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={enviando}
+                                    onClick={() => void manejarReactivar(usuario)}
+                                    className={btnAccionPrimaria}
+                                  >
+                                    Activar
+                                  </button>
+                                )
+                              ) : null}
+                              {puede("usuarios.eliminar") &&
+                              usuario.id !== usuarioActual?.id ? (
                                 <button
                                   type="button"
-                                  onClick={() => setConfirmarEliminar(usuario)}
+                                  onClick={() => {
+                                    setCorreoEliminar("");
+                                    setConfirmarEliminar(usuario);
+                                  }}
                                   className={btnAccionPeligro}
                                 >
                                   Eliminar
@@ -436,6 +548,14 @@ export function GestionUsuarios() {
                     ))}
                   </dd>
                 </div>
+                {alcanceItems ? (
+                  <div>
+                    <dt className="mb-1 text-zinc-500">Territorio</dt>
+                    <dd>
+                      <PillsAlcance items={alcanceItems} />
+                    </dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt className="mb-1 text-zinc-500">Acceso efectivo</dt>
                   <dd>
@@ -523,6 +643,21 @@ export function GestionUsuarios() {
                     ))}
                   </div>
                 </div>
+                {modo === "editar" &&
+                usuarioSeleccionado &&
+                token &&
+                rolesDisponibles.some(
+                  (rol) =>
+                    formulario.rolIds.includes(rol.id) &&
+                    (rol.nombre === "COORDINADOR_ZONA" ||
+                      rol.nombre === "COORDINADOR_DEPARTAMENTAL"),
+                ) ? (
+                  <EditorAlcanceTerritorial
+                    token={token}
+                    usuarioId={usuarioSeleccionado.id}
+                    onChange={recordarAlcance}
+                  />
+                ) : null}
                 {modo === "editar" ? (
                   <label className="flex items-center gap-2 text-sm text-zinc-700">
                     <input
@@ -560,30 +695,97 @@ export function GestionUsuarios() {
           </Modal>
 
           <Modal
-            titulo="Confirmar eliminación"
-            abierto={confirmarEliminar !== null}
-            onCerrar={() => setConfirmarEliminar(null)}
+            titulo="Desactivar usuario"
+            abierto={confirmarDesactivar !== null}
+            onCerrar={() => setConfirmarDesactivar(null)}
           >
             <p className="text-sm text-zinc-600">
               ¿Desactivar a{" "}
-              <strong>{confirmarEliminar?.nombreCompleto}</strong>? El usuario
-              no podrá iniciar sesión pero sus datos se conservarán.
+              <strong>{confirmarDesactivar?.nombreCompleto}</strong>? No podrá
+              iniciar sesión. Puedes volver a activarlo cuando quieras.
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setConfirmarEliminar(null)}
-                className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold"
+                onClick={() => setConfirmarDesactivar(null)}
+                className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 disabled={enviando}
+                onClick={() => void manejarDesactivar()}
+                className="rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white hover:bg-ruralia-teal-hover disabled:opacity-60"
+              >
+                {enviando ? "Desactivando..." : "Desactivar"}
+              </button>
+            </div>
+          </Modal>
+
+          <Modal
+            titulo="Eliminar usuario"
+            abierto={confirmarEliminar !== null}
+            onCerrar={() => {
+              setConfirmarEliminar(null);
+              setCorreoEliminar("");
+            }}
+          >
+            <div className="space-y-4 text-sm">
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+                <p className="font-semibold">Esta acción no se puede deshacer</p>
+                <p className="mt-1">
+                  <strong>{confirmarEliminar?.nombreCompleto}</strong> desaparece
+                  del listado y pierde el acceso. No se puede volver a activar.
+                </p>
+              </div>
+              <ul className="list-disc space-y-1 pl-5 text-zinc-600">
+                <li>Se borra su inicio de sesión.</li>
+                <li>Sale de los equipos y del territorio asignado.</li>
+                <li>
+                  Los proyectos, jornadas y documentos donde ya aparece conservan
+                  su nombre.
+                </li>
+              </ul>
+              <div>
+                <label className="mb-1 block font-medium text-zinc-700">
+                  Escribe el correo{" "}
+                  <span className="font-semibold text-zinc-900">
+                    {confirmarEliminar?.correo}
+                  </span>{" "}
+                  para confirmar
+                </label>
+                <input
+                  type="email"
+                  value={correoEliminar}
+                  onChange={(e) => setCorreoEliminar(e.target.value)}
+                  autoComplete="off"
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmarEliminar(null);
+                  setCorreoEliminar("");
+                }}
+                className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={
+                  enviando ||
+                  correoEliminar.trim().toLowerCase() !==
+                    confirmarEliminar?.correo.trim().toLowerCase()
+                }
                 onClick={() => void manejarEliminar()}
                 className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
-                {enviando ? "Eliminando..." : "Desactivar"}
+                {enviando ? "Eliminando..." : "Eliminar definitivamente"}
               </button>
             </div>
           </Modal>
