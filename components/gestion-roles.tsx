@@ -19,7 +19,13 @@ import {
   btnAccionPrimaria,
   btnAccionSecundaria,
 } from "@/lib/estilos-boton";
-import { etiquetaRol, PERMISOS_CRITICOS_CUANTIVA } from "@/lib/types";
+import {
+  etiquetaNivelAcceso,
+  etiquetaRol,
+  NIVELES_ACCESO_ROL,
+  PERMISOS_CRITICOS_CUANTIVA,
+  type NivelAccesoRol,
+} from "@/lib/types";
 import { usePermisos } from "@/lib/use-permisos";
 
 const ETIQUETAS_MODULO: Record<string, string> = {
@@ -58,6 +64,8 @@ export function GestionRoles() {
   const [creando, setCreando] = useState(false);
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [nivelAcceso, setNivelAcceso] =
+    useState<NivelAccesoRol>("PROYECTOS_ASIGNADOS");
   const [permisoIds, setPermisoIds] = useState<Set<string>>(new Set());
   const [enviando, setEnviando] = useState(false);
   const [confirmarEliminar, setConfirmarEliminar] = useState<RolDetalle | null>(
@@ -125,6 +133,7 @@ export function GestionRoles() {
     setEditando(null);
     setNombre("");
     setDescripcion("");
+    setNivelAcceso("PROYECTOS_ASIGNADOS");
     setPermisoIds(new Set());
   }
 
@@ -136,6 +145,7 @@ export function GestionRoles() {
       setCreando(false);
       setNombre(rol.nombre);
       setDescripcion(rol.descripcion ?? "");
+      setNivelAcceso(rol.nivelAcceso ?? "PROYECTOS_ASIGNADOS");
       setPermisoIds(new Set(rol.permisoIds));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar rol");
@@ -201,6 +211,7 @@ export function GestionRoles() {
         await crearRol(token, {
           nombre: nombre.trim(),
           descripcion: descripcion.trim() || undefined,
+          nivelAcceso,
           permisoIds: ids,
         });
         setExito("Rol creado correctamente");
@@ -208,6 +219,7 @@ export function GestionRoles() {
         await actualizarRol(token, editando.id, {
           nombre: esCuantivaEditando ? undefined : nombre.trim(),
           descripcion: descripcion.trim() || undefined,
+          nivelAcceso: editando.esSistema ? undefined : nivelAcceso,
           permisoIds: ids,
         });
         setExito("Rol actualizado correctamente");
@@ -333,6 +345,7 @@ export function GestionRoles() {
               <thead className="border-b border-zinc-100 bg-ruralia-teal-soft/50 text-xs uppercase tracking-wide text-ruralia-teal-text">
                 <tr>
                   <th className="px-5 py-3 font-semibold">Rol</th>
+                  <th className="px-5 py-3 font-semibold">Acceso</th>
                   <th className="px-5 py-3 font-semibold">Permisos</th>
                   <th className="px-5 py-3 font-semibold">Usuarios</th>
                   <th className="px-5 py-3 font-semibold">Tipo</th>
@@ -350,6 +363,11 @@ export function GestionRoles() {
                       {rol.descripcion ? (
                         <p className="text-xs text-zinc-500">{rol.descripcion}</p>
                       ) : null}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className="whitespace-nowrap rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs font-semibold text-ruralia-teal-text">
+                        {etiquetaNivelAcceso(rol.nivelAcceso)}
+                      </span>
                     </td>
                     <td className="px-5 py-3 text-zinc-600">
                       {rol.conteoPermisos}
@@ -441,6 +459,56 @@ export function GestionRoles() {
                 className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal disabled:bg-zinc-50"
               />
             </div>
+          </div>
+
+          <div>
+            <p className="mb-1 text-sm font-medium text-zinc-700">
+              Acceso a proyectos
+            </p>
+            <p className="mb-2 text-xs text-zinc-500">
+              {editando?.esSistema
+                ? "Fijo en los roles de sistema. Clona el rol si necesitas otra variante."
+                : "Define sobre qué proyectos aplican los permisos de la matriz."}
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {NIVELES_ACCESO_ROL.map((nivel) => {
+                const activo = nivelAcceso === nivel.valor;
+                const bloqueado =
+                  !!editando?.esSistema || (!puede("roles.editar") && !creando);
+                return (
+                  <button
+                    key={nivel.valor}
+                    type="button"
+                    disabled={bloqueado}
+                    onClick={() => setNivelAcceso(nivel.valor)}
+                    className={`rounded-xl border px-4 py-2.5 text-left transition disabled:cursor-not-allowed ${
+                      activo
+                        ? "border-ruralia-teal bg-ruralia-teal-soft ring-2 ring-ruralia-teal/20"
+                        : "border-zinc-200 bg-white hover:border-ruralia-teal-border disabled:bg-zinc-50 disabled:text-zinc-400"
+                    }`}
+                  >
+                    <span
+                      className={`block text-sm font-semibold ${
+                        activo ? "text-ruralia-teal-text" : "text-zinc-800"
+                      }`}
+                    >
+                      {nivel.etiqueta}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-zinc-500">
+                      {nivel.descripcion}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {nivelAcceso === "JORNADAS_ASIGNADAS" ? (
+              <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                Con este acceso solo tienen efecto: ver proyectos y jornadas,
+                registrar la ejecución de sus propias jornadas, enviar
+                formularios, subir evidencias y enviar a revisión. Las demás
+                casillas de la matriz no aplican.
+              </p>
+            ) : null}
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-zinc-200">

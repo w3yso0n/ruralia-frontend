@@ -21,8 +21,43 @@ function etiquetaEstado(estado: Proyecto["estado"]): string {
   return mapa[estado];
 }
 
-export function TarjetaProyecto({ proyecto }: { proyecto: Proyecto }) {
+export function TarjetaProyecto({
+  proyecto,
+  vistaLimitada = false,
+}: {
+  proyecto: Proyecto;
+  /** Técnico: sin avance, contraparte ni equipo. */
+  vistaLimitada?: boolean;
+}) {
   const progreso = proyecto.progresoPorcentaje ?? 0;
+
+  if (vistaLimitada) {
+    return (
+      <article className="flex flex-col rounded-2xl border border-ruralia-teal-border bg-white p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-zinc-900">{proyecto.nombre}</h3>
+            {proyecto.descripcion ? (
+              <p className="mt-1 line-clamp-2 text-sm text-zinc-600">
+                {proyecto.descripcion}
+              </p>
+            ) : null}
+          </div>
+          <span className="rounded-full bg-ruralia-teal-soft px-2.5 py-1 text-xs font-medium text-ruralia-teal-text">
+            {etiquetaEstado(proyecto.estado)}
+          </span>
+        </div>
+        <div className="mt-5 flex gap-2 pt-2">
+          <Link
+            href={`/proyectos/${proyecto.id}`}
+            className="flex-1 rounded-xl bg-ruralia-teal px-3 py-2 text-center text-sm font-semibold text-white transition hover:bg-ruralia-teal-hover"
+          >
+            Ver mis jornadas
+          </Link>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article className="flex flex-col rounded-2xl border border-ruralia-teal-border bg-white p-5 shadow-sm transition hover:border-ruralia-teal-border hover:shadow-md">

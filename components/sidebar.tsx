@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  CalendarCheck,
   LayoutDashboard,
   Users,
   Shield,
@@ -28,6 +29,10 @@ type ItemNav = {
   etiqueta: string;
   icono: LucideIcon;
   permiso?: string;
+  /** Solo para quien opera sus jornadas asignadas (Técnico). */
+  soloTecnico?: boolean;
+  /** Oculto para el Técnico aunque tenga el permiso. */
+  ocultoATecnico?: boolean;
   puedeAlgunoDe?: string[];
   badgeKey?: "revision";
 };
@@ -48,6 +53,14 @@ const SECCIONES: SeccionNav[] = [
         etiqueta: "Dashboard",
         icono: LayoutDashboard,
         permiso: "dashboard.ver",
+        ocultoATecnico: true,
+      },
+      {
+        href: "/mis-jornadas",
+        etiqueta: "Mis jornadas",
+        icono: CalendarCheck,
+        permiso: "jornadas.ver",
+        soloTecnico: true,
       },
     ],
   },
@@ -71,6 +84,7 @@ const SECCIONES: SeccionNav[] = [
         etiqueta: "Seguimiento",
         icono: Waypoints,
         puedeAlgunoDe: ["proyectos.ver", "jornadas.ver"],
+        ocultoATecnico: true,
       },
       {
         href: "/evaluaciones",
@@ -107,6 +121,7 @@ const SECCIONES: SeccionNav[] = [
         etiqueta: "Formularios",
         icono: ClipboardList,
         permiso: "formularios.ver",
+        ocultoATecnico: true,
       },
     ],
   },
@@ -141,7 +156,9 @@ function itemPermitido(
   item: ItemNav,
   puede: (...c: string[]) => boolean,
   puedeAlguno: (...c: string[]) => boolean,
+  esTecnico: boolean,
 ): boolean {
+  if (esTecnico ? item.ocultoATecnico : item.soloTecnico) return false;
   if (item.href === "/dashboard") {
     return puede("dashboard.ver") || puede("proyectos.ver");
   }
@@ -162,13 +179,13 @@ export function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { token } = useAuth();
-  const { puede, puedeAlguno } = usePermisos();
+  const { puede, puedeAlguno, soloJornadasAsignadas } = usePermisos();
   const [badgeRevision, setBadgeRevision] = useState(0);
 
   const secciones = SECCIONES.map((seccion) => ({
     ...seccion,
     items: seccion.items.filter((item) =>
-      itemPermitido(item, puede, puedeAlguno),
+      itemPermitido(item, puede, puedeAlguno, soloJornadasAsignadas),
     ),
   })).filter((seccion) => seccion.items.length > 0);
 
@@ -178,10 +195,12 @@ export function Sidebar({
         pathname === item.href || pathname.startsWith(`${item.href}/`),
     );
     if (!itemActual) return;
-    if (!itemPermitido(itemActual, puede, puedeAlguno)) {
-      router.replace("/dashboard");
+    if (
+      !itemPermitido(itemActual, puede, puedeAlguno, soloJornadasAsignadas)
+    ) {
+      router.replace(soloJornadasAsignadas ? "/mis-jornadas" : "/dashboard");
     }
-  }, [pathname, puede, puedeAlguno, router]);
+  }, [pathname, puede, puedeAlguno, soloJornadasAsignadas, router]);
 
   useEffect(() => {
     if (!token || !puede("jornadas.ver")) return;

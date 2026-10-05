@@ -12,15 +12,11 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { usePermisos } from "@/lib/use-permisos";
-import type {
-  EstadoProyecto,
-  OrdenProyecto,
-  Proyecto,
-} from "@/lib/types";
+import type { EstadoProyecto, OrdenProyecto, Proyecto } from "@/lib/types";
 
 export function ListadoProyectos() {
   const { token } = useAuth();
-  const { puede } = usePermisos();
+  const { puede, soloJornadasAsignadas } = usePermisos();
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [total, setTotal] = useState(0);
   const [pagina, setPagina] = useState(1);
@@ -44,7 +40,6 @@ export function ListadoProyectos() {
 
   const puedeGestionar = puede("proyectos.crear");
 
-
   const limite = 12;
 
   const cargar = useCallback(async () => {
@@ -65,7 +60,9 @@ export function ListadoProyectos() {
       setProyectos(respuesta.datos);
       setTotal(respuesta.total);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar proyectos");
+      setError(
+        err instanceof Error ? err.message : "Error al cargar proyectos",
+      );
     } finally {
       setCargando(false);
     }
@@ -85,9 +82,11 @@ export function ListadoProyectos() {
   }, [cargar]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || soloJornadasAsignadas) return;
     void Promise.all([
-      listarUsuarios(token, { limite: 100, estaActivo: true }).catch(() => null),
+      listarUsuarios(token, { limite: 100, estaActivo: true }).catch(
+        () => null,
+      ),
       listarAsociaciones(token, { limite: 100 }).catch(() => null),
       listarVeredas(token, { limite: 100 }).catch(() => null),
     ]).then(([usuarios, asociaciones, veredas]) => {
@@ -107,7 +106,7 @@ export function ListadoProyectos() {
         );
       }
     });
-  }, [token]);
+  }, [token, soloJornadasAsignadas]);
 
   const totalPaginas = Math.ceil(total / limite) || 1;
 
@@ -117,7 +116,9 @@ export function ListadoProyectos() {
         <div>
           <h2 className="text-2xl font-semibold text-zinc-900">Proyectos</h2>
           <p className="mt-1 text-zinc-600">
-            Explora y gestiona los proyectos rurales
+            {soloJornadasAsignadas
+              ? "Proyectos donde tienes jornadas asignadas"
+              : "Explora y gestiona los proyectos rurales"}
           </p>
         </div>
         {puedeGestionar ? (
@@ -157,68 +158,76 @@ export function ListadoProyectos() {
           <option value="SUSPENDIDO">Suspendido</option>
           <option value="COMPLETADO">Completado</option>
         </select>
-        <select
-          value={personalId}
-          onChange={(e) => {
-            setPersonalId(e.target.value);
-            setPagina(1);
-          }}
-          className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
-        >
-          <option value="">Todo el personal</option>
-          {opcionesPersonal.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nombre}
-            </option>
-          ))}
-        </select>
-        <select
-          value={asociacionId}
-          onChange={(e) => {
-            setAsociacionId(e.target.value);
-            setPagina(1);
-          }}
-          className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
-        >
-          <option value="">Todas las asociaciones</option>
-          {opcionesAsociaciones.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nombre}
-            </option>
-          ))}
-        </select>
-        <select
-          value={orden}
-          onChange={(e) => setOrden(e.target.value as OrdenProyecto)}
-          className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
-        >
-          <option value="creado_desc">Más recientes</option>
-          <option value="creado_asc">Más antiguos</option>
-          <option value="nombre_asc">Nombre A-Z</option>
-          <option value="nombre_desc">Nombre Z-A</option>
-        </select>
-        <select
-          value={veredaId}
-          onChange={(e) => {
-            setVeredaId(e.target.value);
-            setPagina(1);
-          }}
-          className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm lg:col-span-2"
-        >
-          <option value="">Todas las veredas</option>
-          {opcionesVeredas.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.nombre}
-            </option>
-          ))}
-        </select>
+        {soloJornadasAsignadas ? null : (
+          <>
+            <select
+              value={personalId}
+              onChange={(e) => {
+                setPersonalId(e.target.value);
+                setPagina(1);
+              }}
+              className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+            >
+              <option value="">Todo el personal</option>
+              {opcionesPersonal.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
+            </select>
+            <select
+              value={asociacionId}
+              onChange={(e) => {
+                setAsociacionId(e.target.value);
+                setPagina(1);
+              }}
+              className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+            >
+              <option value="">Todas las asociaciones</option>
+              {opcionesAsociaciones.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.nombre}
+                </option>
+              ))}
+            </select>
+            <select
+              value={orden}
+              onChange={(e) => setOrden(e.target.value as OrdenProyecto)}
+              className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+            >
+              <option value="creado_desc">Más recientes</option>
+              <option value="creado_asc">Más antiguos</option>
+              <option value="nombre_asc">Nombre A-Z</option>
+              <option value="nombre_desc">Nombre Z-A</option>
+            </select>
+            <select
+              value={veredaId}
+              onChange={(e) => {
+                setVeredaId(e.target.value);
+                setPagina(1);
+              }}
+              className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm lg:col-span-2"
+            >
+              <option value="">Todas las veredas</option>
+              {opcionesVeredas.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.nombre}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
       </div>
 
       {cargando ? (
         <Spinner />
       ) : proyectos.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-ruralia-teal-border bg-white p-12 text-center">
-          <p className="text-zinc-600">No se encontraron proyectos</p>
+          <p className="text-zinc-600">
+            {soloJornadasAsignadas
+              ? "Aún no tienes jornadas asignadas en ningún proyecto"
+              : "No se encontraron proyectos"}
+          </p>
           {puedeGestionar ? (
             <Link
               href="/proyectos/nuevo"
@@ -231,7 +240,11 @@ export function ListadoProyectos() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {proyectos.map((proyecto) => (
-            <TarjetaProyecto key={proyecto.id} proyecto={proyecto} />
+            <TarjetaProyecto
+              key={proyecto.id}
+              proyecto={proyecto}
+              vistaLimitada={soloJornadasAsignadas}
+            />
           ))}
         </div>
       )}

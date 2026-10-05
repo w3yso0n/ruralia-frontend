@@ -8,13 +8,21 @@ import {
   desactivarUsuario,
   eliminarUsuario,
   guardarAlcanceUsuario,
+  guardarProyectosUsuario,
   listarAlcanceUsuario,
+  listarProyectos,
+  listarProyectosUsuario,
   listarRoles,
   listarUsuarios,
   obtenerUsuario,
   reactivarUsuario,
   type AlcanceTerritorialItem,
+  type ProyectoAsignadoUsuario,
 } from "@/lib/api";
+import {
+  SelectorCatalogo,
+  type OpcionCatalogo,
+} from "@/components/ui/selector-catalogo";
 import {
   EditorAlcanceTerritorial,
   PillsAlcance,
@@ -24,7 +32,15 @@ import {
   btnAccionPrimaria,
   btnAccionSecundaria,
 } from "@/lib/estilos-boton";
-import { etiquetaRol, type RolDetalle, type Usuario } from "@/lib/types";
+import {
+  etiquetaNivelAcceso,
+  etiquetaRol,
+  nivelAccesoDeRoles,
+  type NivelAccesoRol,
+  type Rol,
+  type RolDetalle,
+  type Usuario,
+} from "@/lib/types";
 import { usePermisos } from "@/lib/use-permisos";
 import { useAuth } from "@/lib/auth-context";
 
@@ -35,6 +51,7 @@ interface FormularioUsuario {
   contrasena: string;
   nombreCompleto: string;
   rolIds: string[];
+  proyectoIds: string[];
   estaActivo: boolean;
 }
 
@@ -43,8 +60,41 @@ const FORM_VACIO: FormularioUsuario = {
   contrasena: "",
   nombreCompleto: "",
   rolIds: [],
+  proyectoIds: [],
   estaActivo: true,
 };
+
+/** Qué datos de alcance pide el formulario según los niveles de los roles. */
+function alcanceRequerido(roles: Pick<Rol, "nivelAcceso">[]) {
+  const niveles = new Set<NivelAccesoRol>(
+    roles.map((rol) => rol.nivelAcceso ?? "PROYECTOS_ASIGNADOS"),
+  );
+  const total = niveles.has("TOTAL");
+  return {
+    territorio: !total && niveles.has("TERRITORIAL"),
+    /** Proyectos elegidos a mano (Coordinador de proyecto, Profesional de apoyo). */
+    proyectos: !total && niveles.has("PROYECTOS_ASIGNADOS"),
+    /** Técnico: sus proyectos salen solos de las jornadas asignadas. */
+    porJornadas: nivelAccesoDeRoles(roles) === "JORNADAS_ASIGNADAS",
+  };
+}
+
+async function cargarCatalogoProyectos(
+  token: string,
+): Promise<OpcionCatalogo[]> {
+  const opciones: OpcionCatalogo[] = [];
+  let pagina = 1;
+  let totalPaginas = 1;
+  do {
+    const respuesta = await listarProyectos(token, { limite: 100, pagina });
+    for (const proyecto of respuesta.datos) {
+      opciones.push({ id: proyecto.id, nombre: proyecto.nombre });
+    }
+    totalPaginas = respuesta.totalPaginas;
+    pagina += 1;
+  } while (pagina <= totalPaginas);
+  return opciones;
+}
 
 function MatrizPermisosSoloLectura({ claves }: { claves: string[] }) {
   const porModulo = useMemo(() => {
@@ -93,6 +143,12 @@ export function GestionUsuarios() {
   const [alcanceItems, setAlcanceItems] = useState<AlcanceTerritorialItem[] | null>(
     null,
   );
+  const [proyectosUsuario, setProyectosUsuario] = useState<
+    ProyectoAsignadoUsuario[] | null
+  >(null);
+  const [catalogoProyectos, setCatalogoProyectos] = useState<
+    OpcionCatalogo[] | null
+  >(null);
   const [formulario, setFormulario] = useState<FormularioUsuario>(FORM_VACIO);
   const [enviando, setEnviando] = useState(false);
   const [confirmarDesactivar, setConfirmarDesactivar] = useState<Usuario | null>(
@@ -139,6 +195,21 @@ export function GestionUsuarios() {
       .then(setRolesDisponibles)
       .catch(() => {});
   }, [token, puedeListarRoles]);
+
+  useEffect(() => {
+    if (!token || (modo !== "crear" && modo !== "editar")) return;
+    if (catalogoProyectos) return;
+    cargarCatalogoProyectos(token)
+      .then(setCatalogoProyectos)
+      .catch(() => setCatalogoProyectos([]));
+  }, [token, modo, catalogoProyectos]);
+
+  const rolesFormulario = useMemo(
+    () => rolesDisponibles.filter((rol) => formulario.rolIds.includes(rol.id)),
+    [rolesDisponibles, formulario.rolIds],
+  );
+  const alcanceFormulario = alcanceRequerido(rolesFormulario);
+
   function abrirCrear() {
     const defaultRol =
       rolesDisponibles.find((r) => r.nombre === "VISUALIZADOR") ??
@@ -156,14 +227,15 @@ export function GestionUsuarios() {
     try {
       const usuario = await obtenerUsuario(token, id);
       setUsuarioSeleccionado(usuario);
-      const esCoordinador = usuario.roles.some(
-        (rol) =>
-          rol.nombre === "COORDINADOR_ZONA" ||
-          rol.nombre === "COORDINADOR_DEPARTAMENTAL",
-      );
-      setAlcanceItems(
-        esCoordinador ? await listarAlcanceUsuario(token, id) : null,
-      );
+      const alcance = alcanceRequerido(usuario.roles);
+      const [territorio, proyectos] = await Promise.all([
+        alcance.territorio ? listarAlcanceUsuario(token, id) : null,
+        alcance.proyectos || alcance.porJornadas
+          ? listarProyectosUsuario(token, id)
+          : null,
+      ]);
+      setAlcanceItems(territorio);
+      setProyectosUsuario(proyectos);
       setModo("ver");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar usuario");
@@ -173,13 +245,21 @@ export function GestionUsuarios() {
   async function abrirEditar(id: string) {
     if (!token) return;
     try {
-      const usuario = await obtenerUsuario(token, id);
+      const [usuario, proyectos] = await Promise.all([
+        obtenerUsuario(token, id),
+        listarProyectosUsuario(token, id),
+      ]);
       setUsuarioSeleccionado(usuario);
       setFormulario({
         correo: usuario.correo,
         contrasena: "",
         nombreCompleto: usuario.nombreCompleto,
         rolIds: usuario.roles.map((r) => r.id),
+        // Los proyectos del técnico vienen de sus jornadas: no se precargan
+        // como asignación manual si luego se le cambia el rol.
+        proyectoIds: alcanceRequerido(usuario.roles).porJornadas
+          ? []
+          : proyectos.map((p) => p.id),
         estaActivo: usuario.estaActivo,
       });
       setModo("editar");
@@ -192,21 +272,13 @@ export function GestionUsuarios() {
     setModo(null);
     setUsuarioSeleccionado(null);
     setAlcanceItems(null);
+    setProyectosUsuario(null);
     setFormulario(FORM_VACIO);
   }
 
   const recordarAlcance = useCallback((items: AlcanceTerritorialItem[]) => {
     setAlcanceItems(items);
   }, []);
-
-  function esCoordinadorTerritorial(rolIds: string[]) {
-    return rolesDisponibles.some(
-      (rol) =>
-        rolIds.includes(rol.id) &&
-        (rol.nombre === "COORDINADOR_ZONA" ||
-          rol.nombre === "COORDINADOR_DEPARTAMENTAL"),
-    );
-  }
 
   function toggleRol(rolId: string) {
     setFormulario((prev) => {
@@ -231,6 +303,9 @@ export function GestionUsuarios() {
           contrasena: formulario.contrasena,
           nombreCompleto: formulario.nombreCompleto,
           rolIds: formulario.rolIds,
+          proyectoIds: alcanceFormulario.proyectos
+            ? formulario.proyectoIds
+            : undefined,
         });
         setExito("Usuario creado correctamente");
       } else if (modo === "editar" && usuarioSeleccionado) {
@@ -241,10 +316,14 @@ export function GestionUsuarios() {
           rolIds: formulario.rolIds,
           estaActivo: formulario.estaActivo,
         });
-        if (
-          esCoordinadorTerritorial(formulario.rolIds) &&
-          alcanceItems
-        ) {
+        if (alcanceFormulario.proyectos) {
+          await guardarProyectosUsuario(
+            token,
+            usuarioSeleccionado.id,
+            formulario.proyectoIds,
+          );
+        }
+        if (alcanceFormulario.territorio && alcanceItems) {
           await guardarAlcanceUsuario(
             token,
             usuarioSeleccionado.id,
@@ -556,6 +635,34 @@ export function GestionUsuarios() {
                     </dd>
                   </div>
                 ) : null}
+                {proyectosUsuario ? (
+                  <div>
+                    <dt className="mb-1 text-zinc-500">
+                      {alcanceRequerido(usuarioSeleccionado.roles).porJornadas
+                        ? "Proyectos (según sus jornadas asignadas)"
+                        : "Proyectos asignados"}
+                    </dt>
+                    <dd className="flex flex-wrap gap-1">
+                      {proyectosUsuario.length ? (
+                        proyectosUsuario.map((proyecto) => (
+                          <span
+                            key={proyecto.id}
+                            className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-ruralia-teal-text"
+                          >
+                            {proyecto.nombre}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-zinc-500">
+                          {alcanceRequerido(usuarioSeleccionado.roles)
+                            .porJornadas
+                            ? "Aún no tiene jornadas asignadas"
+                            : "Sin proyectos asignados"}
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt className="mb-1 text-zinc-500">Acceso efectivo</dt>
                   <dd>
@@ -642,16 +749,56 @@ export function GestionUsuarios() {
                       </button>
                     ))}
                   </div>
+                  {rolesFormulario.length ? (
+                    <p className="mt-2 text-xs text-zinc-500">
+                      Acceso:{" "}
+                      {[
+                        ...new Set(
+                          rolesFormulario.map((rol) =>
+                            etiquetaNivelAcceso(rol.nivelAcceso),
+                          ),
+                        ),
+                      ].join(", ")}
+                    </p>
+                  ) : null}
                 </div>
+                {alcanceFormulario.proyectos ? (
+                  <div className="rounded-2xl border border-ruralia-teal-border bg-ruralia-teal-soft/30 p-4">
+                    <label className="mb-1 block text-sm font-medium text-zinc-700">
+                      Proyectos asignados
+                    </label>
+                    <p className="mb-3 text-xs text-zinc-500">
+                      Solo podrá ver y operar los proyectos que elijas aquí.
+                    </p>
+                    {catalogoProyectos ? (
+                      <SelectorCatalogo
+                        multiple
+                        opciones={catalogoProyectos}
+                        value={formulario.proyectoIds}
+                        onChange={(proyectoIds) =>
+                          setFormulario((f) => ({ ...f, proyectoIds }))
+                        }
+                        placeholder="Buscar proyecto..."
+                        mensajeVacio="Sin proyectos asignados. Busca y elige uno o más."
+                      />
+                    ) : (
+                      <p className="text-sm text-zinc-500">
+                        Cargando proyectos...
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+                {alcanceFormulario.porJornadas ? (
+                  <p className="rounded-2xl border border-ruralia-teal-border bg-ruralia-teal-soft/30 p-4 text-xs text-zinc-600">
+                    Los proyectos del técnico se toman automáticamente de las
+                    jornadas que tenga asignadas. Solo verá esos proyectos y
+                    únicamente sus propias jornadas.
+                  </p>
+                ) : null}
                 {modo === "editar" &&
                 usuarioSeleccionado &&
                 token &&
-                rolesDisponibles.some(
-                  (rol) =>
-                    formulario.rolIds.includes(rol.id) &&
-                    (rol.nombre === "COORDINADOR_ZONA" ||
-                      rol.nombre === "COORDINADOR_DEPARTAMENTAL"),
-                ) ? (
+                alcanceFormulario.territorio ? (
                   <EditorAlcanceTerritorial
                     token={token}
                     usuarioId={usuarioSeleccionado.id}

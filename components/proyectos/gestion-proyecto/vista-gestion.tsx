@@ -11,6 +11,7 @@ import { PanelPlan } from "@/components/proyectos/gestion-proyecto/panel-plan";
 import { PanelTerritorio } from "@/components/proyectos/gestion-proyecto/panel-territorio";
 import { ResumenAsignaciones } from "@/components/proyectos/gestion-proyecto/resumen-asignaciones";
 import { ResumenInformacionBasica } from "@/components/proyectos/gestion-proyecto/resumen-informacion-basica";
+import { VistaProyectoTecnico } from "@/components/tecnico/vista-proyecto-tecnico";
 import {
   activarProyecto,
   actualizarProyecto,
@@ -54,6 +55,16 @@ interface VistaGestionProyectoProps {
 }
 
 export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) {
+  const { soloJornadasAsignadas } = usePermisos();
+  if (soloJornadasAsignadas) {
+    return <VistaProyectoTecnico proyectoId={proyectoId} />;
+  }
+  return <VistaGestionProyectoCompleta proyectoId={proyectoId} />;
+}
+
+function VistaGestionProyectoCompleta({
+  proyectoId,
+}: VistaGestionProyectoProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { token } = useAuth();

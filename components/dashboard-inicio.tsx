@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Download, FolderKanban, Settings2 } from "lucide-react";
 import { FiltroDashboardProvider } from "@/components/dashboard/filtro-dashboard-context";
 import {
@@ -141,6 +142,21 @@ function TarjetaSeccion({
 }
 
 export function DashboardInicio() {
+  const { soloJornadasAsignadas } = usePermisos();
+  if (soloJornadasAsignadas) return <RedirigirAMisJornadas />;
+  return <DashboardInicioCompleto />;
+}
+
+/** El técnico no tiene dashboard: su inicio es "Mis jornadas". */
+function RedirigirAMisJornadas() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/mis-jornadas");
+  }, [router]);
+  return <Spinner />;
+}
+
+function DashboardInicioCompleto() {
   const { token } = useAuth();
   const { puede } = usePermisos();
   const [config, setConfig] = useState<ConfiguracionDashboard | null>(null);

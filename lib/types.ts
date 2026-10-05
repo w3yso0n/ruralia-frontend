@@ -1,8 +1,64 @@
+/** Qué proyectos alcanza un rol (alineado con backend). */
+export type NivelAccesoRol =
+  | "TOTAL"
+  | "TERRITORIAL"
+  | "PROYECTOS_ASIGNADOS"
+  | "JORNADAS_ASIGNADAS";
+
+export const NIVELES_ACCESO_ROL: ReadonlyArray<{
+  valor: NivelAccesoRol;
+  etiqueta: string;
+  descripcion: string;
+}> = [
+  {
+    valor: "TOTAL",
+    etiqueta: "Todos los proyectos",
+    descripcion: "Ve y gestiona todos los proyectos.",
+  },
+  {
+    valor: "TERRITORIAL",
+    etiqueta: "Por territorio",
+    descripcion:
+      "Proyectos de las regiones, departamentos o municipios asignados al usuario.",
+  },
+  {
+    valor: "PROYECTOS_ASIGNADOS",
+    etiqueta: "Proyecto asignado",
+    descripcion: "Solo los proyectos donde el usuario está asignado.",
+  },
+  {
+    valor: "JORNADAS_ASIGNADAS",
+    etiqueta: "Jornadas asignadas",
+    descripcion: "Solo las jornadas donde el usuario es responsable o equipo.",
+  },
+];
+
+/** Nivel más amplio entre varios roles (con varios roles gana el mayor). */
+export function nivelAccesoDeRoles(
+  roles: Pick<Rol, "nivelAcceso">[],
+): NivelAccesoRol {
+  const orden = NIVELES_ACCESO_ROL.map((n) => n.valor);
+  let mejor = orden.length - 1;
+  for (const rol of roles) {
+    const idx = orden.indexOf(rol.nivelAcceso ?? "PROYECTOS_ASIGNADOS");
+    if (idx !== -1 && idx < mejor) mejor = idx;
+  }
+  return orden[mejor];
+}
+
+export function etiquetaNivelAcceso(nivel?: NivelAccesoRol): string {
+  return (
+    NIVELES_ACCESO_ROL.find((n) => n.valor === nivel)?.etiqueta ??
+    "Proyecto asignado"
+  );
+}
+
 export interface Rol {
   id: string;
   nombre: string;
   descripcion?: string;
   esSistema?: boolean;
+  nivelAcceso?: NivelAccesoRol;
 }
 
 export interface Permiso {
@@ -25,6 +81,7 @@ export interface RolDetalle {
   descripcion?: string;
   esSistema: boolean;
   estaActivo: boolean;
+  nivelAcceso: NivelAccesoRol;
   permisoIds: string[];
   permisoClaves: string[];
   conteoPermisos: number;
@@ -45,13 +102,16 @@ export const PERMISOS_CRITICOS_CUANTIVA: readonly string[] = [
 export const ETIQUETAS_ROL: Record<string, string> = {
   CUANTIVA: "Cuantiva",
   ADMINISTRADOR: "Administrador",
+  PROFESIONAL_OFICINA_PROYECTOS: "Profesional oficina de proyectos",
   COORDINADOR_DEPARTAMENTAL: "Coordinador departamental",
   COORDINADOR_ZONA: "Coordinador de zona",
-  CAMPO: "Campo",
+  COORDINADOR_PROYECTO: "Coordinador de proyecto",
+  PROFESIONAL_APOYO: "Profesional de apoyo",
+  CAMPO: "Técnico",
   VISUALIZADOR: "Visualizador",
   // legacy
   COORDINADOR: "Coordinador",
-  TECNICO: "Campo",
+  TECNICO: "Técnico",
 };
 
 export function etiquetaRol(nombre: string): string {
@@ -900,6 +960,7 @@ export interface CrearUsuarioPayload {
   nombreCompleto: string;
   urlFoto?: string;
   rolIds: string[];
+  proyectoIds?: string[];
 }
 
 export interface ActualizarUsuarioPayload {
@@ -914,6 +975,7 @@ export interface ActualizarUsuarioPayload {
 export interface CrearRolPayload {
   nombre: string;
   descripcion?: string;
+  nivelAcceso?: NivelAccesoRol;
   permisoIds?: string[];
 }
 
@@ -921,6 +983,7 @@ export interface ActualizarRolPayload {
   nombre?: string;
   descripcion?: string;
   estaActivo?: boolean;
+  nivelAcceso?: NivelAccesoRol;
   permisoIds?: string[];
 }
 

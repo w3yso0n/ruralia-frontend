@@ -302,6 +302,33 @@ export async function guardarAlcanceUsuario(
   );
 }
 
+export interface ProyectoAsignadoUsuario {
+  id: string;
+  nombre: string;
+}
+
+export async function listarProyectosUsuario(
+  token: string,
+  usuarioId: string,
+): Promise<ProyectoAsignadoUsuario[]> {
+  return fetchConAuth<ProyectoAsignadoUsuario[]>(
+    `/usuarios/${usuarioId}/proyectos`,
+    token,
+  );
+}
+
+export async function guardarProyectosUsuario(
+  token: string,
+  usuarioId: string,
+  proyectoIds: string[],
+): Promise<ProyectoAsignadoUsuario[]> {
+  return fetchConAuth<ProyectoAsignadoUsuario[]>(
+    `/usuarios/${usuarioId}/proyectos`,
+    token,
+    { method: "PUT", body: JSON.stringify({ proyectoIds }) },
+  );
+}
+
 export async function desactivarUsuario(
   token: string,
   id: string,

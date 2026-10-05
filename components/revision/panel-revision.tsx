@@ -181,6 +181,9 @@ function etiquetaRol(rol: string): string {
     ADMINISTRADOR: "Administrador",
     CUANTIVA: "Cuantiva",
     VISUALIZADOR: "Consultor",
+    PROFESIONAL_OFICINA_PROYECTOS: "Profesional oficina de proyectos",
+    COORDINADOR_PROYECTO: "Coordinador de proyecto",
+    PROFESIONAL_APOYO: "Profesional de apoyo",
   };
   if (rol.includes(",")) {
     return rol

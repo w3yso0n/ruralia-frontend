@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { nivelAccesoDeRoles } from "@/lib/types";
 
 export function usePermisos() {
   const { usuario } = useAuth();
@@ -26,5 +27,13 @@ export function usePermisos() {
     [permisos],
   );
 
-  return { permisos, puede, puedeAlguno };
+  /** Técnico: solo consulta sus proyectos y opera sus propias jornadas. */
+  const roles = usuario?.roles;
+  const soloJornadasAsignadas = useMemo(
+    () =>
+      !!roles?.length && nivelAccesoDeRoles(roles) === "JORNADAS_ASIGNADAS",
+    [roles],
+  );
+
+  return { permisos, puede, puedeAlguno, soloJornadasAsignadas };
 }
