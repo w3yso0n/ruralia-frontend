@@ -106,7 +106,7 @@ const SECCIONES: SeccionNav[] = [
       },
       {
         href: "/contrapartes",
-        etiqueta: "Beneficiarios y asociaciones",
+        etiqueta: "Beneficiarios y organizaciones",
         icono: HeartHandshake,
         permiso: "contrapartes.ver",
       },

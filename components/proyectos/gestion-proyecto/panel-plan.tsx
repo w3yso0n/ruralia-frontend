@@ -75,6 +75,9 @@ const SIGUIENTE_NIVEL: Partial<
   },
 };
 
+/** Tope vigente: un proceso admite una sola meta. Subir si el negocio lo permite. */
+const MAX_METAS_POR_PROCESO = 1;
+
 function LeyendaJerarquia() {
   const niveles: TipoNivelPlan[] = [
     "actividad",
@@ -668,6 +671,7 @@ export function PanelPlan({
     const [nuevaMetaCantidad, setNuevaMetaCantidad] = useState("");
     const metas = proceso.metas ?? [];
     const siguiente = SIGUIENTE_NIVEL.proceso;
+    const puedeAgregarMeta = metas.length < MAX_METAS_POR_PROCESO;
 
     return (
       <div className="space-y-4">
@@ -752,16 +756,17 @@ export function PanelPlan({
           onSeleccionar={onNavegar}
         />
 
-        {puedeGestionar && siguiente ? (
+        {puedeGestionar && siguiente && puedeAgregarMeta ? (
           <TarjetaSeccion
             titulo={`Agregar ${siguiente.label.toLowerCase()}`}
-            descripcion={siguiente.hint}
+            descripcion={`${siguiente.hint} Solo se puede agregar una meta por proceso.`}
             variante="agregar"
           >
             <form
               className="space-y-3"
               onSubmit={(e) => {
                 e.preventDefault();
+                if (metas.length >= MAX_METAS_POR_PROCESO) return;
                 const cantidad = Number(nuevaMetaCantidad);
                 if (!nuevaMetaNombre.trim() || !cantidad || cantidad < 0) return;
                 void ejecutar(async () => {
@@ -806,6 +811,12 @@ export function PanelPlan({
               </button>
             </form>
           </TarjetaSeccion>
+        ) : null}
+
+        {puedeGestionar && !puedeAgregarMeta ? (
+          <p className="text-xs text-zinc-500">
+            Este proceso ya tiene su meta. Solo se permite una meta por proceso.
+          </p>
         ) : null}
       </div>
     );

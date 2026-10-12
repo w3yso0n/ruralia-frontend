@@ -24,6 +24,7 @@ import {
   mostrarErrorApi,
 } from "@/lib/swal";
 import type { Geocerca, Jornada, PlanProyecto, Proyecto, TipoJornada } from "@/lib/types";
+import { etiquetaOrganizacion } from "@/lib/types";
 
 interface PanelJornadasProps {
   token: string;
@@ -138,13 +139,14 @@ export function PanelJornadas({
     () =>
       (proyecto.asociaciones ?? []).map((a) => ({
         id: a.id,
-        nombre: a.nombre,
+        nombre: etiquetaOrganizacion(a),
       })),
     [proyecto.asociaciones],
   );
 
   async function manejarCrearJornada(datos: {
     fecha: string;
+    municipioId?: string | null;
     veredaId?: string | null;
     geocercaId?: string | null;
     nombre?: string;
@@ -163,6 +165,7 @@ export function PanelJornadas({
       const resultado = await crearJornada(token, {
         proyectoId,
         fecha: datos.fecha,
+        municipioId: datos.municipioId,
         veredaId: datos.veredaId,
         geocercaId: datos.geocercaId,
         nombre: datos.nombre,
@@ -199,6 +202,7 @@ export function PanelJornadas({
     jornadaId: string,
     datos: {
       fecha: string;
+      municipioId?: string | null;
       veredaId?: string | null;
       geocercaId?: string | null;
       nombre?: string;
@@ -337,6 +341,7 @@ export function PanelJornadas({
         <section className="rounded-2xl border border-ruralia-teal-border bg-ruralia-teal-soft/30 p-6">
           <h3 className="mb-4 font-semibold text-zinc-900">Nueva jornada</h3>
           <FormularioJornada
+            municipios={proyecto.municipios ?? []}
             veredas={proyecto.veredas ?? []}
             geocercas={geocercas}
             actividadesPlan={plan?.actividades ?? []}
@@ -442,9 +447,9 @@ export function PanelJornadas({
                           : null}
                         {jornadaSeleccionada.asociaciones?.length ? (
                           <span>
-                            Asociaciones:{" "}
+                            Asociaciones y OAM:{" "}
                             {jornadaSeleccionada.asociaciones
-                              .map((a) => a.nombre)
+                              .map((a) => etiquetaOrganizacion(a))
                               .join(", ")}
                           </span>
                         ) : null}
@@ -530,6 +535,7 @@ export function PanelJornadas({
                   <FormularioEditarJornada
                     key={jornadaSeleccionada.id}
                     jornada={jornadaSeleccionada}
+                    municipios={proyecto.municipios ?? []}
                     veredas={proyecto.veredas ?? []}
                     geocercas={geocercas}
                     actividadesPlan={plan?.actividades ?? []}

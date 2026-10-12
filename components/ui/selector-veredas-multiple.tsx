@@ -19,7 +19,12 @@ import {
   parseGooglePlace,
   type DatosLugarGoogle,
 } from "@/lib/google-maps";
-import type { NodoTerritorial, Vereda, VeredaResumen } from "@/lib/types";
+import type {
+  MunicipioResumen,
+  NodoTerritorial,
+  Vereda,
+  VeredaResumen,
+} from "@/lib/types";
 
 type ModoSeleccion = "maps" | "dane";
 
@@ -40,6 +45,12 @@ interface SelectorVeredasMultipleProps {
   onSeleccion?: (veredas: VeredaOpcion[]) => void;
   veredasIniciales?: (Vereda | VeredaResumen)[];
   placeholder?: string;
+  /** El municipio basta para el territorio. La vereda queda opcional. */
+  veredaOpcional?: boolean;
+  municipioIds?: string[];
+  onMunicipiosChange?: (ids: string[]) => void;
+  onMunicipiosSeleccion?: (municipios: MunicipioResumen[]) => void;
+  municipiosIniciales?: MunicipioResumen[];
 }
 
 function etiquetaVereda(v: VeredaOpcion): string {
@@ -78,6 +89,11 @@ export function SelectorVeredasMultiple({
   onSeleccion,
   veredasIniciales = [],
   placeholder = "Buscar vereda, municipio o departamento…",
+  veredaOpcional = false,
+  municipioIds = [],
+  onMunicipiosChange,
+  onMunicipiosSeleccion,
+  municipiosIniciales = [],
 }: SelectorVeredasMultipleProps) {
   const contenedorRef = useRef<HTMLDivElement>(null);
   const inputMapsRef = useRef<HTMLInputElement>(null);
@@ -95,6 +111,12 @@ export function SelectorVeredasMultiple({
   valueRef.current = value;
   const onSeleccionRef = useRef(onSeleccion);
   onSeleccionRef.current = onSeleccion;
+  const municipioIdsRef = useRef(municipioIds);
+  municipioIdsRef.current = municipioIds;
+  const onMunicipiosChangeRef = useRef(onMunicipiosChange);
+  onMunicipiosChangeRef.current = onMunicipiosChange;
+  const onMunicipiosSeleccionRef = useRef(onMunicipiosSeleccion);
+  onMunicipiosSeleccionRef.current = onMunicipiosSeleccion;
 
   const [modo, setModo] = useState<ModoSeleccion>("dane");
   const [busqueda, setBusqueda] = useState("");
@@ -117,6 +139,9 @@ export function SelectorVeredasMultiple({
   const [catalogo, setCatalogo] = useState<Map<string, VeredaOpcion>>(
     () => new Map(veredasIniciales.map((v) => [v.id, aOpcion(v)])),
   );
+  const [catalogoMunicipios, setCatalogoMunicipios] = useState<
+    Map<string, MunicipioResumen>
+  >(() => new Map(municipiosIniciales.map((m) => [m.id, m])));
 
   const [departamentos, setDepartamentos] = useState<NodoTerritorial[]>([]);
   const [municipios, setMunicipios] = useState<NodoTerritorial[]>([]);
@@ -125,6 +150,7 @@ export function SelectorVeredasMultiple({
   );
   const [deptId, setDeptId] = useState("");
   const [munId, setMunId] = useState("");
+  const [quiereVereda, setQuiereVereda] = useState(false);
   const [cargandoDept, setCargandoDept] = useState(false);
   const [cargandoMun, setCargandoMun] = useState(false);
   const [cargandoVer, setCargandoVer] = useState(false);
@@ -133,29 +159,61 @@ export function SelectorVeredasMultiple({
 
   useEffect(() => {
     setCatalogo((prev) => {
+      let cambio = false;
       const siguiente = new Map(prev);
       for (const v of veredasIniciales) {
         const opcion = aOpcion(v);
         const previa = siguiente.get(v.id);
-        siguiente.set(
-          v.id,
-          previa
-            ? {
-                ...previa,
-                ...opcion,
-                latitud: opcion.latitud ?? previa.latitud,
-                longitud: opcion.longitud ?? previa.longitud,
-                municipioNombre:
-                  opcion.municipioNombre ?? previa.municipioNombre,
-                departamentoNombre:
-                  opcion.departamentoNombre ?? previa.departamentoNombre,
-              }
-            : opcion,
-        );
+        const fusionada = previa
+          ? {
+              ...previa,
+              ...opcion,
+              latitud: opcion.latitud ?? previa.latitud,
+              longitud: opcion.longitud ?? previa.longitud,
+              municipioNombre: opcion.municipioNombre ?? previa.municipioNombre,
+              departamentoNombre:
+                opcion.departamentoNombre ?? previa.departamentoNombre,
+            }
+          : opcion;
+        if (
+          !previa ||
+          previa.nombre !== fusionada.nombre ||
+          previa.codigo !== fusionada.codigo ||
+          previa.municipioNombre !== fusionada.municipioNombre ||
+          previa.departamentoNombre !== fusionada.departamentoNombre ||
+          previa.latitud !== fusionada.latitud ||
+          previa.longitud !== fusionada.longitud
+        ) {
+          siguiente.set(v.id, fusionada);
+          cambio = true;
+        }
       }
-      return siguiente;
+      return cambio ? siguiente : prev;
     });
   }, [veredasIniciales]);
+
+  useEffect(() => {
+    setCatalogoMunicipios((prev) => {
+      let cambio = false;
+      const siguiente = new Map(prev);
+      for (const municipio of municipiosIniciales) {
+        const previo = siguiente.get(municipio.id);
+        if (
+          !previo ||
+          previo.nombre !== municipio.nombre ||
+          previo.codigo !== municipio.codigo ||
+          previo.departamentoNombre !== municipio.departamentoNombre
+        ) {
+          siguiente.set(
+            municipio.id,
+            previo ? { ...previo, ...municipio } : municipio,
+          );
+          cambio = true;
+        }
+      }
+      return cambio ? siguiente : prev;
+    });
+  }, [municipiosIniciales]);
 
   useEffect(() => {
     onSeleccionRef.current?.(
@@ -164,6 +222,30 @@ export function SelectorVeredasMultiple({
         .filter((vereda): vereda is VeredaOpcion => Boolean(vereda)),
     );
   }, [catalogo, value]);
+
+  useEffect(() => {
+    if (!veredaOpcional) return;
+    onMunicipiosSeleccionRef.current?.(
+      municipioIds
+        .map((id) => catalogoMunicipios.get(id))
+        .filter((municipio): municipio is MunicipioResumen => Boolean(municipio)),
+    );
+  }, [catalogoMunicipios, municipioIds, veredaOpcional]);
+
+  const agregarMunicipio = useCallback((municipio: MunicipioResumen) => {
+    setCatalogoMunicipios((prev) => {
+      const siguiente = new Map(prev);
+      siguiente.set(municipio.id, municipio);
+      return siguiente;
+    });
+    if (!municipioIdsRef.current.includes(municipio.id)) {
+      onMunicipiosChangeRef.current?.([
+        ...municipioIdsRef.current,
+        municipio.id,
+      ]);
+    }
+    setError(null);
+  }, []);
 
   useEffect(() => {
     function cerrarSiClickFuera(evento: MouseEvent) {
@@ -514,8 +596,8 @@ export function SelectorVeredasMultiple({
   }, [token, deptId]);
 
   useEffect(() => {
-    if (!munId) {
-      setVeredasMunicipio([]);
+    if (!munId || (veredaOpcional && !quiereVereda)) {
+      setVeredasMunicipio((prev) => (prev.length === 0 ? prev : []));
       return;
     }
     let cancelado = false;
@@ -537,10 +619,28 @@ export function SelectorVeredasMultiple({
     return () => {
       cancelado = true;
     };
-  }, [token, munId]);
+  }, [token, munId, veredaOpcional, quiereVereda]);
 
   function quitar(id: string) {
     onChange(value.filter((x) => x !== id));
+  }
+
+  function quitarMunicipio(id: string) {
+    onMunicipiosChange?.(municipioIds.filter((x) => x !== id));
+  }
+
+  function seleccionarMunicipio(id: string) {
+    setMunId(id);
+    if (!veredaOpcional || !id) return;
+    const mun = municipios.find((m) => m.id === id);
+    if (!mun) return;
+    const dept = departamentos.find((d) => d.id === deptId);
+    agregarMunicipio({
+      id: mun.id,
+      nombre: mun.nombre,
+      codigo: mun.codigo,
+      departamentoNombre: dept?.nombre,
+    });
   }
 
   function agregarDesdeCatalogo(vereda: Vereda) {
@@ -568,11 +668,44 @@ export function SelectorVeredasMultiple({
   const veredasMunicipioDisponibles = veredasMunicipio.filter(
     (v) => !value.includes(v.id),
   );
+  const hayMunicipios = veredaOpcional && municipioIds.length > 0;
+  const haySeleccion = hayMunicipios || value.length > 0;
 
   return (
     <div ref={contenedorRef} className="space-y-3">
-      {value.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
+      {haySeleccion ? (
+        <div className="space-y-2">
+          {hayMunicipios ? (
+            <div className="flex flex-wrap gap-2">
+              {municipioIds.map((id) => {
+                const municipio = catalogoMunicipios.get(id);
+                const etiqueta = municipio
+                  ? [municipio.nombre, municipio.departamentoNombre]
+                      .filter(Boolean)
+                      .join(", ")
+                  : "Municipio seleccionado";
+                return (
+                  <span
+                    key={id}
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-ruralia-teal-border bg-ruralia-teal-soft/50 py-1 pl-3 pr-1.5 text-sm text-zinc-800"
+                  >
+                    <MapPin className="h-3.5 w-3.5 shrink-0 text-ruralia-teal-text" />
+                    <span className="truncate">Municipio · {etiqueta}</span>
+                    <button
+                      type="button"
+                      onClick={() => quitarMunicipio(id)}
+                      className="shrink-0 rounded-full p-0.5 text-zinc-500 transition hover:bg-white hover:text-zinc-800"
+                      aria-label="Quitar municipio"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          ) : null}
+          {value.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
           {value.map((id) => {
             const vereda = catalogo.get(id);
             const georreferenciada = vereda ? tieneUbicacion(vereda) : false;
@@ -618,10 +751,14 @@ export function SelectorVeredasMultiple({
               </span>
             );
           })}
+            </div>
+          ) : null}
         </div>
       ) : (
         <p className="text-sm text-zinc-500">
-          Aún no hay veredas asignadas. Elige cómo agregarlas.
+          {veredaOpcional
+            ? "Elige departamento y municipio. La vereda es opcional."
+            : "Aún no hay veredas asignadas. Elige cómo agregarlas."}
         </p>
       )}
 
@@ -718,7 +855,9 @@ export function SelectorVeredasMultiple({
 
           <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3">
             <p className="mb-3 text-xs font-medium text-zinc-600">
-              O navega el catálogo oficial (departamento → municipio → vereda)
+              {veredaOpcional
+                ? "Elige departamento y municipio. Al seleccionar el municipio queda asociado al proyecto; la vereda es opcional."
+                : "O navega el catálogo oficial (departamento → municipio → vereda)"}
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
@@ -747,7 +886,7 @@ export function SelectorVeredasMultiple({
                 </label>
                 <select
                   value={munId}
-                  onChange={(e) => setMunId(e.target.value)}
+                  onChange={(e) => seleccionarMunicipio(e.target.value)}
                   disabled={!deptId || cargandoMun}
                   className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-ruralia-teal disabled:opacity-60"
                 >
@@ -767,7 +906,33 @@ export function SelectorVeredasMultiple({
               </div>
             </div>
 
-            {munId ? (
+            {veredaOpcional ? (
+              <label
+                className={`mt-3 flex items-start gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 ${
+                  munId ? "cursor-pointer" : "opacity-60"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-ruralia-teal focus:ring-ruralia-teal/30"
+                  checked={quiereVereda}
+                  disabled={!munId}
+                  onChange={(e) => setQuiereVereda(e.target.checked)}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-zinc-800">
+                    Agregar una vereda
+                  </span>
+                  <span className="block text-xs text-zinc-500">
+                    {munId
+                      ? "Opcional. Márcalo para ver las veredas de este municipio."
+                      : "Opcional. Primero elige el municipio."}
+                  </span>
+                </span>
+              </label>
+            ) : null}
+
+            {munId && (!veredaOpcional || quiereVereda) ? (
               <div className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white">
                 {cargandoVer ? (
                   <p className="flex items-center gap-2 px-3 py-3 text-sm text-zinc-500">
@@ -804,7 +969,9 @@ export function SelectorVeredasMultiple({
                   <p className="px-3 py-3 text-sm text-zinc-500">
                     {veredasMunicipio.length > 0
                       ? "Todas las veredas de este municipio ya están seleccionadas."
-                      : "Este municipio no tiene veredas activas en el catálogo."}
+                      : veredaOpcional
+                        ? "No hay veredas activas. Puedes continuar solo con el municipio."
+                        : "Este municipio no tiene veredas activas en el catálogo."}
                   </p>
                 )}
               </div>
@@ -812,8 +979,9 @@ export function SelectorVeredasMultiple({
           </div>
 
           <p className="text-xs text-zinc-500">
-            Usa el mismo catálogo cargado en Territorios (DANE). Busca por
-            nombre o navega por municipio.
+            {veredaOpcional
+              ? "El municipio queda asociado al proyecto. Agrega veredas solo si las necesitas."
+              : "Usa el mismo catálogo cargado en Territorios (DANE). Busca por nombre o navega por municipio."}
           </p>
         </div>
       ) : (

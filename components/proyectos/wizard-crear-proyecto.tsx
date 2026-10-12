@@ -25,7 +25,8 @@ import {
   listarUsuarios,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { TipoProyecto } from "@/lib/types";
+import type { MunicipioResumen, TipoProyecto } from "@/lib/types";
+import { etiquetaOrganizacion } from "@/lib/types";
 
 const PASOS = [
   "Información",
@@ -59,6 +60,10 @@ export function WizardCrearProyecto() {
     fechaFin: "",
   });
   const [veredaIds, setVeredaIds] = useState<string[]>([]);
+  const [municipioIds, setMunicipioIds] = useState<string[]>([]);
+  const [municipiosSeleccionados, setMunicipiosSeleccionados] = useState<
+    MunicipioResumen[]
+  >([]);
   const [veredasDane, setVeredasDane] = useState<VeredaCargaOpcion[]>([]);
   const [veredaCargaId, setVeredaCargaId] = useState("");
   const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
@@ -106,7 +111,10 @@ export function WizardCrearProyecto() {
           })),
         );
         setOpcionesAsociaciones(
-          asociaciones.map((a) => ({ id: a.id, nombre: a.nombre })),
+          asociaciones.map((a) => ({
+            id: a.id,
+            nombre: etiquetaOrganizacion(a),
+          })),
         );
         if (usuario) {
           setUsuarioIds([usuario.id]);
@@ -128,7 +136,7 @@ export function WizardCrearProyecto() {
         if (!basico.nombre.trim()) return "El nombre del proyecto es obligatorio";
         return null;
       case 1:
-        if (!veredaIds.length) return "Selecciona al menos una vereda";
+        if (!municipioIds.length) return "Selecciona al menos un municipio";
         return null;
       case 2:
         if (!usuarioIds.length) return "Asigna al menos un miembro del equipo interno";
@@ -164,10 +172,6 @@ export function WizardCrearProyecto() {
 
   async function finalizar() {
     if (!token) return;
-    if (archivoExcel && !veredaCargaId) {
-      setError("Revisa la carga masiva y elige la vereda DANE antes de crear el proyecto");
-      return;
-    }
     setEnviando(true);
     setError(null);
     try {
@@ -179,7 +183,10 @@ export function WizardCrearProyecto() {
         fechaFin: basico.fechaFin || undefined,
       });
 
-      await asignarTerritoriosProyecto(token, proyecto.id, { veredaIds });
+      await asignarTerritoriosProyecto(token, proyecto.id, {
+        veredaIds,
+        municipioIds,
+      });
       await asignarPersonalProyecto(token, proyecto.id, { usuarioIds });
 
       if (beneficiarioIds.length) {
@@ -193,10 +200,6 @@ export function WizardCrearProyecto() {
         });
       }
       if (archivoExcel) {
-        if (!veredaCargaId) {
-          setError("Revisa la carga masiva y elige la vereda DANE");
-          return;
-        }
         await importarBeneficiariosExcelProyecto(
           token,
           proyecto.id,
@@ -345,13 +348,16 @@ export function WizardCrearProyecto() {
         {paso === 1 && token ? (
           <div>
             <p className="mb-3 text-sm text-zinc-600">
-              Veredas donde se ejecutará el proyecto (catálogo DANE o Google
-              Maps) *
+              Municipio donde se ejecutará el proyecto. La vereda es opcional.
             </p>
             <SelectorVeredasMultiple
               token={token}
               value={veredaIds}
               onChange={setVeredaIds}
+              veredaOpcional
+              municipioIds={municipioIds}
+              onMunicipiosChange={setMunicipioIds}
+              onMunicipiosSeleccion={setMunicipiosSeleccionados}
               onSeleccion={(lista) =>
                 setVeredasDane(
                   lista
@@ -394,9 +400,9 @@ export function WizardCrearProyecto() {
             <p className="text-sm text-zinc-600">
               Un proyecto puede tener <strong>varios beneficiarios</strong> y{" "}
               <strong>varias asociaciones a la vez</strong>. En cada jornada se
-              elige a quién se atiende. Si son muchos, súbelos por Excel:
-              nombre e identificador único; si ya existen en la BD solo se
-              asignan.
+              elige a quién se atiende. Si son muchos, súbelos con la matriz:
+              cédula, nombres, municipio, asociación y línea productiva. Si ya
+              existen en la BD solo se asignan.
             </p>
             <div>
               <p className="mb-2 text-sm font-medium text-zinc-800">
@@ -436,7 +442,7 @@ export function WizardCrearProyecto() {
                 opciones={opcionesAsociaciones}
                 value={asociacionIds}
                 onChange={setAsociacionIds}
-                placeholder="Buscar asociaciones…"
+                placeholder="Buscar asociaciones u OAM…"
                 mensajeVacio="Opcional. Se pueden añadir después."
               />
             </div>
@@ -493,8 +499,22 @@ export function WizardCrearProyecto() {
               <dd className="font-medium">{basico.nombre}</dd>
             </div>
             <div>
+              <dt className="text-zinc-500">Municipios</dt>
+              <dd>
+                {municipiosSeleccionados.length
+                  ? municipiosSeleccionados
+                      .map((municipio) => municipio.nombre)
+                      .join(", ")
+                  : `${municipioIds.length} seleccionados`}
+              </dd>
+            </div>
+            <div>
               <dt className="text-zinc-500">Veredas</dt>
-              <dd>{veredaIds.length} seleccionadas</dd>
+              <dd>
+                {veredaIds.length
+                  ? `${veredaIds.length} seleccionadas`
+                  : "Ninguna (opcional)"}
+              </dd>
             </div>
             <div>
               <dt className="text-zinc-500">Equipo interno</dt>

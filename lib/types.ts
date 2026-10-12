@@ -215,9 +215,19 @@ export interface BeneficiarioResumen {
   reemplazadoEn?: string | null;
 }
 
+export type TipoAsociacion = "ASOCIACION" | "OAM";
+
 export interface AsociacionResumen {
   id: string;
   nombre: string;
+  tipo?: TipoAsociacion;
+}
+
+export function etiquetaOrganizacion(item: {
+  nombre: string;
+  tipo?: TipoAsociacion | null;
+}) {
+  return item.tipo === "OAM" ? `OAM · ${item.nombre}` : item.nombre;
 }
 
 export interface VeredaResumen {
@@ -226,6 +236,13 @@ export interface VeredaResumen {
   codigo?: string;
   latitud?: number;
   longitud?: number;
+}
+
+export interface MunicipioResumen {
+  id: string;
+  nombre: string;
+  codigo?: string;
+  departamentoNombre?: string;
 }
 
 export interface PuntoGeocerca {
@@ -277,6 +294,7 @@ export interface Proyecto {
   asociaciones?: AsociacionResumen[];
   personal?: UsuarioResumen[];
   veredas?: VeredaResumen[];
+  municipios?: MunicipioResumen[];
 }
 
 export interface RespuestaPaginada<T> {
@@ -596,10 +614,11 @@ export interface Jornada {
   proyecto?: { id: string; nombre: string };
   meta?: MetaResumenJornada;
   vereda?: { id: string; nombre: string };
+  municipio?: { id: string; nombre: string };
   geocerca?: { id: string; nombre: string };
   tecnicoResponsable?: { id: string; nombre: string };
   beneficiarios?: { id: string; nombre: string }[];
-  asociaciones?: { id: string; nombre: string }[];
+  asociaciones?: { id: string; nombre: string; tipo?: TipoAsociacion }[];
   actividades?: JornadaActividadItem[];
   asistentes?: JornadaAsistente[];
   evidencias?: EvidenciaJornada[];
@@ -806,18 +825,33 @@ export interface Beneficiario {
   id: string;
   nombres: string;
   apellidos: string;
+  primerNombre?: string | null;
+  segundoNombre?: string | null;
+  primerApellido?: string | null;
+  segundoApellido?: string | null;
   tipoDocumento: TipoDocumento;
   numeroDocumento: string;
   telefono?: string;
   correo?: string;
-  genero?: Genero;
+  genero?: Genero | null;
+  edad?: number | null;
   fechaNacimiento?: string;
+  municipio?: string | null;
+  lineaProductiva?: string | null;
+  nombreAsociacion?: string | null;
   estaActivo: boolean;
   vereda?: VeredaResumen;
 }
 
+export interface OrganizacionResumen {
+  id: string;
+  nombre: string;
+  nit?: string;
+}
+
 export interface Asociacion {
   id: string;
+  tipo: TipoAsociacion;
   nombre: string;
   nit: string;
   nombreRepresentante: string;
@@ -825,6 +859,9 @@ export interface Asociacion {
   correo?: string;
   estaActivo: boolean;
   vereda?: VeredaResumen;
+  oam?: OrganizacionResumen | null;
+  totalAsociaciones?: number;
+  asociaciones?: OrganizacionResumen[];
   totalBeneficiarios?: number;
   /** Solo viene al consultar una asociación por ID. */
   beneficiarios?: BeneficiarioAsociacion[];
@@ -861,7 +898,11 @@ export interface CrearBeneficiarioPayload {
   telefono?: string;
   correo?: string;
   genero?: Genero;
+  edad?: number | null;
   fechaNacimiento?: string;
+  municipio?: string;
+  lineaProductiva?: string;
+  nombreAsociacion?: string;
 }
 
 export interface ActualizarBeneficiarioPayload {
@@ -873,10 +914,15 @@ export interface ActualizarBeneficiarioPayload {
   telefono?: string;
   correo?: string;
   genero?: Genero;
+  edad?: number | null;
   fechaNacimiento?: string;
+  municipio?: string;
+  lineaProductiva?: string;
+  nombreAsociacion?: string;
 }
 
 export interface CrearAsociacionPayload {
+  tipo?: TipoAsociacion;
   nombre: string;
   nit: string;
   nombreRepresentante: string;
@@ -884,6 +930,8 @@ export interface CrearAsociacionPayload {
   telefono?: string;
   correo?: string;
   beneficiarioIds?: string[];
+  oamId?: string | null;
+  asociacionIds?: string[];
 }
 
 export interface ActualizarAsociacionPayload {
@@ -894,6 +942,8 @@ export interface ActualizarAsociacionPayload {
   telefono?: string;
   correo?: string;
   beneficiarioIds?: string[];
+  oamId?: string | null;
+  asociacionIds?: string[];
 }
 
 export interface Vereda {
@@ -1058,6 +1108,7 @@ export interface CrearJornadaPayload {
   proyectoId: string;
   metaId: string;
   actividades?: ActividadJornadaPayload[];
+  municipioId?: string | null;
   veredaId?: string | null;
   geocercaId?: string | null;
   tecnicoResponsableId?: string;
@@ -1073,6 +1124,7 @@ export interface ActualizarJornadaPayload {
   fecha?: string;
   nombre?: string;
   observaciones?: string;
+  municipioId?: string | null;
   veredaId?: string | null;
   geocercaId?: string | null;
   metaId?: string;
@@ -1304,7 +1356,8 @@ export interface ActualizarPlantillaFormularioPayload {
 }
 
 export interface AsignacionTerritoriosPayload {
-  veredaIds: string[];
+  veredaIds?: string[];
+  municipioIds?: string[];
 }
 
 export type AccionCronologia =

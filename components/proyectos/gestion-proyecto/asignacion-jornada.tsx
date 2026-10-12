@@ -28,7 +28,7 @@ export function errorAsignacionJornada(
     return "Debes asignar la jornada al menos a un beneficiario del proyecto";
   }
   if (destino === "asociacion" && !asociacionIds.length) {
-    return "Debes asignar la jornada al menos a una asociación del proyecto";
+    return "Debes asignar la jornada al menos a una asociación u OAM del proyecto";
   }
   return null;
 }
@@ -66,8 +66,8 @@ export function AsignacionJornada({
       <div>
         <p className="text-sm font-medium text-zinc-800">Asignar jornada a *</p>
         <p className="mt-1 text-xs text-zinc-500">
-          Elige beneficiarios del proyecto o asociaciones. La jornada queda
-          ligada a uno de los dos.
+          Elige beneficiarios del proyecto, o asociaciones y OAM. La jornada
+          queda ligada a uno de los dos.
         </p>
       </div>
 
@@ -96,7 +96,7 @@ export function AsignacionJornada({
           }`}
         >
           <Building2 className="h-4 w-4 text-ruralia-teal" />
-          Asociación
+          Asociación / OAM
         </button>
       </div>
 
@@ -119,11 +119,11 @@ export function AsignacionJornada({
           opciones={asociaciones}
           value={asociacionIds}
           onChange={onAsociacionIds}
-          placeholder="Buscar asociación del proyecto..."
+          placeholder="Buscar asociación u OAM del proyecto..."
           mensajeVacio={
             sinCatalogo
-              ? "No hay asociaciones vinculadas al proyecto. Agrégalas en Equipo y contraparte."
-              : "Selecciona al menos una asociación."
+              ? "No hay asociaciones ni OAM vinculadas al proyecto. Agrégalas en Equipo y contraparte."
+              : "Selecciona al menos una asociación u OAM."
           }
         />
       )}

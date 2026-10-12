@@ -34,6 +34,7 @@ import type {
   Proyecto,
   TipoDocumentoExterno,
 } from "@/lib/types";
+import { etiquetaOrganizacion } from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -321,7 +322,7 @@ export function PanelExpediente({
 
   const asociacionesOpciones: OpcionDesplegable[] = (
     proyecto.asociaciones ?? []
-  ).map((a) => ({ id: a.id, nombre: a.nombre }));
+  ).map((a) => ({ id: a.id, nombre: etiquetaOrganizacion(a) }));
 
   const veredasOpciones: OpcionDesplegable[] = (proyecto.veredas ?? []).map(
     (v) => ({ id: v.id, nombre: v.nombre }),

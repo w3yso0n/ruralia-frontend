@@ -23,7 +23,12 @@ import {
   btnAccionPrimaria,
   btnAccionSecundaria,
 } from "@/lib/estilos-boton";
-import type { Asociacion, CrearAsociacionPayload, Vereda } from "@/lib/types";
+import type {
+  Asociacion,
+  CrearAsociacionPayload,
+  TipoAsociacion,
+  Vereda,
+} from "@/lib/types";
 
 type ModoModal = "crear" | "editar" | "ver" | null;
 
@@ -35,6 +40,8 @@ interface FormularioAsociacion {
   telefono: string;
   correo: string;
   beneficiarioIds: string[];
+  oamId: string;
+  asociacionIds: string[];
 }
 
 const FORM_VACIO: FormularioAsociacion = {
@@ -45,6 +52,8 @@ const FORM_VACIO: FormularioAsociacion = {
   telefono: "",
   correo: "",
   beneficiarioIds: [],
+  oamId: "",
+  asociacionIds: [],
 };
 
 function nombreBeneficiario(b: { nombres: string; apellidos: string }) {
@@ -53,9 +62,14 @@ function nombreBeneficiario(b: { nombres: string; apellidos: string }) {
 
 interface GestionAsociacionesProps {
   puedeGestionar: boolean;
+  tipo?: TipoAsociacion;
 }
 
-export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps) {
+export function GestionAsociaciones({
+  puedeGestionar,
+  tipo = "ASOCIACION",
+}: GestionAsociacionesProps) {
+  const esOam = tipo === "OAM";
   const { token } = useAuth();
   const [asociaciones, setAsociaciones] = useState<Asociacion[]>([]);
   const [veredaSeleccionada, setVeredaSeleccionada] = useState<Vereda | null>(
@@ -79,6 +93,10 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
     OpcionCatalogo[] | null
   >(null);
   const [cargandoBeneficiarios, setCargandoBeneficiarios] = useState(false);
+  const [opcionesOam, setOpcionesOam] = useState<OpcionCatalogo[] | null>(null);
+  const [opcionesAsociaciones, setOpcionesAsociaciones] = useState<
+    OpcionCatalogo[] | null
+  >(null);
 
   const limite = 10;
 
@@ -119,6 +137,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
       const respuesta = await listarAsociaciones(token, {
         pagina,
         limite,
+        tipo,
         busqueda: busqueda || undefined,
       });
       setAsociaciones(respuesta.datos);
@@ -130,11 +149,47 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
     } finally {
       setCargando(false);
     }
-  }, [token, pagina, busqueda]);
+  }, [token, pagina, busqueda, tipo]);
 
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  async function asegurarCatalogoRelacionado() {
+    if (!token) return;
+    try {
+      if (esOam && !opcionesAsociaciones) {
+        const asociaciones = await listarTodasLasPaginas((pag, lim) =>
+          listarAsociaciones(token, {
+            pagina: pag,
+            limite: lim,
+            tipo: "ASOCIACION",
+          }),
+        );
+        setOpcionesAsociaciones(
+          asociaciones.map((a) => ({
+            id: a.id,
+            nombre: a.nombre,
+            subtitulo: a.oam ? `Ya está en ${a.oam.nombre}` : a.nit,
+          })),
+        );
+      }
+      if (!esOam && !opcionesOam) {
+        const oams = await listarTodasLasPaginas((pag, lim) =>
+          listarAsociaciones(token, { pagina: pag, limite: lim, tipo: "OAM" }),
+        );
+        setOpcionesOam(
+          oams.map((a) => ({ id: a.id, nombre: a.nombre, subtitulo: a.nit })),
+        );
+      }
+    } catch (err) {
+      if (esOam) setOpcionesAsociaciones([]);
+      else setOpcionesOam([]);
+      setError(
+        err instanceof Error ? err.message : "Error al cargar el catálogo",
+      );
+    }
+  }
 
   function abrirCrear() {
     setFormulario(FORM_VACIO);
@@ -142,6 +197,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
     setSeleccionado(null);
     setModo("crear");
     void asegurarOpcionesBeneficiarios();
+    void asegurarCatalogoRelacionado();
   }
 
   async function abrirVer(id: string) {
@@ -177,9 +233,12 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
         telefono: item.telefono ?? "",
         correo: item.correo ?? "",
         beneficiarioIds: (item.beneficiarios ?? []).map((b) => b.id),
+        oamId: item.oam?.id ?? "",
+        asociacionIds: (item.asociaciones ?? []).map((a) => a.id),
       });
       setModo("editar");
       void asegurarOpcionesBeneficiarios();
+      void asegurarCatalogoRelacionado();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar");
     }
@@ -201,6 +260,9 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
       telefono: formulario.telefono.trim() || undefined,
       correo: formulario.correo.trim() || undefined,
       beneficiarioIds: formulario.beneficiarioIds,
+      tipo,
+      oamId: esOam ? null : formulario.oamId || null,
+      asociacionIds: esOam ? formulario.asociacionIds : undefined,
     };
   }
 
@@ -212,10 +274,12 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
     try {
       if (modo === "crear") {
         await crearAsociacion(token, aPayload());
-        setExito("Asociación creada correctamente");
+        setExito(esOam ? "OAM creada correctamente" : "Asociación creada correctamente");
       } else if (modo === "editar" && seleccionado) {
         await actualizarAsociacion(token, seleccionado.id, aPayload());
-        setExito("Asociación actualizada correctamente");
+        setExito(
+          esOam ? "OAM actualizada correctamente" : "Asociación actualizada correctamente",
+        );
       }
       cerrarModal();
       await cargar();
@@ -248,8 +312,9 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
     <>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-zinc-600">
-          Organizaciones que agrupan beneficiarios y pueden vincularse como
-          contraparte de un proyecto.
+          {esOam
+            ? "Organizaciones asociativas municipales. Agrupan asociaciones y se asignan a proyectos y jornadas igual que una asociación."
+            : "Organizaciones que agrupan beneficiarios. Pueden pertenecer a una OAM y vincularse como contraparte de un proyecto."}
         </p>
         {puedeGestionar ? (
           <button
@@ -257,7 +322,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
             onClick={abrirCrear}
             className="rounded-xl bg-ruralia-teal px-4 py-2.5 text-sm font-semibold text-white hover:bg-ruralia-teal-hover"
           >
-            + Nueva asociación
+            {esOam ? "+ Nueva OAM" : "+ Nueva asociación"}
           </button>
         ) : null}
       </div>
@@ -290,6 +355,9 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                   <th className="px-5 py-3 font-semibold">NIT</th>
                   <th className="px-5 py-3 font-semibold">Representante</th>
                   <th className="px-5 py-3 font-semibold">Vereda</th>
+                  <th className="px-5 py-3 font-semibold">
+                    {esOam ? "Asociaciones" : "OAM"}
+                  </th>
                   <th className="px-5 py-3 font-semibold">Beneficiarios</th>
                   <th className="px-5 py-3 font-semibold">Estado</th>
                   <th className="px-5 py-3 font-semibold">Acciones</th>
@@ -298,8 +366,8 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
               <tbody className="divide-y divide-zinc-100">
                 {asociaciones.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-8 text-center text-zinc-500">
-                      No se encontraron asociaciones
+                    <td colSpan={8} className="px-5 py-8 text-center text-zinc-500">
+                      {esOam ? "No se encontraron OAM" : "No se encontraron asociaciones"}
                     </td>
                   </tr>
                 ) : (
@@ -314,6 +382,9 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                       </td>
                       <td className="px-5 py-3 text-zinc-600">
                         {a.vereda?.nombre ?? "—"}
+                      </td>
+                      <td className="px-5 py-3 text-zinc-600">
+                        {esOam ? (a.totalAsociaciones ?? 0) : (a.oam?.nombre ?? "—")}
                       </td>
                       <td className="px-5 py-3">
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs font-semibold text-ruralia-teal-text">
@@ -399,10 +470,16 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
       <Modal
         titulo={
           modo === "crear"
-            ? "Nueva asociación"
+            ? esOam
+              ? "Nueva OAM"
+              : "Nueva asociación"
             : modo === "editar"
-              ? "Editar asociación"
-              : "Detalle de la asociación"
+              ? esOam
+                ? "Editar OAM"
+                : "Editar asociación"
+              : esOam
+                ? "Detalle de la OAM"
+                : "Detalle de la asociación"
         }
         abierto={modo !== null}
         onCerrar={cerrarModal}
@@ -440,6 +517,36 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                 {seleccionado.estaActivo ? "Activa" : "Inactiva"}
               </dd>
             </div>
+            {esOam ? (
+              <div className="sm:col-span-2">
+                <dt className="mb-2 text-zinc-500">
+                  Asociaciones ({seleccionado.asociaciones?.length ?? 0})
+                </dt>
+                <dd>
+                  {seleccionado.asociaciones?.length ? (
+                    <ul className="max-h-40 divide-y divide-zinc-100 overflow-y-auto rounded-xl border border-zinc-200">
+                      {seleccionado.asociaciones.map((a) => (
+                        <li key={a.id} className="px-3 py-2 font-medium text-zinc-900">
+                          {a.nombre}
+                          {a.nit ? (
+                            <span className="ml-2 text-xs font-normal text-zinc-500">
+                              {a.nit}
+                            </span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-zinc-500">Esta OAM todavía no agrupa asociaciones.</p>
+                  )}
+                </dd>
+              </div>
+            ) : (
+              <div>
+                <dt className="text-zinc-500">OAM</dt>
+                <dd className="font-medium">{seleccionado.oam?.nombre ?? "—"}</dd>
+              </div>
+            )}
             <div className="sm:col-span-2">
               <dt className="mb-2 text-zinc-500">
                 Beneficiarios ({seleccionado.beneficiarios?.length ?? 0})
@@ -474,7 +581,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
           <form onSubmit={manejarSubmit} className="space-y-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-zinc-700">
-                Nombre de la asociación *
+                {esOam ? "Nombre de la OAM *" : "Nombre de la asociación *"}
               </label>
               <input
                 required
@@ -555,9 +662,50 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
                 />
               </div>
             </div>
+            {esOam ? (
+              <div className="rounded-2xl border border-ruralia-teal-border bg-ruralia-teal-soft/30 p-4">
+                <p className="text-sm font-medium text-zinc-700">
+                  Asociaciones de la OAM
+                </p>
+                <p className="mb-3 text-xs text-zinc-500">
+                  Si una asociación ya está en otra OAM, al guardarla pasa a esta.
+                </p>
+                {!opcionesAsociaciones ? (
+                  <Spinner className="py-6" />
+                ) : (
+                  <SelectorCatalogo
+                    multiple
+                    opciones={opcionesAsociaciones}
+                    value={formulario.asociacionIds}
+                    onChange={(asociacionIds) =>
+                      setFormulario((f) => ({ ...f, asociacionIds }))
+                    }
+                    placeholder="Buscar asociaciones..."
+                    mensajeVacio="Sin asociaciones agrupadas todavía."
+                  />
+                )}
+              </div>
+            ) : (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">
+                  OAM
+                </label>
+                {!opcionesOam ? (
+                  <Spinner className="py-6" />
+                ) : (
+                  <SelectorCatalogo
+                    opciones={opcionesOam}
+                    value={formulario.oamId}
+                    onChange={(oamId) => setFormulario((f) => ({ ...f, oamId }))}
+                    placeholder="Sin OAM"
+                    mensajeVacio="No hay OAM registradas."
+                  />
+                )}
+              </div>
+            )}
             <div className="rounded-2xl border border-ruralia-teal-border bg-ruralia-teal-soft/30 p-4">
               <p className="text-sm font-medium text-zinc-700">
-                Beneficiarios de la asociación
+                {esOam ? "Beneficiarios de la OAM" : "Beneficiarios de la asociación"}
               </p>
               <p className="mb-3 text-xs text-zinc-500">
                 Elige beneficiarios ya registrados. Uno puede pertenecer a varias
@@ -604,7 +752,7 @@ export function GestionAsociaciones({ puedeGestionar }: GestionAsociacionesProps
         onCerrar={() => setConfirmarEliminar(null)}
       >
         <p className="text-sm text-zinc-600">
-          ¿Desactivar la asociación{" "}
+          ¿Desactivar {esOam ? "la OAM" : "la asociación"}{" "}
           <strong>{confirmarEliminar?.nombre}</strong>? No se podrá vincular a
           nuevos proyectos.
         </p>

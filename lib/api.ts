@@ -614,7 +614,7 @@ export async function importarBeneficiariosExcelCatalogo(
 ): Promise<ResultadoCargaMasivaBeneficiarios> {
   const formData = new FormData();
   formData.append("archivo", archivo);
-  formData.append("veredaId", veredaId);
+  if (veredaId) formData.append("veredaId", veredaId);
   const respuesta = await fetch(`${API_URL}/beneficiarios/importar`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
@@ -672,6 +672,12 @@ export interface FilaExcelBeneficiarioPreview {
   tipoDocumento: string;
   telefono?: string;
   correo?: string;
+  genero?: "MASCULINO" | "FEMENINO" | "OTRO" | null;
+  edad?: number | null;
+  municipio?: string | null;
+  lineaProductiva?: string | null;
+  nombreAsociacion?: string | null;
+  estaActivo?: boolean;
 }
 
 export async function importarBeneficiariosExcelProyecto(
@@ -682,7 +688,7 @@ export async function importarBeneficiariosExcelProyecto(
 ): Promise<ResultadoCargaMasivaBeneficiarios> {
   const formData = new FormData();
   formData.append("archivo", archivo);
-  formData.append("veredaId", veredaId);
+  if (veredaId) formData.append("veredaId", veredaId);
   const respuesta = await fetch(
     `${API_URL}/proyectos/${proyectoId}/beneficiarios/importar`,
     {
@@ -1212,7 +1218,13 @@ export async function listarBeneficiarios(
 
 export async function listarAsociaciones(
   token: string,
-  params?: { busqueda?: string; veredaId?: string; pagina?: number; limite?: number },
+  params?: {
+    busqueda?: string;
+    veredaId?: string;
+    tipo?: "ASOCIACION" | "OAM";
+    pagina?: number;
+    limite?: number;
+  },
 ): Promise<RespuestaPaginada<Asociacion>> {
   return fetchConAuth<RespuestaPaginada<Asociacion>>(
     `/asociaciones${construirQuery(params)}`,

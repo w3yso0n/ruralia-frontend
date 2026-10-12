@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { usePermisos } from "@/lib/use-permisos";
 import type { EstadoProyecto, OrdenProyecto, Proyecto } from "@/lib/types";
+import { etiquetaOrganizacion } from "@/lib/types";
 
 export function ListadoProyectos() {
   const { token } = useAuth();
@@ -97,7 +98,10 @@ export function ListadoProyectos() {
       }
       if (asociaciones) {
         setOpcionesAsociaciones(
-          asociaciones.datos.map((a) => ({ id: a.id, nombre: a.nombre })),
+          asociaciones.datos.map((a) => ({
+            id: a.id,
+            nombre: etiquetaOrganizacion(a),
+          })),
         );
       }
       if (veredas) {

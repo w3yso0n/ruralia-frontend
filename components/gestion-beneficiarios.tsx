@@ -14,7 +14,10 @@ import {
   obtenerUsoBeneficiario,
   reactivarBeneficiario,
 } from "@/lib/api";
-import { CargaExcelBeneficiarios } from "@/components/proyectos/carga-excel-beneficiarios";
+import {
+  AvisosCargaBeneficiarios,
+  CargaExcelBeneficiarios,
+} from "@/components/proyectos/carga-excel-beneficiarios";
 import { useAuth } from "@/lib/auth-context";
 import { usePermisos } from "@/lib/use-permisos";
 import { SelectorVereda } from "@/components/ui/selector-vereda";
@@ -29,6 +32,7 @@ import type {
   EstadoFiltroBeneficiario,
   Genero,
   TipoDocumento,
+  ResultadoFilaCargaBeneficiario,
   UsoBeneficiario,
   Vereda,
 } from "@/lib/types";
@@ -44,7 +48,11 @@ interface FormularioBeneficiario {
   telefono: string;
   correo: string;
   genero: Genero | "";
+  edad: string;
   fechaNacimiento: string;
+  municipio: string;
+  lineaProductiva: string;
+  nombreAsociacion: string;
 }
 
 const FORM_VACIO: FormularioBeneficiario = {
@@ -56,7 +64,11 @@ const FORM_VACIO: FormularioBeneficiario = {
   telefono: "",
   correo: "",
   genero: "",
+  edad: "",
   fechaNacimiento: "",
+  municipio: "",
+  lineaProductiva: "",
+  nombreAsociacion: "",
 };
 
 const TIPOS_DOCUMENTO: { valor: TipoDocumento; etiqueta: string }[] = [
@@ -107,6 +119,9 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
   );
   const [archivoExcel, setArchivoExcel] = useState<File | null>(null);
   const [importando, setImportando] = useState(false);
+  const [detalleCarga, setDetalleCarga] = useState<
+    ResultadoFilaCargaBeneficiario[]
+  >([]);
 
   const limite = 10;
 
@@ -177,7 +192,11 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
         telefono: item.telefono ?? "",
         correo: item.correo ?? "",
         genero: item.genero ?? "",
+        edad: item.edad != null ? String(item.edad) : "",
         fechaNacimiento: item.fechaNacimiento?.slice(0, 10) ?? "",
+        municipio: item.municipio ?? "",
+        lineaProductiva: item.lineaProductiva ?? "",
+        nombreAsociacion: item.nombreAsociacion ?? "",
       });
       setModo("editar");
     } catch (err) {
@@ -202,13 +221,21 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
       telefono: formulario.telefono.trim() || undefined,
       correo: formulario.correo.trim() || undefined,
       genero: formulario.genero || undefined,
+      edad: formulario.edad.trim() ? Number(formulario.edad) : null,
       fechaNacimiento: formulario.fechaNacimiento || undefined,
+      municipio: formulario.municipio.trim(),
+      lineaProductiva: formulario.lineaProductiva.trim(),
+      nombreAsociacion: formulario.nombreAsociacion.trim(),
     };
   }
 
   async function manejarSubmit(evento: React.FormEvent) {
     evento.preventDefault();
     if (!token) return;
+    if (formulario.edad.trim() && !/^\d{1,3}$/.test(formulario.edad.trim())) {
+      setError("La edad debe ser un número entero");
+      return;
+    }
     setEnviando(true);
     setError(null);
     try {
@@ -233,15 +260,19 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
     setImportando(true);
     setError(null);
     setExito(null);
+    setDetalleCarga([]);
     try {
       const resultado = await importarBeneficiariosExcelCatalogo(
         token,
         archivo,
         veredaId,
       );
+      setDetalleCarga(resultado.detalle);
       setExito(
-        `Carga lista: ${resultado.creados} dadas de alta, ${resultado.asignadosExistentes} ya estaban activas${
-          resultado.errores ? `, ${resultado.errores} con error` : ""
+        `Carga lista: ${resultado.creados} dadas de alta, ${resultado.asignadosExistentes} ya existían${
+          resultado.errores
+            ? `. ${resultado.errores} no se pudieron agregar`
+            : ""
         }.`,
       );
       setArchivoExcel(null);
@@ -348,6 +379,7 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
 
       {error ? <Alerta mensaje={error} /> : null}
       {exito ? <Alerta mensaje={exito} tipo="exito" /> : null}
+      <AvisosCargaBeneficiarios detalle={detalleCarga} />
 
       <div className="mb-4 flex gap-6 border-b border-ruralia-teal-border">
         {PESTANAS.map((p) => (
@@ -419,7 +451,7 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
                         {b.tipoDocumento} {b.numeroDocumento}
                       </td>
                       <td className="px-5 py-3 text-zinc-600">
-                        {b.vereda?.nombre ?? "—"}
+                        {b.vereda?.nombre ?? b.municipio ?? "—"}
                       </td>
                       <td className="px-5 py-3">
                         <span
@@ -546,6 +578,24 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
             <div>
               <dt className="text-zinc-500">Vereda</dt>
               <dd className="font-medium">{seleccionado.vereda?.nombre ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">Municipio</dt>
+              <dd className="font-medium">{seleccionado.municipio ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">Asociación</dt>
+              <dd className="font-medium">{seleccionado.nombreAsociacion ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">Línea productiva</dt>
+              <dd className="font-medium">{seleccionado.lineaProductiva ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">Edad</dt>
+              <dd className="font-medium">
+                {seleccionado.edad != null ? seleccionado.edad : "—"}
+              </dd>
             </div>
             <div>
               <dt className="text-zinc-500">Teléfono</dt>
@@ -709,6 +759,65 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
                     setFormulario((f) => ({
                       ...f,
                       fechaNacimiento: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">
+                  Edad
+                </label>
+                <input
+                  inputMode="numeric"
+                  value={formulario.edad}
+                  onChange={(e) =>
+                    setFormulario((f) => ({ ...f, edad: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">
+                  Municipio
+                </label>
+                <input
+                  value={formulario.municipio}
+                  onChange={(e) =>
+                    setFormulario((f) => ({ ...f, municipio: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">
+                  Asociación
+                </label>
+                <input
+                  value={formulario.nombreAsociacion}
+                  onChange={(e) =>
+                    setFormulario((f) => ({
+                      ...f,
+                      nombreAsociacion: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">
+                  Línea productiva
+                </label>
+                <input
+                  value={formulario.lineaProductiva}
+                  onChange={(e) =>
+                    setFormulario((f) => ({
+                      ...f,
+                      lineaProductiva: e.target.value,
                     }))
                   }
                   className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"

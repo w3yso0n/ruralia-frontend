@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { listarJornadas } from "@/lib/api";
 import type { EstadoFuncional, EstadoJornada, Jornada } from "@/lib/types";
+import { etiquetaOrganizacion } from "@/lib/types";
 
 const ETIQUETA_ESTADO: Record<EstadoJornada, string> = {
   PLANIFICADA: "Planificada",
@@ -192,10 +193,10 @@ function TarjetaJornada({
               }
             />
             <Dato
-              etiqueta="Asociaciones"
+              etiqueta="Asociaciones y OAM"
               valor={
                 jornada.asociaciones?.length
-                  ? jornada.asociaciones.map((a) => a.nombre).join(", ")
+                  ? jornada.asociaciones.map((a) => etiquetaOrganizacion(a)).join(", ")
                   : null
               }
             />

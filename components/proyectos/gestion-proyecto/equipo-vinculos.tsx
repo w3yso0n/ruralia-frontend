@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CargaExcelBeneficiarios } from "@/components/proyectos/carga-excel-beneficiarios";
+import {
+  AvisosCargaBeneficiarios,
+  CargaExcelBeneficiarios,
+} from "@/components/proyectos/carga-excel-beneficiarios";
 import { Alerta, Modal } from "@/components/ui/modal";
 import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 import { SelectorVeredasMultiple } from "@/components/ui/selector-veredas-multiple";
@@ -24,6 +27,7 @@ import type {
   ResultadoCargaMasivaBeneficiarios,
   TipoDocumento,
 } from "@/lib/types";
+import { etiquetaOrganizacion } from "@/lib/types";
 
 interface EquipoVinculosProps {
   token: string;
@@ -52,6 +56,7 @@ export function EquipoVinculos({
   onActualizar,
 }: EquipoVinculosProps) {
   const [veredaIds, setVeredaIds] = useState<string[]>([]);
+  const [municipioIds, setMunicipioIds] = useState<string[]>([]);
   const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
   const [beneficiarioIds, setBeneficiarioIds] = useState<string[]>([]);
   const [asociacionIds, setAsociacionIds] = useState<string[]>([]);
@@ -91,6 +96,7 @@ export function EquipoVinculos({
 
   useEffect(() => {
     setVeredaIds(proyecto.veredas?.map((v) => v.id) ?? []);
+    setMunicipioIds(proyecto.municipios?.map((m) => m.id) ?? []);
     setUsuarioIds(proyecto.personal?.map((p) => p.id) ?? []);
     setBeneficiarioIds(proyecto.beneficiarios?.map((b) => b.id) ?? []);
     setAsociacionIds(proyecto.asociaciones?.map((a) => a.id) ?? []);
@@ -120,7 +126,10 @@ export function EquipoVinculos({
           })),
         );
         setOpcionesAsociaciones(
-          asociaciones.map((a) => ({ id: a.id, nombre: a.nombre })),
+          asociaciones.map((a) => ({
+            id: a.id,
+            nombre: etiquetaOrganizacion(a),
+          })),
         );
       })
       .catch((err: unknown) => {
@@ -140,11 +149,14 @@ export function EquipoVinculos({
     setExito(null);
     try {
       if (tipo === "territorio") {
-        if (!veredaIds.length) {
-          setError("Selecciona al menos una vereda");
+        if (!municipioIds.length && !veredaIds.length) {
+          setError("Selecciona al menos un municipio");
           return;
         }
-        await asignarTerritoriosProyecto(token, proyectoId, { veredaIds });
+        await asignarTerritoriosProyecto(token, proyectoId, {
+          veredaIds,
+          municipioIds,
+        });
       }
       if (tipo === "personal") {
         if (!usuarioIds.length) {
@@ -185,7 +197,7 @@ export function EquipoVinculos({
       );
       setResultadoCarga(resultado);
       setArchivoExcel(null);
-      const resumen = `${resultado.creados} creados, ${resultado.asignadosExistentes} ya estaban en la BD, ${resultado.yaEnProyecto} ya estaban en el proyecto${resultado.errores ? `, ${resultado.errores} con error` : ""}.`;
+      const resumen = `${resultado.creados} nuevas, ${resultado.asignadosExistentes} ya existían y se vincularon al proyecto, ${resultado.yaEnProyecto} ya estaban en el proyecto${resultado.errores ? `, ${resultado.errores} con error` : ""}.`;
       setExito(`Carga masiva lista: ${resumen}`);
       await onActualizar();
     } catch (err) {
@@ -362,15 +374,32 @@ export function EquipoVinculos({
           ) : (
             <p className="mt-2 text-sm text-zinc-500">Sin beneficiarios</p>
           )}
-          <h3 className="mt-5 font-semibold text-zinc-900">Asociaciones</h3>
+          <h3 className="mt-5 font-semibold text-zinc-900">Asociaciones y OAM</h3>
           {proyecto.asociaciones?.length ? (
             <ul className="mt-3 space-y-1 text-sm text-zinc-700">
               {proyecto.asociaciones.map((a) => (
-                <li key={a.id}>{a.nombre}</li>
+                <li key={a.id}>{etiquetaOrganizacion(a)}</li>
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-sm text-zinc-500">Sin asociaciones</p>
+            <p className="mt-2 text-sm text-zinc-500">Sin asociaciones ni OAM</p>
+          )}
+          <p className="mt-4 text-sm text-zinc-600">Municipios</p>
+          {proyecto.municipios?.length ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {proyecto.municipios.map((municipio) => (
+                <span
+                  key={municipio.id}
+                  className="inline-flex rounded-full border border-ruralia-teal-border bg-ruralia-teal-soft/50 px-3 py-1 text-sm text-zinc-800"
+                >
+                  {municipio.departamentoNombre
+                    ? `${municipio.nombre}, ${municipio.departamentoNombre}`
+                    : municipio.nombre}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-zinc-500">Sin municipios asignados</p>
           )}
           <p className="mt-4 text-sm text-zinc-600">Veredas asignadas</p>
           {proyecto.veredas?.length ? (
@@ -385,7 +414,9 @@ export function EquipoVinculos({
               ))}
             </div>
           ) : (
-            <p className="mt-1 text-sm text-zinc-500">Sin veredas asignadas</p>
+            <p className="mt-1 text-sm text-zinc-500">
+              Sin veredas asignadas (opcional)
+            </p>
           )}
         </section>
       </div>
@@ -468,14 +499,17 @@ export function EquipoVinculos({
           />
         </div>
         {resultadoCarga ? (
-          <p className="mt-3 text-xs text-zinc-500">
-            Última carga: {resultadoCarga.totalFilas} filas ·{" "}
-            {resultadoCarga.creados} altas nuevas ·{" "}
-            {resultadoCarga.asignadosExistentes} reutilizadas de la BD
-            {resultadoCarga.errores
-              ? ` · ${resultadoCarga.errores} errores`
-              : ""}
-          </p>
+          <div className="mt-3">
+            <p className="text-xs text-zinc-500">
+              Última carga: {resultadoCarga.totalFilas} filas ·{" "}
+              {resultadoCarga.creados} altas nuevas ·{" "}
+              {resultadoCarga.asignadosExistentes} ya existían y se vincularon
+              {resultadoCarga.yaEnProyecto
+                ? ` · ${resultadoCarga.yaEnProyecto} ya estaban en el proyecto`
+                : ""}
+            </p>
+            <AvisosCargaBeneficiarios detalle={resultadoCarga.detalle} />
+          </div>
         ) : null}
 
         {beneficiariosVinculados.length > 0 ? (
@@ -524,10 +558,10 @@ export function EquipoVinculos({
       <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-zinc-900">Asociaciones</h3>
+            <h3 className="font-semibold text-zinc-900">Asociaciones y OAM</h3>
             <p className="mt-1 text-sm text-zinc-500">
-              Independiente de los beneficiarios: un proyecto puede tener ambos,
-              y varios de cada uno.
+              Una OAM se asigna igual que una asociación. El proyecto puede
+              tener varias.
             </p>
           </div>
           <button
@@ -544,7 +578,7 @@ export function EquipoVinculos({
           opciones={opcionesAsociaciones}
           value={asociacionIds}
           onChange={setAsociacionIds}
-          placeholder="Buscar asociaciones…"
+          placeholder="Buscar asociaciones u OAM…"
           mensajeVacio="Puedes dejarlo vacío si el proyecto solo tiene beneficiarios."
         />
       </section>
@@ -552,9 +586,9 @@ export function EquipoVinculos({
       <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-zinc-900">Territorio (veredas)</h3>
+            <h3 className="font-semibold text-zinc-900">Territorio</h3>
             <p className="mt-1 text-sm text-zinc-500">
-              Asocia veredas del catálogo DANE o desde Google Maps.
+              Elige el municipio. La vereda es opcional.
             </p>
           </div>
           <button
@@ -571,6 +605,10 @@ export function EquipoVinculos({
           value={veredaIds}
           onChange={setVeredaIds}
           veredasIniciales={proyecto.veredas}
+          veredaOpcional
+          municipioIds={municipioIds}
+          onMunicipiosChange={setMunicipioIds}
+          municipiosIniciales={proyecto.municipios}
         />
       </section>
 

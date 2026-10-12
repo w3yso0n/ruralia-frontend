@@ -18,6 +18,7 @@ import type {
   ActividadPlan,
   Geocerca,
   Jornada,
+  MunicipioResumen,
   PlantillaFormularioCatalogo,
   TipoJornada,
   VeredaResumen,
@@ -31,6 +32,7 @@ import {
 
 interface FormularioEditarJornadaProps {
   jornada: Jornada;
+  municipios: MunicipioResumen[];
   veredas: VeredaResumen[];
   geocercas: Geocerca[];
   actividadesPlan: ActividadPlan[];
@@ -42,6 +44,7 @@ interface FormularioEditarJornadaProps {
   tamanoGrupo?: number;
   onSubmit: (datos: {
     fecha: string;
+    municipioId?: string | null;
     veredaId?: string | null;
     geocercaId?: string | null;
     nombre?: string;
@@ -61,6 +64,7 @@ function fechaParaInput(fecha: string) {
 
 export function FormularioEditarJornada({
   jornada,
+  municipios,
   veredas,
   geocercas,
   actividadesPlan,
@@ -77,11 +81,16 @@ export function FormularioEditarJornada({
   const [nombre, setNombre] = useState(jornada.nombre ?? "");
   const [fecha, setFecha] = useState(fechaParaInput(jornada.fecha));
   const [tipoLugar, setTipoLugar] = useState<TipoLugarJornada>(
-    jornada.geocerca?.id ? "geocerca" : "vereda",
+    jornada.geocerca?.id
+      ? "geocerca"
+      : jornada.vereda?.id && !jornada.municipio?.id
+        ? "vereda"
+        : "municipio",
   );
-  const [veredaId, setVeredaId] = useState(
-    jornada.vereda?.id ?? veredas[0]?.id ?? "",
+  const [municipioId, setMunicipioId] = useState(
+    jornada.municipio?.id ?? municipios[0]?.id ?? "",
   );
+  const [veredaId, setVeredaId] = useState(jornada.vereda?.id ?? "");
   const [geocercaId, setGeocercaId] = useState(
     jornada.geocerca?.id ?? geocercas[0]?.id ?? "",
   );
@@ -135,12 +144,20 @@ export function FormularioEditarJornada({
     evento.preventDefault();
     setErrorLocal(null);
 
-    if (!fecha || (tipoLugar === "vereda" ? !veredaId : !geocercaId)) {
-      setErrorLocal(
-        tipoLugar === "vereda"
-          ? "Fecha y vereda son obligatorias"
-          : "Fecha y geocerca son obligatorias",
-      );
+    if (!fecha) {
+      setErrorLocal("La fecha es obligatoria");
+      return;
+    }
+    if (tipoLugar === "municipio" && !municipioId) {
+      setErrorLocal("Selecciona el municipio de la jornada");
+      return;
+    }
+    if (tipoLugar === "vereda" && !veredaId) {
+      setErrorLocal("Selecciona la vereda de la jornada");
+      return;
+    }
+    if (tipoLugar === "geocerca" && !geocercaId) {
+      setErrorLocal("Selecciona la geocerca de la jornada");
       return;
     }
 
@@ -174,7 +191,8 @@ export function FormularioEditarJornada({
     const seleccion = resolverSeleccionFormulario(claveFormulario, plantillas);
     await onSubmit({
       fecha,
-      veredaId: tipoLugar === "vereda" ? veredaId : null,
+      municipioId: tipoLugar === "municipio" ? municipioId : null,
+      veredaId: tipoLugar === "geocerca" ? null : veredaId || null,
       geocercaId: tipoLugar === "geocerca" ? geocercaId : null,
       nombre: nombre.trim(),
       observaciones: observaciones.trim() || undefined,
@@ -191,7 +209,7 @@ export function FormularioEditarJornada({
       {tamanoGrupo > 1 ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           Esta jornada pertenece a un grupo de {tamanoGrupo} agentes. Los
-          cambios de fecha, meta, vereda, nombre, formulario, asignación y
+          cambios de fecha, meta, lugar, nombre, formulario, asignación y
           observaciones se aplicarán a todos.
         </p>
       ) : null}
@@ -230,10 +248,13 @@ export function FormularioEditarJornada({
       <SelectorLugarJornada
         tipo={tipoLugar}
         onTipo={setTipoLugar}
+        municipios={municipios}
         veredas={veredas}
         geocercas={geocercas}
+        municipioId={municipioId}
         veredaId={veredaId}
         geocercaId={geocercaId}
+        onMunicipioId={setMunicipioId}
         onVeredaId={setVeredaId}
         onGeocercaId={setGeocercaId}
         disabled={enviando}

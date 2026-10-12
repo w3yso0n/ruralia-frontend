@@ -10,11 +10,56 @@ import {
   previsualizarBeneficiariosExcel,
   type FilaExcelBeneficiarioPreview,
 } from "@/lib/api";
+import type { ResultadoFilaCargaBeneficiario } from "@/lib/types";
 
 export interface VeredaCargaOpcion {
   id: string;
   nombre: string;
   subtitulo?: string;
+}
+
+function etiquetaGenero(genero: string): string {
+  if (genero === "MASCULINO") return "M";
+  if (genero === "FEMENINO") return "F";
+  return genero;
+}
+
+function motivoFilaOmitida(fila: FilaExcelBeneficiarioPreview): string | null {
+  const nombre = [fila.nombres, fila.apellidos].filter(Boolean).join(" ").trim();
+  const quien = nombre || "Sin nombre";
+  if (!fila.identificador && !fila.nombres) {
+    return `Fila ${fila.fila}: faltan la cédula y el nombre`;
+  }
+  if (!fila.identificador) {
+    return `${quien} (fila ${fila.fila}): falta la cédula`;
+  }
+  if (!fila.nombres) {
+    return `Fila ${fila.fila}, cédula ${fila.identificador}: falta el nombre`;
+  }
+  return null;
+}
+
+export function AvisosCargaBeneficiarios({
+  detalle,
+}: {
+  detalle: ResultadoFilaCargaBeneficiario[];
+}) {
+  const errores = detalle.filter((fila) => fila.resultado === "error");
+  if (!errores.length) return null;
+  return (
+    <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+      <p className="text-sm font-semibold text-red-800">
+        No se {errores.length === 1 ? "pudo agregar este registro" : `pudieron agregar estos ${errores.length} registros`}
+      </p>
+      <ul className="mt-2 max-h-56 space-y-1 overflow-y-auto text-sm text-red-900">
+        {errores.map((fila) => (
+          <li key={`${fila.fila}-${fila.identificador}-${fila.nombres}`}>
+            {fila.mensaje ?? `Fila ${fila.fila}`}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 interface CargaExcelBeneficiariosProps {
@@ -159,8 +204,14 @@ export function CargaExcelBeneficiarios({
     onArchivo(null);
   }
 
+  const pideVereda = filas.some((fila) => !fila.municipio?.trim());
+  const omitidas = filas
+    .map((fila) => motivoFilaOmitida(fila))
+    .filter((motivo): motivo is string => motivo !== null);
+
   async function confirmar() {
-    if (!archivoLocal || !onImportar || !veredaId) return;
+    if (!archivoLocal || !onImportar) return;
+    if (pideVereda && !veredaId) return;
     await onImportar(archivoLocal, veredaId);
     setRevisando(false);
     setArchivoLocal(null);
@@ -171,12 +222,12 @@ export function CargaExcelBeneficiarios({
 
   const ayuda = (
     <p className="text-xs text-zinc-500">
-      Obligatorios: <strong>nombres</strong> e <strong>identificador</strong>.
-      Elegir el archivo no guarda nada: en el mismo paso revisas las personas y
-      eliges la vereda DANE.
+      La plantilla trae las columnas de la matriz: cédula, nombres, apellidos,
+      sexo, edad, contacto, asociación, municipio, línea productiva y estado.
+      Elegir el archivo no guarda nada: primero revisas la lista.
       {contexto === "proyecto"
-        ? " Solo aparecen las veredas DANE ya vinculadas a este proyecto."
-        : " Si el documento ya existe y está activo, no se duplica."}
+        ? " La cédula es la clave: si la persona no existe se crea, y si ya está en la base no se duplica pero sí se vincula a este proyecto."
+        : " La cédula es la clave: si ya existe, no se duplica el registro."}
     </p>
   );
 
@@ -240,9 +291,9 @@ export function CargaExcelBeneficiarios({
           >
             <div className="space-y-4">
               <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-600">
-                <li>Descarga la plantilla y llénala con las personas.</li>
+                <li>Descarga la plantilla de la matriz y llénala, o usa el Excel que ya tienes con esas columnas.</li>
                 <li>Elige el archivo: verás la lista antes de guardar.</li>
-                <li>Selecciona la vereda DANE y confirma la carga.</li>
+                <li>Confirma la carga. El municipio va en cada fila.</li>
               </ol>
               {ayuda}
               {acciones}
@@ -269,29 +320,63 @@ export function CargaExcelBeneficiarios({
           <p className="text-sm text-zinc-600">
             {archivoLocal ? archivoLocal.name : "Archivo"} tiene{" "}
             {leyendo ? "…" : filas.length}{" "}
-            {filas.length === 1 ? "persona" : "personas"}. Elige la vereda y
-            confirma para darlas de alta.
+            {filas.length === 1 ? "persona" : "personas"}.
+            {leyendo
+              ? ""
+              : pideVereda
+                ? " Elige la vereda y confirma para darlas de alta."
+                : " El municipio viene en el archivo. Confirma para darlas de alta."}
           </p>
           {leyendo ? (
             <p className="text-sm text-zinc-500">Leyendo el archivo…</p>
           ) : (
-            <ul className="max-h-52 divide-y divide-zinc-100 overflow-y-auto rounded-xl border border-zinc-200">
-              {filas.map((fila) => (
-                <li key={`${fila.fila}-${fila.identificador}`} className="px-3 py-2">
-                  <p className="text-sm font-medium text-zinc-900">
-                    {fila.nombres} {fila.apellidos}
+            <>
+              {omitidas.length ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-sm font-semibold text-red-800">
+                    {omitidas.length === 1
+                      ? "Este registro no se va a agregar"
+                      : `Estos ${omitidas.length} registros no se van a agregar`}
                   </p>
-                  <p className="text-xs text-zinc-500">
-                    {fila.tipoDocumento} {fila.identificador}
-                    {fila.telefono ? ` · ${fila.telefono}` : ""}
-                    {fila.correo ? ` · ${fila.correo}` : ""}
-                  </p>
-                </li>
-              ))}
-            </ul>
+                  <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto text-sm text-red-900">
+                    {omitidas.map((motivo) => (
+                      <li key={motivo}>{motivo}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <ul className="max-h-52 divide-y divide-zinc-100 overflow-y-auto rounded-xl border border-zinc-200">
+                {filas.map((fila) => {
+                  const omitida = motivoFilaOmitida(fila);
+                  return (
+                    <li
+                      key={`${fila.fila}-${fila.identificador}`}
+                      className={`px-3 py-2 ${omitida ? "bg-red-50" : ""}`}
+                    >
+                      <p className="text-sm font-medium text-zinc-900">
+                        {fila.nombres || "Sin nombre"} {fila.apellidos}
+                      </p>
+                      <p className={`text-xs ${omitida ? "text-red-700" : "text-zinc-500"}`}>
+                        {omitida ?? (
+                          <>
+                            {fila.tipoDocumento} {fila.identificador}
+                            {fila.genero ? ` · ${etiquetaGenero(fila.genero)}` : ""}
+                            {fila.edad != null ? ` · ${fila.edad} años` : ""}
+                            {fila.telefono ? ` · ${fila.telefono}` : ""}
+                            {fila.municipio ? ` · ${fila.municipio}` : ""}
+                            {fila.nombreAsociacion ? ` · ${fila.nombreAsociacion}` : ""}
+                            {fila.lineaProductiva ? ` · ${fila.lineaProductiva}` : ""}
+                          </>
+                        )}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
 
-          {contexto === "catalogo" ? (
+          {contexto === "catalogo" && pideVereda ? (
             <div>
               <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                 Buscar vereda DANE
@@ -309,6 +394,7 @@ export function CargaExcelBeneficiarios({
             </div>
           ) : null}
 
+          {pideVereda ? (
           <div>
             <span className="mb-1.5 block text-sm font-medium text-zinc-700">
               Vereda DANE *
@@ -353,6 +439,7 @@ export function CargaExcelBeneficiarios({
               </ul>
             )}
           </div>
+          ) : null}
 
           <div className="flex justify-end gap-2">
             <button
@@ -365,7 +452,7 @@ export function CargaExcelBeneficiarios({
             </button>
             <button
               type="button"
-              disabled={!veredaId || importando || leyendo}
+              disabled={(pideVereda && !veredaId) || importando || leyendo}
               onClick={() => void confirmar()}
               className="rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white hover:bg-ruralia-teal-hover disabled:opacity-50"
             >

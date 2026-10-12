@@ -215,10 +215,12 @@ function VistaGestionProyectoCompleta({
     proyecto.asociaciones?.[0]
   );
 
+  const tieneTerritorio = !!(
+    proyecto.municipios?.length || proyecto.veredas?.length
+  );
+
   const configuracionIncompleta =
-    !proyecto.veredas?.length ||
-    !proyecto.personal?.length ||
-    !tieneContraparte;
+    !tieneTerritorio || !proyecto.personal?.length || !tieneContraparte;
 
   const enBorrador = proyecto.estado === "BORRADOR";
 
@@ -324,7 +326,7 @@ function VistaGestionProyectoCompleta({
           >
             Equipo y contraparte
           </button>{" "}
-          para asignar veredas, equipo interno y beneficiarios o asociaciones antes
+          para asignar el municipio, el equipo interno y beneficiarios o asociaciones antes
           de crear jornadas.
         </div>
       ) : null}

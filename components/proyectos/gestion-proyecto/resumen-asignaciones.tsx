@@ -1,6 +1,7 @@
 "use client";
 
 import type { Proyecto } from "@/lib/types";
+import { etiquetaOrganizacion } from "@/lib/types";
 
 function iniciales(nombre: string): string {
   return nombre
@@ -121,12 +122,12 @@ export function ResumenAsignaciones({
         {proyecto.asociaciones?.length ? (
           <div className="mb-3">
             <p className="text-xs font-medium uppercase tracking-wide text-ruralia-teal-text">
-              Asociaciones ({proyecto.asociaciones.length})
+              Asociaciones y OAM ({proyecto.asociaciones.length})
             </p>
             <ul className="mt-2 space-y-1.5">
               {proyecto.asociaciones.map((a) => (
                 <li key={a.id} className="text-sm text-zinc-800">
-                  {a.nombre}
+                  {etiquetaOrganizacion(a)}
                 </li>
               ))}
             </ul>
@@ -149,10 +150,15 @@ export function ResumenAsignaciones({
             ) : null}
           </p>
         ) : null}
-        {proyecto.veredas?.length ? (
+        {proyecto.municipios?.length || proyecto.veredas?.length ? (
           <p className="mt-4 text-sm text-zinc-600">
             <span className="text-zinc-400">Territorio: </span>
-            {proyecto.veredas.map((v) => v.nombre).join(", ")}
+            {[
+              ...(proyecto.municipios ?? []).map(
+                (municipio) => `Municipio ${municipio.nombre}`,
+              ),
+              ...(proyecto.veredas ?? []).map((vereda) => vereda.nombre),
+            ].join(", ")}
           </p>
         ) : null}
       </section>

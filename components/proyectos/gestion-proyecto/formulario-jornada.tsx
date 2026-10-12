@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/auth-context";
 import type {
   ActividadPlan,
   Geocerca,
+  MunicipioResumen,
   PlantillaFormularioCatalogo,
   TipoJornada,
   VeredaResumen,
@@ -35,6 +36,7 @@ interface AgenteOpcion {
 }
 
 interface FormularioJornadaProps {
+  municipios: MunicipioResumen[];
   veredas: VeredaResumen[];
   geocercas: Geocerca[];
   actividadesPlan: ActividadPlan[];
@@ -46,6 +48,7 @@ interface FormularioJornadaProps {
   enviando: boolean;
   onSubmit: (datos: {
     fecha: string;
+    municipioId?: string | null;
     veredaId?: string | null;
     geocercaId?: string | null;
     nombre?: string;
@@ -61,6 +64,7 @@ interface FormularioJornadaProps {
 }
 
 export function FormularioJornada({
+  municipios,
   veredas,
   geocercas,
   actividadesPlan,
@@ -75,8 +79,13 @@ export function FormularioJornada({
   const { token } = useAuth();
   const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState("");
-  const [tipoLugar, setTipoLugar] = useState<TipoLugarJornada>("vereda");
-  const [veredaId, setVeredaId] = useState(veredas[0]?.id ?? "");
+  const [tipoLugar, setTipoLugar] = useState<TipoLugarJornada>(
+    municipios.length ? "municipio" : "vereda",
+  );
+  const [municipioId, setMunicipioId] = useState(municipios[0]?.id ?? "");
+  const [veredaId, setVeredaId] = useState(
+    municipios.length ? "" : (veredas[0]?.id ?? ""),
+  );
   const [geocercaId, setGeocercaId] = useState(geocercas[0]?.id ?? "");
   const [observaciones, setObservaciones] = useState("");
   const [metaId, setMetaId] = useState("");
@@ -109,12 +118,20 @@ export function FormularioJornada({
     evento.preventDefault();
     setErrorLocal(null);
 
-    if (!fecha || (tipoLugar === "vereda" ? !veredaId : !geocercaId)) {
-      setErrorLocal(
-        tipoLugar === "vereda"
-          ? "Fecha y vereda son obligatorias"
-          : "Fecha y geocerca son obligatorias",
-      );
+    if (!fecha) {
+      setErrorLocal("La fecha es obligatoria");
+      return;
+    }
+    if (tipoLugar === "municipio" && !municipioId) {
+      setErrorLocal("Selecciona el municipio de la jornada");
+      return;
+    }
+    if (tipoLugar === "vereda" && !veredaId) {
+      setErrorLocal("Selecciona la vereda de la jornada");
+      return;
+    }
+    if (tipoLugar === "geocerca" && !geocercaId) {
+      setErrorLocal("Selecciona la geocerca de la jornada");
       return;
     }
 
@@ -154,7 +171,8 @@ export function FormularioJornada({
 
     await onSubmit({
       fecha,
-      veredaId: tipoLugar === "vereda" ? veredaId : null,
+      municipioId: tipoLugar === "municipio" ? municipioId : null,
+      veredaId: tipoLugar === "geocerca" ? null : veredaId || null,
       geocercaId: tipoLugar === "geocerca" ? geocercaId : null,
       nombre: nombre.trim() || undefined,
       observaciones: observaciones.trim() || undefined,
@@ -254,10 +272,13 @@ export function FormularioJornada({
       <SelectorLugarJornada
         tipo={tipoLugar}
         onTipo={setTipoLugar}
+        municipios={municipios}
         veredas={veredas}
         geocercas={geocercas}
+        municipioId={municipioId}
         veredaId={veredaId}
         geocercaId={geocercaId}
+        onMunicipioId={setMunicipioId}
         onVeredaId={setVeredaId}
         onGeocercaId={setGeocercaId}
         disabled={enviando}
@@ -323,7 +344,11 @@ export function FormularioJornada({
 
       <button
         type="submit"
-        disabled={enviando || !veredas.length || !agentes.length}
+        disabled={
+          enviando ||
+          !agentes.length ||
+          (!municipios.length && !veredas.length && !geocercas.length)
+        }
         className="w-full rounded-xl bg-ruralia-teal py-2.5 text-sm font-semibold text-white disabled:opacity-50"
       >
         {enviando
