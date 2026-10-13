@@ -1,6 +1,11 @@
 "use client";
 
+import { Building2, Calendar, MapPin, UserRound, Users } from "lucide-react";
 import { nombreLugarJornada } from "@/components/proyectos/gestion-proyecto/selector-lugar-jornada";
+import {
+  EstadoJornadaPill,
+  formatearFechaJornada,
+} from "@/components/proyectos/gestion-proyecto/estado-jornada";
 import type { Jornada } from "@/lib/types";
 
 interface ArbolJornadasProps {
@@ -43,12 +48,36 @@ function construirItems(jornadas: Jornada[]): ItemArbol[] {
 function etiquetaTitulo(jornada: Jornada) {
   return jornada.nombre?.trim()
     ? jornada.nombre
-    : new Date(jornada.fecha).toLocaleDateString("es-CO");
+    : `Jornada del ${formatearFechaJornada(jornada.fecha)}`;
 }
 
 function elegirJornadaGrupo(grupo: Jornada[]): Jornada {
+  return grupo.find((j) => j.estado !== "CANCELADA") ?? grupo[0];
+}
+
+function DetallesJornada({
+  jornada,
+  activa = false,
+}: {
+  jornada: Jornada;
+  activa?: boolean;
+}) {
+  const tono = activa ? "text-white/85" : "text-zinc-500";
+  const icono = activa ? "text-white/70" : "text-ruralia-teal-muted";
+
   return (
-    grupo.find((j) => j.estado !== "CANCELADA") ?? grupo[0]
+    <span
+      className={`mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs ${tono}`}
+    >
+      <span className="inline-flex items-center gap-1">
+        <Calendar className={`h-3.5 w-3.5 shrink-0 ${icono}`} />
+        {formatearFechaJornada(jornada.fecha)}
+      </span>
+      <span className="inline-flex min-w-0 items-center gap-1">
+        <MapPin className={`h-3.5 w-3.5 shrink-0 ${icono}`} />
+        <span className="truncate">{nombreLugarJornada(jornada)}</span>
+      </span>
+    </span>
   );
 }
 
@@ -61,49 +90,52 @@ function FilaJornada({
   activa: boolean;
   onSeleccionar: () => void;
 }) {
-  const cancelada = jornada.estado === "CANCELADA";
-
   return (
     <button
       type="button"
       onClick={onSeleccionar}
-      className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
+      className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
         activa
-          ? "bg-ruralia-teal text-white"
-          : "hover:bg-ruralia-teal-soft text-zinc-800"
+          ? "border-ruralia-teal bg-ruralia-teal text-white"
+          : "border-transparent text-zinc-900 hover:border-ruralia-teal-border hover:bg-ruralia-teal-soft/50"
       }`}
     >
-      <span>
-        <span className="font-medium">{etiquetaTitulo(jornada)}</span>
-        {jornada.nombre?.trim() ? (
-          <span
-            className={`ml-2 text-xs ${activa ? "text-white/85" : "text-zinc-400"}`}
-          >
-            {new Date(jornada.fecha).toLocaleDateString("es-CO")}
-          </span>
-        ) : null}
-        <span
-          className={`ml-2 text-xs ${activa ? "text-white/85" : "text-zinc-400"}`}
-        >
-          {nombreLugarJornada(jornada)}
+      <span className="flex items-start justify-between gap-2">
+        <span className="min-w-0 text-sm font-semibold leading-snug">
+          {etiquetaTitulo(jornada)}
         </span>
-        {jornada.tipo === "GRUPAL" ? (
-          <span
-            className={`ml-1.5 text-[10px] uppercase tracking-wide ${
-              activa ? "text-white/70" : "text-zinc-400"
-            }`}
-          >
-            · grupal
-          </span>
-        ) : null}
+        <EstadoJornadaPill estado={jornada.estado} sobreTeal={activa} />
       </span>
-      <span
-        className={`text-xs ${activa ? "text-white/85" : cancelada ? "text-red-500" : "text-zinc-500"}`}
-      >
-        {jornada.estado.replace(/_/g, " ")}
-      </span>
+      <DetallesJornada jornada={jornada} activa={activa} />
+      {jornada.tipo === "GRUPAL" ? (
+        <span
+          className={`mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium ${
+            activa ? "text-white/85" : "text-ruralia-teal-text"
+          }`}
+        >
+          <Users className="h-3.5 w-3.5" />
+          Actividad grupal
+        </span>
+      ) : null}
     </button>
   );
+}
+
+/** Nombre que distingue a una jornada dentro de su grupo. */
+export function etiquetaJornadaDeGrupo(
+  jornada: Pick<
+    Jornada,
+    "beneficiarios" | "asociaciones" | "tecnicoResponsable"
+  >,
+  sinAgente: string,
+): string {
+  const participantes = jornada.beneficiarios?.length
+    ? jornada.beneficiarios
+    : jornada.asociaciones;
+  if (participantes?.length) {
+    return participantes.map((p) => p.nombre).join(", ");
+  }
+  return jornada.tecnicoResponsable?.nombre ?? sinAgente;
 }
 
 export function ArbolJornadas({
@@ -170,6 +202,12 @@ export function ArbolJornadas({
         }
 
         const representativa = item.jornadas[0];
+        const porBeneficiario = item.jornadas.some(
+          (j) => (j.beneficiarios?.length ?? 0) > 0,
+        );
+        const porAsociacion = item.jornadas.some(
+          (j) => (j.asociaciones?.length ?? 0) > 0,
+        );
         const grupoActivo = item.jornadas.some(
           (j) => j.id === jornadaSeleccionadaId,
         );
@@ -177,66 +215,59 @@ export function ArbolJornadas({
         return (
           <div
             key={item.grupoId}
-            className="rounded-xl border border-zinc-100 p-1"
+            className="rounded-xl border border-ruralia-teal-border/70 p-1"
           >
             <button
               type="button"
               onClick={() =>
                 onSeleccionarJornada(elegirJornadaGrupo(item.jornadas).id)
               }
-              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${
-                grupoActivo
-                  ? "bg-ruralia-teal-soft text-zinc-900"
-                  : "hover:bg-zinc-50 text-zinc-800"
+              className={`w-full rounded-lg px-3 py-2.5 text-left transition ${
+                grupoActivo ? "bg-ruralia-teal-soft" : "hover:bg-zinc-50"
               }`}
             >
-              <span>
-                <span className="font-medium">
-                  {etiquetaTitulo(representativa)}
-                </span>
-                {representativa.nombre?.trim() ? (
-                  <span className="ml-2 text-xs text-zinc-400">
-                    {new Date(representativa.fecha).toLocaleDateString("es-CO")}
-                  </span>
-                ) : null}
-                <span className="ml-2 text-xs text-zinc-400">
-                  {nombreLugarJornada(representativa)}
-                </span>
+              <span className="block text-sm font-semibold leading-snug text-zinc-900">
+                {etiquetaTitulo(representativa)}
               </span>
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-600">
-                {item.jornadas.length} agentes
+              <DetallesJornada jornada={representativa} />
+              <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-ruralia-teal-text ring-1 ring-ruralia-teal-border">
+                {porBeneficiario ? (
+                  <UserRound className="h-3.5 w-3.5" />
+                ) : porAsociacion ? (
+                  <Building2 className="h-3.5 w-3.5" />
+                ) : (
+                  <Users className="h-3.5 w-3.5" />
+                )}
+                {item.jornadas.length}{" "}
+                {porBeneficiario
+                  ? "beneficiarios"
+                  : porAsociacion
+                    ? "asociaciones"
+                    : "agentes"}
               </span>
             </button>
 
-            <div className="mt-1 space-y-1 pl-2">
+            <div className="mt-1 space-y-0.5 border-l-2 border-ruralia-teal-border ml-3 pl-2">
               {item.jornadas.map((jornada) => {
                 const activa = jornadaSeleccionadaId === jornada.id;
-                const cancelada = jornada.estado === "CANCELADA";
                 return (
                   <button
                     key={jornada.id}
                     type="button"
                     onClick={() => onSeleccionarJornada(jornada.id)}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${
+                    className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition ${
                       activa
                         ? "bg-ruralia-teal text-white"
-                        : "hover:bg-ruralia-teal-soft text-zinc-800"
+                        : "text-zinc-800 hover:bg-ruralia-teal-soft"
                     }`}
                   >
-                    <span className="font-medium">
-                      {jornada.tecnicoResponsable?.nombre ?? "Sin agente"}
+                    <span className="min-w-0 truncate font-medium">
+                      {etiquetaJornadaDeGrupo(jornada, "Sin agente")}
                     </span>
-                    <span
-                      className={`text-xs ${
-                        activa
-                          ? "text-white/85"
-                          : cancelada
-                            ? "text-red-500"
-                            : "text-zinc-500"
-                      }`}
-                    >
-                      {jornada.estado.replace(/_/g, " ")}
-                    </span>
+                    <EstadoJornadaPill
+                      estado={jornada.estado}
+                      sobreTeal={activa}
+                    />
                   </button>
                 );
               })}

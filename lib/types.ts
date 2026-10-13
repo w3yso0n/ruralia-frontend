@@ -548,6 +548,44 @@ export interface ProgresoProyecto {
   actividadesCompletadas: number;
 }
 
+/** Agregados de la pestaña Resumen (GET /proyectos/:id/resumen). */
+export interface ResumenProyecto {
+  progreso: number;
+  jornadas: number;
+  formularios: number;
+  actividades: { completadas: number; total: number };
+  fechas: { inicio: string | null; fin: string | null };
+  equipo: {
+    total: number;
+    porRol: Array<{
+      rolId: string | null;
+      rol: string;
+      descripcion: string | null;
+      total: number;
+      muestra: Array<{ id: string; nombre: string; iniciales: string }>;
+    }>;
+  };
+  contraparte: {
+    beneficiarios: number;
+    asociaciones: number;
+    /** municipio null = beneficiarios sin municipio (siempre al final). */
+    porMunicipio: Array<{ municipio: string | null; total: number }>;
+    conVereda: number;
+  };
+}
+
+/** Persona del equipo en el modal del Resumen (GET /proyectos/:id/resumen/equipo). */
+export interface MiembroEquipoResumen {
+  id: string;
+  nombre: string;
+  correo: string;
+  urlFoto: string | null;
+  estaActivo: boolean;
+  rolId: string | null;
+  rol: string;
+  otrosRoles: string[];
+}
+
 export interface EstadisticasProyecto {
   conteoBeneficiarios: number;
   conteoJornadas: number;

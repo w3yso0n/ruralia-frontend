@@ -40,6 +40,7 @@ interface AsignacionJornadaProps {
   beneficiarioIds: string[];
   asociacionIds: string[];
   disabled?: boolean;
+  ayudaSeleccionMultiple?: string;
   onDestino: (destino: DestinoAsignacionJornada) => void;
   onBeneficiarioIds: (ids: string[]) => void;
   onAsociacionIds: (ids: string[]) => void;
@@ -52,6 +53,7 @@ export function AsignacionJornada({
   beneficiarioIds,
   asociacionIds,
   disabled = false,
+  ayudaSeleccionMultiple,
   onDestino,
   onBeneficiarioIds,
   onAsociacionIds,
@@ -113,7 +115,8 @@ export function AsignacionJornada({
               : "Selecciona al menos un beneficiario."
           }
         />
-      ) : (
+      ) : null}
+      {destino === "asociacion" ? (
         <SelectorCatalogo
           multiple
           opciones={asociaciones}
@@ -126,7 +129,10 @@ export function AsignacionJornada({
               : "Selecciona al menos una asociación u OAM."
           }
         />
-      )}
+      ) : null}
+      {ayudaSeleccionMultiple ? (
+        <p className="text-xs text-zinc-500">{ayudaSeleccionMultiple}</p>
+      ) : null}
     </div>
   );
 }

@@ -32,6 +32,34 @@ import type {
 } from "@/lib/types";
 
 /**
+ * Varios widgets (los 4 KPI, progreso y proyectos recientes) leen el mismo
+ * /dashboard/resumen. Se comparte la petición en curso durante unos segundos
+ * para que el backend no calcule el resumen varias veces a la vez.
+ * (Objeto y no Map: el icono `Map` de Lucide oculta el Map global aquí.)
+ */
+const VIGENCIA_KPIS_MS = 5_000;
+const kpisCompartidos: Record<
+  string,
+  { promesa: ReturnType<typeof obtenerKpisDashboard>; en: number }
+> = {};
+
+function obtenerKpisCompartidos(token: string, proyectoId?: string) {
+  const clave = `${token}|${proyectoId ?? ""}`;
+  const previo = kpisCompartidos[clave];
+  if (previo && Date.now() - previo.en < VIGENCIA_KPIS_MS) {
+    return previo.promesa;
+  }
+  const promesa = obtenerKpisDashboard(token, proyectoId);
+  kpisCompartidos[clave] = { promesa, en: Date.now() };
+  promesa.catch(() => {
+    if (kpisCompartidos[clave]?.promesa === promesa) {
+      delete kpisCompartidos[clave];
+    }
+  });
+  return promesa;
+}
+
+/**
  * Hook genérico para que cada widget pida su propio dato de forma autocontenida,
  * en vez de depender del blob /dashboard completo.
  */
@@ -99,7 +127,7 @@ type CampoKpiNumerico =
 function WidgetKpisResumen({ campo }: { campo: CampoKpiNumerico }) {
   const { proyectoId } = useFiltroDashboard();
   const { datos, cargando, error } = useDatoWidget(
-    (token) => obtenerKpisDashboard(token, proyectoId || undefined),
+    (token) => obtenerKpisCompartidos(token, proyectoId || undefined),
     [proyectoId],
   );
   const etiquetas = proyectoId ? ETIQUETAS_KPI_PROYECTO : ETIQUETAS_KPI;
@@ -255,7 +283,7 @@ function WidgetActividadMensual() {
 function WidgetProgresoProyectos() {
   const { proyectoId } = useFiltroDashboard();
   const { datos, cargando, error } = useDatoWidget(
-    (token) => obtenerKpisDashboard(token, proyectoId || undefined),
+    (token) => obtenerKpisCompartidos(token, proyectoId || undefined),
     [proyectoId],
   );
   return (
@@ -291,7 +319,7 @@ function WidgetMapaCobertura() {
 function WidgetProyectosRecientes() {
   const { proyectoId } = useFiltroDashboard();
   const { datos, cargando, error } = useDatoWidget(
-    (token) => obtenerKpisDashboard(token, proyectoId || undefined),
+    (token) => obtenerKpisCompartidos(token, proyectoId || undefined),
     [proyectoId],
   );
   return (

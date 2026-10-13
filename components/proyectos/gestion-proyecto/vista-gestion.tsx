@@ -1,34 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AlertTriangle, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Alerta, Spinner } from "@/components/ui/modal";
 import { EquipoVinculos } from "@/components/proyectos/gestion-proyecto/equipo-vinculos";
 import { PanelExpediente } from "@/components/proyectos/gestion-proyecto/panel-expediente";
 import { PanelJornadas } from "@/components/proyectos/gestion-proyecto/panel-jornadas";
 import { PanelPlan } from "@/components/proyectos/gestion-proyecto/panel-plan";
 import { PanelTerritorio } from "@/components/proyectos/gestion-proyecto/panel-territorio";
-import { ResumenAsignaciones } from "@/components/proyectos/gestion-proyecto/resumen-asignaciones";
 import { ResumenInformacionBasica } from "@/components/proyectos/gestion-proyecto/resumen-informacion-basica";
+import { ResumenProyecto } from "@/components/proyectos/gestion-proyecto/resumen-proyecto";
 import { VistaProyectoTecnico } from "@/components/tecnico/vista-proyecto-tecnico";
 import {
   activarProyecto,
   actualizarProyecto,
   eliminarProyecto,
-  obtenerEstadisticasProyecto,
   obtenerPlanProyecto,
-  obtenerProgresoProyecto,
   obtenerProyecto,
   listarJornadas,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { usePermisos } from "@/lib/use-permisos";
 import type {
-  EstadisticasProyecto,
+  EstadoProyecto,
   Jornada,
   PlanProyecto,
-  ProgresoProyecto,
   Proyecto,
 } from "@/lib/types";
 
@@ -42,6 +40,38 @@ const TABS_VALIDOS: Tab[] = [
   "equipo",
   "expediente",
 ];
+
+const ETIQUETA_ESTADO: Record<EstadoProyecto, string> = {
+  BORRADOR: "Borrador",
+  ACTIVO: "Activo",
+  COMPLETADO: "Completado",
+  SUSPENDIDO: "Suspendido",
+};
+
+const CLASE_ESTADO: Record<EstadoProyecto, string> = {
+  BORRADOR: "bg-amber-50 text-amber-800",
+  ACTIVO: "bg-ruralia-teal-soft text-ruralia-teal-text",
+  COMPLETADO: "bg-ruralia-teal-soft text-ruralia-teal-text",
+  SUSPENDIDO: "bg-zinc-100 text-zinc-600",
+};
+
+/** Largo a partir del cual la descripción se trunca a 2 líneas con "Ver más". */
+const LARGO_DESCRIPCION_CORTA = 220;
+
+/** Los textos de convenio suelen venir en mayúsculas: se pasan a sentence case. */
+function aSentenceCase(texto: string): string {
+  const limpio = texto.trim();
+  if (!/[A-ZÁÉÍÓÚÑ]/.test(limpio) || limpio !== limpio.toUpperCase()) {
+    return limpio;
+  }
+  const minusculas = limpio.toLocaleLowerCase("es");
+  return minusculas.charAt(0).toLocaleUpperCase("es") + minusculas.slice(1);
+}
+
+function textoPendientes(pendientes: string[]): string {
+  if (pendientes.length === 1) return pendientes[0];
+  return `${pendientes.slice(0, -1).join(", ")} y ${pendientes[pendientes.length - 1]}`;
+}
 
 function tabDesdeParam(valor: string | null): Tab {
   if (valor && TABS_VALIDOS.includes(valor as Tab)) {
@@ -74,17 +104,19 @@ function VistaGestionProyectoCompleta({
   );
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [plan, setPlan] = useState<PlanProyecto | null>(null);
-  const [progreso, setProgreso] = useState<ProgresoProyecto | null>(null);
-  const [estadisticas, setEstadisticas] = useState<EstadisticasProyecto | null>(
-    null,
-  );
+  const [versionResumen, setVersionResumen] = useState(0);
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
+  const [jornadasCargadas, setJornadasCargadas] = useState(false);
+  const cargaJornadasRef = useRef(0);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activando, setActivando] = useState(false);
   const [editando, setEditando] = useState(false);
   const [nombreEdicion, setNombreEdicion] = useState("");
   const [descripcionEdicion, setDescripcionEdicion] = useState("");
+  const [descripcionExpandida, setDescripcionExpandida] = useState(false);
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [guardando, setGuardando] = useState(false);
   const [planActualizadoEn, setPlanActualizadoEn] = useState<Date | null>(null);
 
@@ -107,25 +139,29 @@ function VistaGestionProyectoCompleta({
     if (!token) return;
     setCargando(true);
     setError(null);
+
+    // Las jornadas solo se usan en su pestaña: se piden en paralelo y no
+    // bloquean el resto de la vista.
+    const cargaId = ++cargaJornadasRef.current;
+    setJornadasCargadas(false);
+    void listarJornadas(token, { proyectoId, limite: 50 })
+      .then((jor) => jor.datos)
+      .catch(() => [] as Jornada[])
+      .then((datos) => {
+        if (cargaId !== cargaJornadasRef.current) return;
+        setJornadas(datos);
+        setJornadasCargadas(true);
+      });
+
     try {
-      const [p, pl, pr, est] = await Promise.all([
+      const [p, pl] = await Promise.all([
         obtenerProyecto(token, proyectoId),
         obtenerPlanProyecto(token, proyectoId),
-        obtenerProgresoProyecto(token, proyectoId),
-        obtenerEstadisticasProyecto(token, proyectoId),
       ]);
       setProyecto(p);
       setPlan(pl);
-      setProgreso(pr);
-      setEstadisticas(est);
+      setVersionResumen((v) => v + 1);
       setPlanActualizadoEn(new Date());
-
-      try {
-        const jor = await listarJornadas(token, { proyectoId, limite: 50 });
-        setJornadas(jor.datos);
-      } catch {
-        setJornadas([]);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar proyecto");
     } finally {
@@ -136,12 +172,8 @@ function VistaGestionProyectoCompleta({
   const recargarAvancePlan = useCallback(async () => {
     if (!token) return;
     try {
-      const [pl, pr] = await Promise.all([
-        obtenerPlanProyecto(token, proyectoId),
-        obtenerProgresoProyecto(token, proyectoId),
-      ]);
+      const pl = await obtenerPlanProyecto(token, proyectoId);
       setPlan(pl);
-      setProgreso(pr);
       setPlanActualizadoEn(new Date());
     } catch {
       // Ignorar errores puntuales del polling en segundo plano
@@ -155,6 +187,24 @@ function VistaGestionProyectoCompleta({
   useEffect(() => {
     setTab(tabDesdeParam(searchParams.get("tab")));
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!menuAbierto) return;
+    function alClickFuera(evento: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(evento.target as Node)) {
+        setMenuAbierto(false);
+      }
+    }
+    function alEscape(evento: KeyboardEvent) {
+      if (evento.key === "Escape") setMenuAbierto(false);
+    }
+    document.addEventListener("mousedown", alClickFuera);
+    document.addEventListener("keydown", alEscape);
+    return () => {
+      document.removeEventListener("mousedown", alClickFuera);
+      document.removeEventListener("keydown", alEscape);
+    };
+  }, [menuAbierto]);
 
   function cambiarTab(nueva: Tab) {
     setTab(nueva);
@@ -215,12 +265,19 @@ function VistaGestionProyectoCompleta({
     proyecto.asociaciones?.[0]
   );
 
-  const tieneTerritorio = !!(
-    proyecto.municipios?.length || proyecto.veredas?.length
-  );
+  const pendientes = [
+    !(proyecto.municipios?.length || proyecto.veredas?.length)
+      ? "municipios"
+      : null,
+    !proyecto.personal?.length ? "equipo interno" : null,
+    !tieneContraparte ? "beneficiarios o asociaciones" : null,
+  ].filter((p): p is string => !!p);
+  const configuracionIncompleta = pendientes.length > 0;
 
-  const configuracionIncompleta =
-    !tieneTerritorio || !proyecto.personal?.length || !tieneContraparte;
+  const descripcion = proyecto.descripcion
+    ? aSentenceCase(proyecto.descripcion)
+    : "";
+  const descripcionLarga = descripcion.length > LARGO_DESCRIPCION_CORTA;
 
   const enBorrador = proyecto.estado === "BORRADOR";
 
@@ -242,6 +299,7 @@ function VistaGestionProyectoCompleta({
     if (!proyecto) return;
     setNombreEdicion(proyecto.nombre);
     setDescripcionEdicion(proyecto.descripcion ?? "");
+    setError(null);
     setEditando(true);
   }
 
@@ -265,6 +323,7 @@ function VistaGestionProyectoCompleta({
 
   async function manejarEliminar() {
     if (!token) return;
+    setMenuAbierto(false);
     if (
       !confirm(
         "¿Eliminar permanentemente este proyecto? Se borrará el plan y la configuración. Esta acción no se puede deshacer.",
@@ -297,7 +356,7 @@ function VistaGestionProyectoCompleta({
         </div>
       ) : null}
 
-      <nav className="mb-4 text-sm text-zinc-500">
+      <nav aria-label="Ruta" className="mb-4 text-sm text-zinc-500">
         {desdeRevision ? (
           <>
             <Link
@@ -317,139 +376,193 @@ function VistaGestionProyectoCompleta({
       </nav>
 
       {configuracionIncompleta && puedeGestionar ? (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Este proyecto aún no está completo. Ve a{" "}
-          <button
-            type="button"
-            onClick={() => setTab("equipo")}
-            className="font-semibold underline"
-          >
-            Equipo y contraparte
-          </button>{" "}
-          para asignar el municipio, el equipo interno y beneficiarios o asociaciones antes
-          de crear jornadas.
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <AlertTriangle
+            className="mt-0.5 h-[18px] w-[18px] shrink-0 text-amber-700"
+            aria-hidden="true"
+          />
+          <p>
+            Faltan {textoPendientes(pendientes)} por asignar. Completa{" "}
+            <Link
+              href={`/proyectos/${proyectoId}?tab=equipo`}
+              className="font-semibold underline underline-offset-2"
+            >
+              Equipo y contraparte
+            </Link>{" "}
+            antes de crear jornadas.
+          </p>
         </div>
       ) : null}
 
       {enBorrador && !configuracionIncompleta && puedeGestionar ? (
-        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <div className="mb-6 rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-3 text-sm text-ruralia-teal-text">
           El proyecto está en <strong>borrador</strong>. Actívalo para poder
           registrar jornadas de campo.{" "}
           <button
             type="button"
             disabled={activando}
             onClick={() => void manejarActivar()}
-            className="font-semibold underline disabled:opacity-50"
+            className="font-semibold underline underline-offset-2 disabled:opacity-50"
           >
             {activando ? "Activando..." : "Activar proyecto"}
           </button>
         </div>
       ) : null}
 
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex-1">
-          {editando && puedeGestionar ? (
-            <div className="space-y-3">
-              <input
-                value={nombreEdicion}
-                onChange={(e) => setNombreEdicion(e.target.value)}
-                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-2xl font-semibold"
-                placeholder="Nombre del proyecto"
-              />
-              <textarea
-                value={descripcionEdicion}
-                onChange={(e) => setDescripcionEdicion(e.target.value)}
-                rows={2}
-                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-                placeholder="Descripción (opcional)"
-              />
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={guardando || !nombreEdicion.trim()}
-                  onClick={() => void manejarGuardarEdicion()}
-                  className="rounded-lg bg-ruralia-teal px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
-                >
-                  {guardando ? "Guardando..." : "Guardar"}
-                </button>
-                <button
-                  type="button"
-                  disabled={guardando}
-                  onClick={() => setEditando(false)}
-                  className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm font-semibold text-zinc-700"
-                >
-                  Cancelar
-                </button>
-              </div>
+      {editando && puedeGestionar ? (
+        <section
+          aria-label="Editar proyecto"
+          className="mb-6 space-y-4 rounded-2xl border border-ruralia-teal-border bg-white p-5"
+        >
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-700">
+              Nombre
+            </label>
+            <input
+              value={nombreEdicion}
+              onChange={(e) => setNombreEdicion(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm outline-none transition hover:border-ruralia-teal-border focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
+              placeholder="Nombre del proyecto"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-700">
+              Descripción
+            </label>
+            <textarea
+              value={descripcionEdicion}
+              onChange={(e) => setDescripcionEdicion(e.target.value)}
+              rows={3}
+              className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm outline-none transition hover:border-ruralia-teal-border focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
+              placeholder="Descripción (opcional)"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={guardando || !nombreEdicion.trim()}
+              onClick={() => void manejarGuardarEdicion()}
+              className="inline-flex h-10 items-center rounded-xl bg-ruralia-teal px-4 text-sm font-semibold text-white transition hover:bg-ruralia-teal-hover disabled:opacity-50"
+            >
+              {guardando ? "Guardando..." : "Guardar"}
+            </button>
+            <button
+              type="button"
+              disabled={guardando}
+              onClick={() => {
+                setEditando(false);
+                setError(null);
+              }}
+              className="inline-flex h-10 items-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
+            >
+              Cancelar
+            </button>
+          </div>
+        </section>
+      ) : (
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-[999_1_560px]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <h1 className="text-[28px] font-bold leading-tight tracking-[-0.01em] text-zinc-900">
+                {proyecto.nombre}
+              </h1>
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${CLASE_ESTADO[proyecto.estado]}`}
+              >
+                {ETIQUETA_ESTADO[proyecto.estado]}
+              </span>
             </div>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-start gap-3">
-                <h2 className="text-2xl font-semibold text-zinc-900">
-                  {proyecto.nombre}
-                </h2>
-                {puedeGestionar ? (
-                  <button
-                    type="button"
-                    onClick={iniciarEdicion}
-                    className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
-                  >
-                    Editar
-                  </button>
-                ) : null}
-                {puedeEliminar ? (
-                  <button
-                    type="button"
-                    onClick={() => void manejarEliminar()}
-                    className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700"
-                  >
-                    Eliminar
-                  </button>
-                ) : null}
-              </div>
-              <p className="mt-1 flex flex-wrap items-center gap-2 text-zinc-600">
-                <span>{proyecto.descripcion || "—"}</span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    proyecto.estado === "ACTIVO"
-                      ? "bg-ruralia-teal-soft text-ruralia-teal-text"
-                      : proyecto.estado === "BORRADOR"
-                        ? "bg-amber-50 text-amber-800"
-                        : "bg-zinc-100 text-zinc-600"
+            {descripcion ? (
+              <div className="mt-2 max-w-[900px]">
+                <p
+                  className={`text-sm leading-[1.55] text-zinc-500 ${
+                    descripcionLarga && !descripcionExpandida
+                      ? "line-clamp-2"
+                      : ""
                   }`}
                 >
-                  {proyecto.estado === "BORRADOR"
-                    ? "Borrador"
-                    : proyecto.estado === "ACTIVO"
-                      ? "Activo"
-                      : proyecto.estado === "COMPLETADO"
-                        ? "Completado"
-                        : "Suspendido"}
-                </span>
-              </p>
-            </>
-          )}
+                  {descripcion}
+                </p>
+                {descripcionLarga ? (
+                  <button
+                    type="button"
+                    onClick={() => setDescripcionExpandida((v) => !v)}
+                    aria-expanded={descripcionExpandida}
+                    className="mt-1 text-sm font-semibold text-ruralia-teal-text hover:underline"
+                  >
+                    {descripcionExpandida ? "Ver menos" : "Ver más"}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          {puedeGestionar || puedeEliminar ? (
+            <div className="flex shrink-0 items-center gap-2">
+              {puedeGestionar ? (
+                <button
+                  type="button"
+                  onClick={iniciarEdicion}
+                  className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                >
+                  <Pencil
+                    className="h-4 w-4 text-ruralia-teal-muted"
+                    aria-hidden="true"
+                  />
+                  Editar
+                </button>
+              ) : null}
+              {puedeEliminar ? (
+                <div ref={menuRef} className="relative">
+                  <button
+                    type="button"
+                    aria-label="Más acciones"
+                    aria-haspopup="menu"
+                    aria-expanded={menuAbierto}
+                    onClick={() => setMenuAbierto((v) => !v)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-600 transition hover:bg-zinc-50"
+                  >
+                    <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  {menuAbierto ? (
+                    <div
+                      role="menu"
+                      className="absolute right-0 z-20 mt-2 w-52 rounded-2xl border border-ruralia-teal-border bg-white p-1.5 shadow-lg shadow-zinc-900/10"
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => void manejarEliminar()}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-700 transition hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        Eliminar proyecto
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
-        <div className="text-right">
-          <p className="text-3xl font-bold text-ruralia-teal-text">
-            {progreso?.progresoPorcentaje ?? 0}%
-          </p>
-          <p className="text-xs text-zinc-500">Progreso del plan</p>
-        </div>
-      </div>
+      )}
 
       {error ? <Alerta mensaje={error} /> : null}
 
-      <div className="mb-6 flex gap-2 overflow-x-auto border-b border-zinc-200">
+      <div
+        role="tablist"
+        className="mb-6 flex gap-2 overflow-x-auto border-b border-zinc-200"
+      >
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
+            role="tab"
+            aria-selected={tab === t.id}
             onClick={() => cambiarTab(t.id)}
-            className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium ${
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm ${
               tab === t.id
-                ? "border-ruralia-teal text-ruralia-teal-text"
-                : "border-transparent text-zinc-500 hover:text-zinc-800"
+                ? "border-ruralia-teal font-semibold text-ruralia-teal-text"
+                : "border-transparent font-medium text-zinc-500 hover:text-zinc-800"
             }`}
           >
             {t.etiqueta}
@@ -458,48 +571,20 @@ function VistaGestionProyectoCompleta({
       </div>
 
       {tab === "resumen" ? (
-        <>
+        <div className="space-y-6">
           <ResumenInformacionBasica
             token={token}
             proyecto={proyecto}
             puedeGestionar={puedeGestionar}
             onActualizar={cargar}
           />
-          <ResumenAsignaciones
-            proyecto={proyecto}
+          <ResumenProyecto
+            token={token}
+            proyectoId={proyectoId}
             puedeGestionar={puedeGestionar}
-            onIrAEquipo={() => cambiarTab("equipo")}
+            version={versionResumen}
           />
-          {estadisticas ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
-                <p className="text-sm text-zinc-500">Beneficiarios</p>
-                <p className="text-2xl font-bold">
-                  {estadisticas.conteoBeneficiarios}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
-                <p className="text-sm text-zinc-500">Jornadas</p>
-                <p className="text-2xl font-bold">
-                  {estadisticas.conteoJornadas}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
-                <p className="text-sm text-zinc-500">Formularios</p>
-                <p className="text-2xl font-bold">
-                  {estadisticas.conteoFormulariosEnviados}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
-                <p className="text-sm text-zinc-500">Actividades completadas</p>
-                <p className="text-2xl font-bold">
-                  {progreso?.actividadesCompletadas ?? 0} /{" "}
-                  {progreso?.actividadesTotal ?? 0}
-                </p>
-              </div>
-            </div>
-          ) : null}
-        </>
+        </div>
       ) : null}
 
       {tab === "territorio" ? (
@@ -524,7 +609,9 @@ function VistaGestionProyectoCompleta({
         />
       ) : null}
 
-      {tab === "jornadas" ? (
+      {tab === "jornadas" && !jornadasCargadas ? <Spinner /> : null}
+
+      {tab === "jornadas" && jornadasCargadas ? (
         <PanelJornadas
           token={token}
           proyectoId={proyectoId}

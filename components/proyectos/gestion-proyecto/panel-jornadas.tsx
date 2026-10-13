@@ -2,9 +2,25 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Building2,
+  Calendar,
+  FileText,
+  MapPin,
+  UserRound,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import {
+  EstadoJornadaPill,
+  formatearFechaJornada,
+} from "@/components/proyectos/gestion-proyecto/estado-jornada";
 import { nombreLugarJornada } from "@/components/proyectos/gestion-proyecto/selector-lugar-jornada";
 import { Alerta } from "@/components/ui/modal";
-import { ArbolJornadas } from "@/components/proyectos/gestion-proyecto/arbol-jornadas";
+import {
+  ArbolJornadas,
+  etiquetaJornadaDeGrupo,
+} from "@/components/proyectos/gestion-proyecto/arbol-jornadas";
 import { ControlAsistenciaJornada } from "@/components/proyectos/gestion-proyecto/control-asistencia-jornada";
 import { FormularioJornada } from "@/components/proyectos/gestion-proyecto/formulario-jornada";
 import { FormularioEditarJornada } from "@/components/proyectos/gestion-proyecto/formulario-editar-jornada";
@@ -23,7 +39,13 @@ import {
   confirmarEliminacionSimple,
   mostrarErrorApi,
 } from "@/lib/swal";
-import type { Geocerca, Jornada, PlanProyecto, Proyecto, TipoJornada } from "@/lib/types";
+import type {
+  Geocerca,
+  Jornada,
+  PlanProyecto,
+  Proyecto,
+  TipoJornada,
+} from "@/lib/types";
 import { etiquetaOrganizacion } from "@/lib/types";
 
 interface PanelJornadasProps {
@@ -34,6 +56,36 @@ interface PanelJornadasProps {
   jornadas: Jornada[];
   puedeGestionar: boolean;
   onActualizar: () => Promise<void>;
+}
+
+function etiquetaAsignacionOrganizacion(
+  items: { tipo?: "ASOCIACION" | "OAM" | null }[],
+) {
+  const hayOam = items.some((item) => item.tipo === "OAM");
+  const hayAsociacion = items.some((item) => item.tipo !== "OAM");
+  if (hayOam && hayAsociacion) return "Asociaciones y OAM";
+  if (hayOam) return "OAM";
+  return items.length > 1 ? "Asociaciones" : "Asociación";
+}
+
+function DatoJornada({
+  icono: Icono,
+  etiqueta,
+  children,
+}: {
+  icono: LucideIcon;
+  etiqueta: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 gap-2.5">
+      <Icono className="mt-0.5 h-4 w-4 shrink-0 text-ruralia-teal" />
+      <div className="min-w-0">
+        <dt className="text-xs text-zinc-500">{etiqueta}</dt>
+        <dd className="text-sm font-medium text-zinc-900">{children}</dd>
+      </div>
+    </div>
+  );
 }
 
 function jornadasDelGrupo(
@@ -234,7 +286,7 @@ export function PanelJornadas({
       titulo: "Cancelar jornada",
       texto:
         n > 1
-          ? `¿Cancelar esta jornada para los ${n} agentes del grupo? Todas quedarán marcadas como CANCELADA.`
+          ? `¿Cancelar las ${n} jornadas del grupo? Todas quedarán marcadas como CANCELADA.`
           : "¿Cancelar esta jornada? Quedará marcada como CANCELADA.",
       textoConfirmar: "Sí, cancelar",
     });
@@ -373,88 +425,32 @@ export function PanelJornadas({
             ) : (
               <>
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-zinc-900">
+                  <div className="min-w-0">
+                    <h3 className="text-xl font-semibold text-zinc-900">
                       {jornadaSeleccionada.nombre?.trim()
                         ? jornadaSeleccionada.nombre
-                        : `Jornada del ${new Date(
+                        : `Jornada del ${formatearFechaJornada(
                             jornadaSeleccionada.fecha,
-                          ).toLocaleDateString("es-CO", {
-                            weekday: "long",
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })}`}
+                            "larga",
+                          )}`}
                     </h3>
-                    {jornadaSeleccionada.nombre?.trim() ? (
-                      <p className="mt-0.5 text-sm text-zinc-500">
-                        {new Date(jornadaSeleccionada.fecha).toLocaleDateString(
-                          "es-CO",
-                          {
-                            weekday: "long",
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          },
-                        )}
-                      </p>
-                    ) : null}
-                    <p className="mt-1 text-sm text-zinc-500">
-                      {nombreLugarJornada(jornadaSeleccionada)} ·{" "}
-                      {jornadaSeleccionada.tecnicoResponsable?.nombre ?? "—"} ·{" "}
-                      <span className="font-medium">
-                        {jornadaSeleccionada.estado}
-                      </span>
-                      {jornadaSeleccionada.tipo === "GRUPAL" ? (
-                        <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
-                          Grupal · asistencia
-                        </span>
-                      ) : null}
-                      {jornadaSeleccionada.plantillaFormulario?.nombre ? (
-                        <span className="ml-2 rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs font-medium text-ruralia-teal-text">
-                          {jornadaSeleccionada.plantillaFormulario.nombre}
-                        </span>
-                      ) : null}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <EstadoJornadaPill estado={jornadaSeleccionada.estado} />
                       {jornadaSeleccionada.requiereRevision !== false ? (
-                        <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
                           Requiere revisión
                         </span>
                       ) : (
-                        <span className="ml-2 rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs font-medium text-ruralia-teal-text">
+                        <span className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-[11px] font-semibold text-ruralia-teal-text">
                           Sin revisión
                         </span>
                       )}
-                      {grupoActivo.length > 1 ? (
-                        <span className="ml-2 rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-xs font-medium text-ruralia-teal-text">
-                          {grupoActivo.length} agentes
+                      {jornadaSeleccionada.tipo === "GRUPAL" ? (
+                        <span className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-[11px] font-semibold text-ruralia-teal-text">
+                          Grupal · asistencia
                         </span>
                       ) : null}
-                    </p>
-                    {(jornadaSeleccionada.beneficiarios?.length ||
-                      jornadaSeleccionada.asociaciones?.length) ? (
-                      <p className="mt-2 text-sm text-zinc-600">
-                        {jornadaSeleccionada.beneficiarios?.length ? (
-                          <span>
-                            Beneficiarios:{" "}
-                            {jornadaSeleccionada.beneficiarios
-                              .map((b) => b.nombre)
-                              .join(", ")}
-                          </span>
-                        ) : null}
-                        {jornadaSeleccionada.beneficiarios?.length &&
-                        jornadaSeleccionada.asociaciones?.length
-                          ? " · "
-                          : null}
-                        {jornadaSeleccionada.asociaciones?.length ? (
-                          <span>
-                            Asociaciones y OAM:{" "}
-                            {jornadaSeleccionada.asociaciones
-                              .map((a) => etiquetaOrganizacion(a))
-                              .join(", ")}
-                          </span>
-                        ) : null}
-                      </p>
-                    ) : null}
+                    </div>
                   </div>
                   {puedeGestionar ? (
                     <div className="flex flex-wrap gap-2">
@@ -463,9 +459,7 @@ export function PanelJornadas({
                       jornadaSeleccionada.estadoFuncional !== "APROBADO" ? (
                         <button
                           type="button"
-                          onClick={() =>
-                            setEditandoId(jornadaSeleccionada.id)
-                          }
+                          onClick={() => setEditandoId(jornadaSeleccionada.id)}
                           className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
                         >
                           Editar
@@ -499,32 +493,93 @@ export function PanelJornadas({
                   ) : null}
                 </div>
 
+                <dl className="mt-5 grid gap-x-6 gap-y-4 rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft/30 p-4 sm:grid-cols-2 xl:grid-cols-3">
+                  <DatoJornada icono={Calendar} etiqueta="Fecha">
+                    <span className="first-letter:uppercase">
+                      {formatearFechaJornada(
+                        jornadaSeleccionada.fecha,
+                        "larga",
+                      )}
+                    </span>
+                  </DatoJornada>
+                  <DatoJornada
+                    icono={MapPin}
+                    etiqueta={
+                      jornadaSeleccionada.geocerca
+                        ? "Geocerca"
+                        : jornadaSeleccionada.vereda
+                          ? "Vereda"
+                          : "Municipio"
+                    }
+                  >
+                    {nombreLugarJornada(jornadaSeleccionada)}
+                  </DatoJornada>
+                  <DatoJornada icono={UserRound} etiqueta="Agente de campo">
+                    {jornadaSeleccionada.tecnicoResponsable?.nombre ??
+                      "Sin asignar"}
+                  </DatoJornada>
+                  {jornadaSeleccionada.beneficiarios?.length ? (
+                    <DatoJornada
+                      icono={Users}
+                      etiqueta={
+                        jornadaSeleccionada.beneficiarios.length > 1
+                          ? "Beneficiarios"
+                          : "Beneficiario"
+                      }
+                    >
+                      {jornadaSeleccionada.beneficiarios
+                        .map((b) => b.nombre)
+                        .join(", ")}
+                    </DatoJornada>
+                  ) : null}
+                  {jornadaSeleccionada.asociaciones?.length ? (
+                    <DatoJornada
+                      icono={Building2}
+                      etiqueta={etiquetaAsignacionOrganizacion(
+                        jornadaSeleccionada.asociaciones,
+                      )}
+                    >
+                      {jornadaSeleccionada.asociaciones
+                        .map((a) => etiquetaOrganizacion(a))
+                        .join(", ")}
+                    </DatoJornada>
+                  ) : null}
+                  {jornadaSeleccionada.plantillaFormulario?.nombre ? (
+                    <DatoJornada icono={FileText} etiqueta="Formulario">
+                      {jornadaSeleccionada.plantillaFormulario.nombre}
+                    </DatoJornada>
+                  ) : null}
+                </dl>
+
                 {grupoActivo.length > 1 ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {grupoActivo.map((hermana) => {
-                      const activa = hermana.id === jornadaSeleccionada.id;
-                      return (
-                        <button
-                          key={hermana.id}
-                          type="button"
-                          onClick={() => seleccionarJornada(hermana.id)}
-                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                            activa
-                              ? "border-ruralia-teal bg-ruralia-teal text-white"
-                              : "border-zinc-200 bg-white text-zinc-700 hover:border-ruralia-teal-border"
-                          }`}
-                        >
-                          {hermana.tecnicoResponsable?.nombre ?? "Agente"}
-                          <span
-                            className={`ml-1.5 font-normal ${
-                              activa ? "text-white/80" : "text-zinc-400"
+                  <div className="mt-4">
+                    <p className="text-xs font-medium text-zinc-500">
+                      Grupo de {grupoActivo.length} jornadas con la misma
+                      información
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {grupoActivo.map((hermana) => {
+                        const activa = hermana.id === jornadaSeleccionada.id;
+                        return (
+                          <button
+                            key={hermana.id}
+                            type="button"
+                            onClick={() => seleccionarJornada(hermana.id)}
+                            className={`inline-flex items-center gap-2 rounded-full border py-1 pl-3 pr-1 text-xs font-semibold transition ${
+                              activa
+                                ? "border-ruralia-teal bg-ruralia-teal text-white"
+                                : "border-zinc-200 bg-white text-zinc-700 hover:border-ruralia-teal-border hover:bg-ruralia-teal-soft/50"
                             }`}
                           >
-                            {hermana.estado.replace(/_/g, " ")}
-                          </span>
-                        </button>
-                      );
-                    })}
+                            {etiquetaJornadaDeGrupo(hermana, "Agente")}
+                            <EstadoJornadaPill
+                              estado={hermana.estado}
+                              sobreTeal={activa}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 ) : null}
 

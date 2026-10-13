@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SelectorLugarJornada, type TipoLugarJornada } from "./selector-lugar-jornada";
+import {
+  SelectorLugarJornada,
+  type TipoLugarJornada,
+} from "./selector-lugar-jornada";
 import {
   AsignacionJornada,
   destinoInicialAsignacion,
@@ -94,7 +97,9 @@ export function FormularioEditarJornada({
   const [geocercaId, setGeocercaId] = useState(
     jornada.geocerca?.id ?? geocercas[0]?.id ?? "",
   );
-  const [observaciones, setObservaciones] = useState(jornada.observaciones ?? "");
+  const [observaciones, setObservaciones] = useState(
+    jornada.observaciones ?? "",
+  );
   const [metaId, setMetaId] = useState(jornada.meta?.id ?? "");
   const [claveFormulario, setClaveFormulario] = useState(
     claveDesdeJornada(jornada),
@@ -208,9 +213,9 @@ export function FormularioEditarJornada({
     <form onSubmit={(e) => void manejarSubmit(e)} className="mt-4 space-y-4">
       {tamanoGrupo > 1 ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          Esta jornada pertenece a un grupo de {tamanoGrupo} agentes. Los
-          cambios de fecha, meta, lugar, nombre, formulario, asignación y
-          observaciones se aplicarán a todos.
+          Esta jornada pertenece a un grupo de {tamanoGrupo} jornadas. Los
+          cambios de fecha, meta, lugar, nombre, formulario y observaciones se
+          aplicarán a todas; la asignación solo cambia en esta.
         </p>
       ) : null}
 
@@ -305,9 +310,7 @@ export function FormularioEditarJornada({
         disabled={enviando}
       />
 
-      {errorLocal ? (
-        <p className="text-sm text-red-600">{errorLocal}</p>
-      ) : null}
+      {errorLocal ? <p className="text-sm text-red-600">{errorLocal}</p> : null}
 
       <div className="flex flex-wrap gap-2">
         <button
