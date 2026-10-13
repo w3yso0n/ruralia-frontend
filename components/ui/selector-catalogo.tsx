@@ -16,6 +16,10 @@ interface BaseProps {
   opciones: OpcionCatalogo[];
   placeholder?: string;
   mensajeVacio?: string;
+  /** Si está, la lista se pide al escribir al menos 2 letras. `opciones` solo etiqueta lo ya elegido. */
+  buscar?: (termino: string) => Promise<OpcionCatalogo[]>;
+  /** Avisa la opción elegida para que el padre conserve el nombre si el selector se desmonta. */
+  alElegir?: (opcion: OpcionCatalogo) => void;
 }
 
 interface SelectorCatalogoMultipleProps extends BaseProps {
@@ -74,6 +78,40 @@ function Pill({
   );
 }
 
+function ListaRemota({
+  buscando,
+  remoto,
+  termino,
+  opciones,
+  onElegir,
+  seleccionadoId,
+}: {
+  buscando: boolean;
+  remoto: boolean;
+  termino: string;
+  opciones: OpcionCatalogo[];
+  onElegir: (opcion: OpcionCatalogo) => void;
+  seleccionadoId?: string;
+}) {
+  if (buscando) {
+    return <li className="px-3 py-2 text-sm text-zinc-500">Buscando…</li>;
+  }
+  if (remoto && termino.length < 2) {
+    return (
+      <li className="px-3 py-2 text-sm text-zinc-500">
+        Escribe al menos 2 letras
+      </li>
+    );
+  }
+  return (
+    <ListaOpciones
+      opciones={opciones}
+      onElegir={onElegir}
+      seleccionadoId={seleccionadoId}
+    />
+  );
+}
+
 function ListaOpciones({
   opciones,
   onElegir,
@@ -118,22 +156,67 @@ export function SelectorCatalogo(props: SelectorCatalogoProps) {
     opciones,
     placeholder = "Buscar o seleccionar…",
     mensajeVacio = "Nada seleccionado. Haz clic para ver la lista.",
+    buscar,
+    alElegir,
   } = props;
 
   const contenedorRef = useRef<HTMLDivElement>(null);
   const [busqueda, setBusqueda] = useState("");
   const [mostrarLista, setMostrarLista] = useState(false);
   const [verSeleccion, setVerSeleccion] = useState(false);
+  const [resultados, setResultados] = useState<OpcionCatalogo[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [elegidas, setElegidas] = useState<OpcionCatalogo[]>([]);
 
-  const catalogo = useMemo(
-    () => new Map(opciones.map((o) => [o.id, o])),
-    [opciones],
-  );
+  useEffect(() => {
+    if (!buscar) return;
+    const termino = busqueda.trim();
+    if (termino.length < 2) {
+      setResultados([]);
+      setBuscando(false);
+      return;
+    }
+    let cancelado = false;
+    const timer = setTimeout(() => {
+      setBuscando(true);
+      void buscar(termino)
+        .then((datos) => {
+          if (!cancelado) setResultados(datos);
+        })
+        .catch(() => {
+          if (!cancelado) setResultados([]);
+        })
+        .finally(() => {
+          if (!cancelado) setBuscando(false);
+        });
+    }, 300);
+    return () => {
+      cancelado = true;
+      clearTimeout(timer);
+    };
+  }, [buscar, busqueda]);
+
+  const catalogo = useMemo(() => {
+    const mapa = new Map<string, OpcionCatalogo>();
+    for (const opcion of [...opciones, ...elegidas, ...resultados]) {
+      mapa.set(opcion.id, opcion);
+    }
+    return mapa;
+  }, [opciones, elegidas, resultados]);
 
   const opcionesFiltradas = useMemo(
-    () => opciones.filter((o) => coincideBusqueda(o, busqueda.trim())),
-    [opciones, busqueda],
+    () =>
+      buscar
+        ? resultados
+        : opciones.filter((o) => coincideBusqueda(o, busqueda.trim())),
+    [buscar, opciones, resultados, busqueda],
   );
+
+  function recordar(opcion: OpcionCatalogo) {
+    setElegidas((prev) =>
+      prev.some((item) => item.id === opcion.id) ? prev : [...prev, opcion],
+    );
+  }
 
   useEffect(() => {
     function cerrarSiClickFuera(evento: MouseEvent) {
@@ -154,6 +237,8 @@ export function SelectorCatalogo(props: SelectorCatalogoProps) {
 
     function agregar(opcion: OpcionCatalogo) {
       if (value.includes(opcion.id)) return;
+      recordar(opcion);
+      alElegir?.(opcion);
       onChange([...value, opcion.id]);
       setBusqueda("");
     }
@@ -252,7 +337,13 @@ export function SelectorCatalogo(props: SelectorCatalogoProps) {
 
           {mostrarLista ? (
             <ul className="absolute z-20 mt-2 max-h-56 w-full overflow-y-auto rounded-2xl border border-ruralia-teal-border bg-white py-1.5 shadow-lg shadow-zinc-900/10">
-              <ListaOpciones opciones={disponibles} onElegir={agregar} />
+              <ListaRemota
+                buscando={buscando}
+                remoto={!!buscar}
+                termino={busqueda.trim()}
+                opciones={disponibles}
+                onElegir={agregar}
+              />
             </ul>
           ) : null}
         </div>
@@ -264,6 +355,8 @@ export function SelectorCatalogo(props: SelectorCatalogoProps) {
   const seleccionada = value ? catalogo.get(value) : undefined;
 
   function elegir(opcion: OpcionCatalogo) {
+    recordar(opcion);
+    alElegir?.(opcion);
     onChange(opcion.id);
     setBusqueda("");
     setMostrarLista(false);
@@ -298,7 +391,10 @@ export function SelectorCatalogo(props: SelectorCatalogoProps) {
 
         {mostrarLista ? (
           <ul className="absolute z-20 mt-2 max-h-56 w-full overflow-y-auto rounded-2xl border border-ruralia-teal-border bg-white py-1.5 shadow-lg shadow-zinc-900/10">
-            <ListaOpciones
+            <ListaRemota
+              buscando={buscando}
+              remoto={!!buscar}
+              termino={busqueda.trim()}
               opciones={opcionesFiltradas}
               onElegir={elegir}
               seleccionadoId={value}

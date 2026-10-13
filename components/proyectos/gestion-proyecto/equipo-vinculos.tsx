@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AvisosCargaBeneficiarios,
   CargaExcelBeneficiarios,
@@ -10,34 +10,37 @@ import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 import { SelectorVeredasMultiple } from "@/components/ui/selector-veredas-multiple";
 import {
   asignarAsociacionesProyecto,
-  asignarBeneficiariosProyecto,
   asignarPersonalProyecto,
   asignarTerritoriosProyecto,
+  desvincularBeneficiarioProyecto,
   historialBeneficiarioProyecto,
   importarBeneficiariosExcelProyecto,
   listarAsociaciones,
   listarBeneficiarios,
+  listarBeneficiariosProyecto,
   listarTodasLasPaginas,
   listarUsuarios,
   reemplazarBeneficiarioProyecto,
+  vincularBeneficiariosProyecto,
 } from "@/lib/api";
 import type {
+  BeneficiarioResumen,
   HistorialBeneficiarioProyecto,
   Proyecto,
+  RespuestaPaginada,
   ResultadoCargaMasivaBeneficiarios,
   TipoDocumento,
 } from "@/lib/types";
 import { etiquetaOrganizacion } from "@/lib/types";
+import { mostrarResultadoCargaBeneficiarios } from "@/lib/swal";
 
 interface EquipoVinculosProps {
   token: string;
   proyectoId: string;
   proyecto: Proyecto;
   puedeGestionar: boolean;
-  onActualizar: () => Promise<void>;
+  onActualizar: (opciones?: { silencioso?: boolean }) => Promise<void>;
 }
-
-const LIMITE_LISTA_BENEFICIARIOS = 5;
 
 function etiquetaBeneficiario(b: {
   nombres: string;
@@ -58,13 +61,9 @@ export function EquipoVinculos({
   const [veredaIds, setVeredaIds] = useState<string[]>([]);
   const [municipioIds, setMunicipioIds] = useState<string[]>([]);
   const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
-  const [beneficiarioIds, setBeneficiarioIds] = useState<string[]>([]);
   const [asociacionIds, setAsociacionIds] = useState<string[]>([]);
   const [opcionesUsuarios, setOpcionesUsuarios] = useState<
     { id: string; nombre: string }[]
-  >([]);
-  const [opcionesBeneficiarios, setOpcionesBeneficiarios] = useState<
-    { id: string; nombre: string; subtitulo?: string }[]
   >([]);
   const [opcionesAsociaciones, setOpcionesAsociaciones] = useState<
     { id: string; nombre: string }[]
@@ -77,8 +76,18 @@ export function EquipoVinculos({
   const [exito, setExito] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [reemplazoId, setReemplazoId] = useState<string | null>(null);
-  const [verListaBeneficiarios, setVerListaBeneficiarios] = useState(false);
+  const [reemplazo, setReemplazo] = useState<BeneficiarioResumen | null>(null);
+  const [listaAbierta, setListaAbierta] = useState(false);
+  const [estadoLista, setEstadoLista] = useState<"activos" | "reemplazados">(
+    "activos",
+  );
+  const [busquedaLista, setBusquedaLista] = useState("");
+  const [paginaLista, setPaginaLista] = useState(1);
+  const [lista, setLista] = useState<RespuestaPaginada<BeneficiarioResumen> | null>(
+    null,
+  );
+  const [cargandoLista, setCargandoLista] = useState(false);
+  const [recargaLista, setRecargaLista] = useState(0);
   const [modoReemplazo, setModoReemplazo] = useState<"existente" | "nuevo">(
     "nuevo",
   );
@@ -98,7 +107,6 @@ export function EquipoVinculos({
     setVeredaIds(proyecto.veredas?.map((v) => v.id) ?? []);
     setMunicipioIds(proyecto.municipios?.map((m) => m.id) ?? []);
     setUsuarioIds(proyecto.personal?.map((p) => p.id) ?? []);
-    setBeneficiarioIds(proyecto.beneficiarios?.map((b) => b.id) ?? []);
     setAsociacionIds(proyecto.asociaciones?.map((a) => a.id) ?? []);
   }, [proyecto]);
 
@@ -108,22 +116,12 @@ export function EquipoVinculos({
         listarUsuarios(token, { pagina, limite, estaActivo: true }),
       ),
       listarTodasLasPaginas((pagina, limite) =>
-        listarBeneficiarios(token, { pagina, limite }),
-      ),
-      listarTodasLasPaginas((pagina, limite) =>
         listarAsociaciones(token, { pagina, limite }),
       ),
     ])
-      .then(([usuarios, beneficiarios, asociaciones]) => {
+      .then(([usuarios, asociaciones]) => {
         setOpcionesUsuarios(
           usuarios.map((u) => ({ id: u.id, nombre: u.nombreCompleto })),
-        );
-        setOpcionesBeneficiarios(
-          beneficiarios.map((b) => ({
-            id: b.id,
-            nombre: `${b.nombres} ${b.apellidos}`,
-            subtitulo: b.numeroDocumento,
-          })),
         );
         setOpcionesAsociaciones(
           asociaciones.map((a) => ({
@@ -141,8 +139,73 @@ export function EquipoVinculos({
       });
   }, [token]);
 
+  useEffect(() => {
+    if (!listaAbierta) return;
+    let cancelado = false;
+    const timer = setTimeout(() => {
+      setCargandoLista(true);
+      void listarBeneficiariosProyecto(token, proyectoId, {
+        busqueda: busquedaLista.trim() || undefined,
+        pagina: paginaLista,
+        limite: 20,
+        estado: estadoLista,
+      })
+        .then((datos) => {
+          if (!cancelado) setLista(datos);
+        })
+        .catch((err: unknown) => {
+          if (cancelado) return;
+          setError(
+            err instanceof Error
+              ? err.message
+              : "No se pudo cargar la lista de beneficiarios",
+          );
+        })
+        .finally(() => {
+          if (!cancelado) setCargandoLista(false);
+        });
+    }, 300);
+    return () => {
+      cancelado = true;
+      clearTimeout(timer);
+    };
+  }, [
+    listaAbierta,
+    busquedaLista,
+    paginaLista,
+    estadoLista,
+    token,
+    proyectoId,
+    recargaLista,
+  ]);
+
+  const buscarEnCatalogo = useCallback(
+    async (termino: string) => {
+      const respuesta = await listarBeneficiarios(token, {
+        busqueda: termino,
+        limite: 20,
+      });
+      return respuesta.datos
+        .filter((b) => b.id !== reemplazo?.id)
+        .map((b) => ({
+          id: b.id,
+          nombre: `${b.nombres} ${b.apellidos}`.trim(),
+          subtitulo: b.numeroDocumento,
+        }));
+    },
+    [token, reemplazo?.id],
+  );
+
+  function abrirLista(estado: "activos" | "reemplazados") {
+    setEstadoLista(estado);
+    setBusquedaLista("");
+    setPaginaLista(1);
+    setLista(null);
+    setListaAbierta(true);
+  }
+
   async function guardarSeccion(
-    tipo: "territorio" | "personal" | "beneficiarios" | "asociaciones",
+    tipo: "territorio" | "personal" | "asociaciones",
   ) {
     setEnviando(true);
     setError(null);
@@ -164,11 +227,6 @@ export function EquipoVinculos({
           return;
         }
         await asignarPersonalProyecto(token, proyectoId, { usuarioIds });
-      }
-      if (tipo === "beneficiarios") {
-        await asignarBeneficiariosProyecto(token, proyectoId, {
-          beneficiarios: beneficiarioIds.map((id) => ({ beneficiarioId: id })),
-        });
       }
       if (tipo === "asociaciones") {
         await asignarAsociacionesProyecto(token, proyectoId, {
@@ -197,9 +255,9 @@ export function EquipoVinculos({
       );
       setResultadoCarga(resultado);
       setArchivoExcel(null);
-      const resumen = `${resultado.creados} nuevas, ${resultado.asignadosExistentes} ya existían y se vincularon al proyecto, ${resultado.yaEnProyecto} ya estaban en el proyecto${resultado.errores ? `, ${resultado.errores} con error` : ""}.`;
-      setExito(`Carga masiva lista: ${resumen}`);
-      await onActualizar();
+      await mostrarResultadoCargaBeneficiarios(resultado);
+      await onActualizar({ silencioso: true });
+      setRecargaLista((n) => n + 1);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Error al importar el Excel",
@@ -210,7 +268,7 @@ export function EquipoVinculos({
   }
 
   async function confirmarReemplazo() {
-    if (!reemplazoId) return;
+    if (!reemplazo) return;
     setEnviando(true);
     setError(null);
     try {
@@ -219,7 +277,7 @@ export function EquipoVinculos({
           setError("Selecciona a la persona que entra como reemplazo");
           return;
         }
-        await reemplazarBeneficiarioProyecto(token, proyectoId, reemplazoId, {
+        await reemplazarBeneficiarioProyecto(token, proyectoId, reemplazo.id, {
           nuevoBeneficiarioId,
           nota: notaReemplazo.trim() || undefined,
         });
@@ -228,22 +286,57 @@ export function EquipoVinculos({
           setError("El reemplazo necesita nombre e identificador único");
           return;
         }
-        await reemplazarBeneficiarioProyecto(token, proyectoId, reemplazoId, {
+        await reemplazarBeneficiarioProyecto(token, proyectoId, reemplazo.id, {
           nombres: nombresNuevo.trim(),
           numeroDocumento: documentoNuevo.trim(),
           tipoDocumento: tipoDocumentoNuevo,
           nota: notaReemplazo.trim() || undefined,
         });
       }
-      setReemplazoId(null);
+      setReemplazo(null);
       setNuevoBeneficiarioId("");
       setNombresNuevo("");
       setDocumentoNuevo("");
       setNotaReemplazo("");
       setExito("Reemplazo registrado. El historial del cupo se conserva.");
-      await onActualizar();
+      await onActualizar({ silencioso: true });
+      setRecargaLista((n) => n + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al reemplazar");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function vincularUno(id: string) {
+    if (!id) return;
+    setEnviando(true);
+    setError(null);
+    try {
+      await vincularBeneficiariosProyecto(token, proyectoId, {
+        beneficiarios: [{ beneficiarioId: id }],
+      });
+      await onActualizar({ silencioso: true });
+      setRecargaLista((n) => n + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo vincular");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function quitarBeneficiario(persona: BeneficiarioResumen) {
+    if (!confirm(`¿Quitar a ${etiquetaBeneficiario(persona)} de este proyecto?`)) {
+      return;
+    }
+    setEnviando(true);
+    setError(null);
+    try {
+      await desvincularBeneficiarioProyecto(token, proyectoId, persona.id);
+      await onActualizar({ silencioso: true });
+      setRecargaLista((n) => n + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo quitar");
     } finally {
       setEnviando(false);
     }
@@ -270,22 +363,10 @@ export function EquipoVinculos({
     }
   }
 
-  const beneficiarioAReemplazar = proyecto.beneficiarios?.find(
-    (b) => b.id === reemplazoId,
-  );
-  const opcionesReemplazo = opcionesBeneficiarios.filter(
-    (b) => b.id !== reemplazoId,
-  );
-  const beneficiariosVinculados = proyecto.beneficiarios ?? [];
-  const beneficiariosVisibles = beneficiariosVinculados.slice(
-    0,
-    LIMITE_LISTA_BENEFICIARIOS,
-  );
+  const conteoBeneficiarios =
+    proyecto.conteoBeneficiarios ?? proyecto.beneficiarios?.length ?? 0;
 
-  function filaBeneficiario(
-    b: (typeof beneficiariosVinculados)[number],
-    conAcciones: boolean,
-  ) {
+  function filaBeneficiario(b: BeneficiarioResumen, conAcciones: boolean) {
     return (
       <li
         key={b.id}
@@ -305,7 +386,7 @@ export function EquipoVinculos({
             </p>
           ) : null}
         </div>
-        {conAcciones ? (
+        {conAcciones && estadoLista === "activos" ? (
           <div className="flex gap-2">
             <button
               type="button"
@@ -317,8 +398,7 @@ export function EquipoVinculos({
             <button
               type="button"
               onClick={() => {
-                setVerListaBeneficiarios(false);
-                setReemplazoId(b.id);
+                setReemplazo(b);
                 setModoReemplazo("nuevo");
                 setNuevoBeneficiarioId("");
                 setNombresNuevo("");
@@ -329,15 +409,88 @@ export function EquipoVinculos({
             >
               Reemplazar
             </button>
+            <button
+              type="button"
+              disabled={enviando}
+              onClick={() => void quitarBeneficiario(b)}
+              className="rounded-lg px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              Quitar
+            </button>
           </div>
         ) : null}
       </li>
     );
   }
 
+  const modalLista = (
+    <Modal
+      abierto={listaAbierta}
+      onCerrar={() => setListaAbierta(false)}
+      titulo={
+        estadoLista === "reemplazados"
+          ? "Historial de reemplazos"
+          : `Beneficiarios (${conteoBeneficiarios.toLocaleString("es-CO")})`
+      }
+      ancho="lg"
+    >
+      <div className="space-y-3">
+        <input
+          type="search"
+          value={busquedaLista}
+          onChange={(e) => {
+            setBusquedaLista(e.target.value);
+            setPaginaLista(1);
+          }}
+          placeholder="Buscar por nombre o documento"
+          className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal"
+        />
+        {cargandoLista && !lista ? (
+          <p className="text-sm text-zinc-500">Cargando…</p>
+        ) : lista && lista.datos.length === 0 ? (
+          <p className="text-sm text-zinc-500">
+            {estadoLista === "reemplazados"
+              ? "No hay reemplazos."
+              : "Nadie coincide con la búsqueda."}
+          </p>
+        ) : (
+          <ul className="max-h-[50vh] divide-y divide-zinc-100 overflow-y-auto rounded-xl border border-zinc-100">
+            {(lista?.datos ?? []).map((b) =>
+              filaBeneficiario(b, puedeGestionar),
+            )}
+          </ul>
+        )}
+        {lista && lista.totalPaginas > 1 ? (
+          <div className="flex items-center justify-between text-sm">
+            <button
+              type="button"
+              disabled={paginaLista <= 1}
+              onClick={() => setPaginaLista((p) => Math.max(1, p - 1))}
+              className="rounded-lg px-2 py-1 font-semibold text-zinc-600 hover:bg-zinc-100 disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <span className="text-zinc-500">
+              {paginaLista} / {lista.totalPaginas}
+            </span>
+            <button
+              type="button"
+              disabled={paginaLista >= lista.totalPaginas}
+              onClick={() => setPaginaLista((p) => p + 1)}
+              className="rounded-lg px-2 py-1 font-semibold text-zinc-600 hover:bg-zinc-100 disabled:opacity-40"
+            >
+              Siguiente
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </Modal>
+  );
+
   if (!puedeGestionar) {
     return (
       <div className="space-y-4">
+        {error ? <Alerta mensaje={error} /> : null}
         <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
           <h3 className="font-semibold text-zinc-900">Equipo interno</h3>
           {proyecto.personal?.length ? (
@@ -357,23 +510,21 @@ export function EquipoVinculos({
         </section>
         <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
           <h3 className="font-semibold text-zinc-900">Beneficiarios</h3>
-          {proyecto.beneficiarios?.length ? (
-            <ul className="mt-3 space-y-2">
-              {proyecto.beneficiarios.map((b) => (
-                <li key={b.id} className="text-sm text-zinc-700">
-                  {etiquetaBeneficiario(b)}
-                  {b.reemplazaA ? (
-                    <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
-                      Reemplazo de {b.reemplazaA.nombres}{" "}
-                      {b.reemplazaA.apellidos}
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm text-zinc-500">Sin beneficiarios</p>
-          )}
+          <p className="mt-2 text-sm text-zinc-700">
+            {conteoBeneficiarios.toLocaleString("es-CO")}{" "}
+            {conteoBeneficiarios === 1
+              ? "beneficiario asociado"
+              : "beneficiarios asociados"}
+          </p>
+          {conteoBeneficiarios > 0 ? (
+            <button
+              type="button"
+              onClick={() => abrirLista("activos")}
+              className="mt-2 rounded-lg px-2 py-1 text-sm font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft"
+            >
+              Ver beneficiarios
+            </button>
+          ) : null}
           <h3 className="mt-5 font-semibold text-zinc-900">Asociaciones y OAM</h3>
           {proyecto.asociaciones?.length ? (
             <ul className="mt-3 space-y-1 text-sm text-zinc-700">
@@ -419,6 +570,7 @@ export function EquipoVinculos({
             </p>
           )}
         </section>
+        {modalLista}
       </div>
     );
   }
@@ -460,30 +612,42 @@ export function EquipoVinculos({
       <section
         id="contraparte"
         className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-zinc-900">Beneficiarios</h3>
-            <p className="mt-1 text-sm text-zinc-500">
-              Puedes vincular varios, junto con asociaciones. En cada jornada se
-              elige a quién se atiende.
-            </p>
-          </div>
+        <div className="mb-3">
+          <h3 className="font-semibold text-zinc-900">Beneficiarios</h3>
+          <p className="mt-1 text-sm text-zinc-800">
+            {conteoBeneficiarios.toLocaleString("es-CO")}{" "}
+            {conteoBeneficiarios === 1
+              ? "beneficiario asociado"
+              : "beneficiarios asociados"}
+          </p>
+          <p className="mt-1 text-sm text-zinc-500">
+            En cada jornada se elige a quién se atiende. La lista completa se
+            consulta solo al administrarlos.
+          </p>
+        </div>
+        <div className="mb-4 flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={enviando}
-            onClick={() => void guardarSeccion("beneficiarios")}
-            className="shrink-0 rounded-lg bg-ruralia-teal-soft px-3 py-1.5 text-sm font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal hover:text-white disabled:opacity-50"
+            onClick={() => abrirLista("activos")}
+            className="rounded-lg bg-ruralia-teal-soft px-3 py-1.5 text-sm font-semibold text-ruralia-teal-text transition hover:bg-ruralia-teal hover:text-white"
           >
-            Guardar
+            Ver beneficiarios
+          </button>
+          <button
+            type="button"
+            onClick={() => abrirLista("reemplazados")}
+            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-100"
+          >
+            Historial de reemplazos
           </button>
         </div>
         <SelectorCatalogo
-          multiple
-          opciones={opcionesBeneficiarios}
-          value={beneficiarioIds}
-          onChange={setBeneficiarioIds}
-          placeholder="Buscar beneficiarios de la base de datos…"
-          mensajeVacio="Selecciona uno o más, o súbelos por Excel."
+          opciones={[]}
+          buscar={buscarEnCatalogo}
+          value=""
+          onChange={(id) => void vincularUno(id)}
+          placeholder="Buscar en la base para añadir uno…"
+          mensajeVacio="Opcional. Si son muchos, usa el Excel."
         />
         <div className="mt-4">
           <CargaExcelBeneficiarios
@@ -513,48 +677,6 @@ export function EquipoVinculos({
                 : ""}
             </p>
             <AvisosCargaBeneficiarios detalle={resultadoCarga.detalle} />
-          </div>
-        ) : null}
-
-        {beneficiariosVinculados.length > 0 ? (
-          <div className="mt-4">
-            <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-100">
-              {beneficiariosVisibles.map((b) => filaBeneficiario(b, true))}
-            </ul>
-            {beneficiariosVinculados.length > LIMITE_LISTA_BENEFICIARIOS ? (
-              <button
-                type="button"
-                onClick={() => setVerListaBeneficiarios(true)}
-                className="mt-2 rounded-lg px-2 py-1 text-sm font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft"
-              >
-                Ver todos ({beneficiariosVinculados.length})
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-
-        {(proyecto.beneficiariosReemplazados?.length ?? 0) > 0 ? (
-          <div className="mt-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-              Cupos reemplazados (historial)
-            </p>
-            <ul className="mt-2 space-y-1 text-sm text-zinc-500">
-              {proyecto.beneficiariosReemplazados!.map((b) => (
-                <li key={b.id}>
-                  {etiquetaBeneficiario(b)}
-                  {b.reemplazadoPor
-                    ? ` → sustituido por ${b.reemplazadoPor.nombres} ${b.reemplazadoPor.apellidos}`
-                    : ""}
-                  <button
-                    type="button"
-                    onClick={() => void abrirHistorial(b.id)}
-                    className="ml-2 text-xs font-semibold text-ruralia-teal-text"
-                  >
-                    Ver
-                  </button>
-                </li>
-              ))}
-            </ul>
           </div>
         ) : null}
       </section>
@@ -616,26 +738,17 @@ export function EquipoVinculos({
         />
       </section>
 
-      <Modal
-        abierto={verListaBeneficiarios}
-        onCerrar={() => setVerListaBeneficiarios(false)}
-        titulo={`Beneficiarios (${beneficiariosVinculados.length})`}
-        ancho="lg"
-      >
-        <ul className="max-h-[60vh] divide-y divide-zinc-100 overflow-y-auto rounded-xl border border-zinc-100">
-          {beneficiariosVinculados.map((b) => filaBeneficiario(b, true))}
-        </ul>
-      </Modal>
+      {modalLista}
 
       <Modal
-        abierto={!!reemplazoId}
-        onCerrar={() => setReemplazoId(null)}
+        abierto={!!reemplazo}
+        onCerrar={() => setReemplazo(null)}
         titulo="Reemplazar beneficiario"
       >
-        {beneficiarioAReemplazar ? (
+        {reemplazo ? (
           <div className="space-y-4">
             <p className="text-sm text-zinc-600">
-              {etiquetaBeneficiario(beneficiarioAReemplazar)} sale del cupo. La
+              {etiquetaBeneficiario(reemplazo)} sale del cupo. La
               persona nueva hereda las jornadas ya hechas; quedan marcadas como
               historial de reemplazo, no como un proceso nuevo.
             </p>
@@ -701,7 +814,8 @@ export function EquipoVinculos({
               </div>
             ) : (
               <SelectorCatalogo
-                opciones={opcionesReemplazo}
+                opciones={[]}
+                buscar={buscarEnCatalogo}
                 value={nuevoBeneficiarioId}
                 onChange={setNuevoBeneficiarioId}
                 placeholder="Buscar a quien entra…"
@@ -722,7 +836,7 @@ export function EquipoVinculos({
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setReemplazoId(null)}
+                onClick={() => setReemplazo(null)}
                 className="rounded-lg px-3 py-2 text-sm font-semibold text-zinc-600"
               >
                 Cancelar

@@ -30,6 +30,8 @@ export function TarjetaProyecto({
   vistaLimitada?: boolean;
 }) {
   const progreso = proyecto.progresoPorcentaje ?? 0;
+  const beneficiarios =
+    proyecto.conteoBeneficiarios ?? proyecto.beneficiarios?.length ?? 0;
 
   if (vistaLimitada) {
     return (
@@ -87,12 +89,12 @@ export function TarjetaProyecto({
       </div>
 
       <div className="mt-4 space-y-2 text-sm text-zinc-600">
-        {proyecto.beneficiarios?.length || proyecto.asociaciones?.length ? (
+        {beneficiarios || proyecto.asociaciones?.length ? (
           <p>
             <span className="text-zinc-400">Contraparte: </span>
             {[
-              proyecto.beneficiarios?.length
-                ? `${proyecto.beneficiarios.length} beneficiario${proyecto.beneficiarios.length === 1 ? "" : "s"}`
+              beneficiarios
+                ? `${beneficiarios.toLocaleString("es-CO")} beneficiario${beneficiarios === 1 ? "" : "s"}`
                 : null,
               proyecto.asociaciones?.length
                 ? `${proyecto.asociaciones.length} asociación${proyecto.asociaciones.length === 1 ? "" : "es"}`

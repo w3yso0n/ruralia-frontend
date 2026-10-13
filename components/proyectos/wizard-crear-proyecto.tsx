@@ -1,10 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Alerta, Spinner } from "@/components/ui/modal";
-import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
+import {
+  SelectorCatalogo,
+  type OpcionCatalogo,
+} from "@/components/ui/selector-catalogo";
 import { SelectorVeredasMultiple } from "@/components/ui/selector-veredas-multiple";
 import {
   CargaExcelBeneficiarios,
@@ -24,9 +27,20 @@ import {
   listarTodasLasPaginas,
   listarUsuarios,
 } from "@/lib/api";
+import { mostrarResultadoCargaBeneficiarios } from "@/lib/swal";
 import { useAuth } from "@/lib/auth-context";
-import type { MunicipioResumen, TipoProyecto } from "@/lib/types";
+import type {
+  MunicipioResumen,
+  ResultadoCargaMasivaBeneficiarios,
+  TipoProyecto,
+} from "@/lib/types";
 import { etiquetaOrganizacion } from "@/lib/types";
+
+function textoExcelPreparado(total: number, nombre: string): string {
+  const cantidad = total.toLocaleString("es-CO");
+  const personas = total === 1 ? "persona" : "personas";
+  return `${cantidad} ${personas} en ${nombre}. Se vincularán al crear el proyecto.`;
+}
 
 const PASOS = [
   "Información",
@@ -68,15 +82,16 @@ export function WizardCrearProyecto() {
   const [veredaCargaId, setVeredaCargaId] = useState("");
   const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
   const [beneficiarioIds, setBeneficiarioIds] = useState<string[]>([]);
+  const [etiquetasBeneficiarios, setEtiquetasBeneficiarios] = useState<
+    OpcionCatalogo[]
+  >([]);
   const [asociacionIds, setAsociacionIds] = useState<string[]>([]);
   const [archivoExcel, setArchivoExcel] = useState<File | null>(null);
+  const [personasExcel, setPersonasExcel] = useState(0);
   const [actividades, setActividades] = useState<string[]>([""]);
 
   const [opcionesUsuarios, setOpcionesUsuarios] = useState<
     { id: string; nombre: string }[]
-  >([]);
-  const [opcionesBeneficiarios, setOpcionesBeneficiarios] = useState<
-    { id: string; nombre: string; subtitulo?: string }[]
   >([]);
   const [opcionesAsociaciones, setOpcionesAsociaciones] = useState<
     { id: string; nombre: string }[]
@@ -90,24 +105,14 @@ export function WizardCrearProyecto() {
         listarUsuarios(token, { pagina, limite, estaActivo: true }),
       ),
       listarTodasLasPaginas((pagina, limite) =>
-        listarBeneficiarios(token, { pagina, limite }),
-      ),
-      listarTodasLasPaginas((pagina, limite) =>
         listarAsociaciones(token, { pagina, limite }),
       ),
     ])
-      .then(([usuarios, beneficiarios, asociaciones]) => {
+      .then(([usuarios, asociaciones]) => {
         setOpcionesUsuarios(
           usuarios.map((u) => ({
             id: u.id,
             nombre: u.nombreCompleto,
-          })),
-        );
-        setOpcionesBeneficiarios(
-          beneficiarios.map((b) => ({
-            id: b.id,
-            nombre: `${b.nombres} ${b.apellidos}`,
-            subtitulo: b.numeroDocumento,
           })),
         );
         setOpcionesAsociaciones(
@@ -129,6 +134,28 @@ export function WizardCrearProyecto() {
       })
       .finally(() => setCargandoOpciones(false));
   }, [token, usuario]);
+
+  const buscarBeneficiarios = useCallback(
+    async (termino: string) => {
+      if (!token) return [];
+      const respuesta = await listarBeneficiarios(token, {
+        busqueda: termino,
+        limite: 20,
+      });
+      return respuesta.datos.map((b) => ({
+        id: b.id,
+        nombre: `${b.nombres} ${b.apellidos}`.trim(),
+        subtitulo: b.numeroDocumento,
+      }));
+    },
+    [token],
+  );
+
+  function quitarExcel() {
+    setArchivoExcel(null);
+    setVeredaCargaId("");
+    setPersonasExcel(0);
+  }
 
   function validarPasoActual(): string | null {
     switch (paso) {
@@ -199,8 +226,9 @@ export function WizardCrearProyecto() {
           asociaciones: asociacionIds.map((id) => ({ asociacionId: id })),
         });
       }
+      let resultadoExcel: ResultadoCargaMasivaBeneficiarios | null = null;
       if (archivoExcel) {
-        await importarBeneficiariosExcelProyecto(
+        resultadoExcel = await importarBeneficiariosExcelProyecto(
           token,
           proyecto.id,
           archivoExcel,
@@ -216,6 +244,10 @@ export function WizardCrearProyecto() {
       }
 
       await activarProyecto(token, proyecto.id);
+
+      if (resultadoExcel) {
+        await mostrarResultadoCargaBeneficiarios(resultadoExcel);
+      }
 
       router.push(`/proyectos/${proyecto.id}?tab=plan`);
     } catch (err) {
@@ -410,9 +442,22 @@ export function WizardCrearProyecto() {
               </p>
               <SelectorCatalogo
                 multiple
-                opciones={opcionesBeneficiarios}
+                opciones={etiquetasBeneficiarios}
+                buscar={buscarBeneficiarios}
                 value={beneficiarioIds}
-                onChange={setBeneficiarioIds}
+                alElegir={(opcion) =>
+                  setEtiquetasBeneficiarios((prev) =>
+                    prev.some((item) => item.id === opcion.id)
+                      ? prev
+                      : [...prev, opcion],
+                  )
+                }
+                onChange={(ids) => {
+                  setBeneficiarioIds(ids);
+                  setEtiquetasBeneficiarios((prev) =>
+                    prev.filter((item) => ids.includes(item.id)),
+                  );
+                }}
                 placeholder="Buscar y añadir beneficiarios…"
                 mensajeVacio="Opcional si vas a cargar un Excel."
               />
@@ -422,16 +467,31 @@ export function WizardCrearProyecto() {
                 token={token}
                 archivo={archivoExcel}
                 onArchivo={(archivo) => {
-                  setArchivoExcel(archivo);
-                  setVeredaCargaId("");
+                  if (!archivo) quitarExcel();
                 }}
                 disabled={enviando}
                 veredas={veredasDane}
-                onImportar={async (archivo, veredaId) => {
+                onImportar={async (archivo, veredaId, total) => {
                   setArchivoExcel(archivo);
                   setVeredaCargaId(veredaId);
+                  setPersonasExcel(total);
+                  setError(null);
                 }}
               />
+            ) : null}
+            {archivoExcel && personasExcel > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-3">
+                <p className="text-sm text-zinc-800">
+                  {textoExcelPreparado(personasExcel, archivoExcel.name)}
+                </p>
+                <button
+                  type="button"
+                  onClick={quitarExcel}
+                  className="rounded-lg px-2 py-1 text-sm font-semibold text-zinc-600 hover:bg-white"
+                >
+                  Quitar
+                </button>
+              </div>
             ) : null}
             <div>
               <p className="mb-2 text-sm font-medium text-zinc-800">
@@ -526,7 +586,9 @@ export function WizardCrearProyecto() {
                 {beneficiarioIds.length
                   ? `${beneficiarioIds.length} de la BD`
                   : "Ninguno de la BD"}
-                {archivoExcel ? ` · Excel: ${archivoExcel.name}` : ""}
+                {archivoExcel && personasExcel > 0
+                  ? `. ${textoExcelPreparado(personasExcel, archivoExcel.name)}`
+                  : ""}
               </dd>
             </div>
             <div>

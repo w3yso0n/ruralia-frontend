@@ -67,7 +67,11 @@ interface CargaExcelBeneficiariosProps {
   archivo: File | null;
   onArchivo: (archivo: File | null) => void;
   disabled?: boolean;
-  onImportar?: (archivo: File, veredaId: string) => Promise<void>;
+  onImportar?: (
+    archivo: File,
+    veredaId: string,
+    totalPersonas: number,
+  ) => Promise<void>;
   importando?: boolean;
   contexto?: "proyecto" | "catalogo";
   /** Veredas DANE ya vinculadas. En el catálogo se buscan al confirmar. */
@@ -78,7 +82,6 @@ interface CargaExcelBeneficiariosProps {
 
 export function CargaExcelBeneficiarios({
   token,
-  onArchivo,
   disabled,
   onImportar,
   importando,
@@ -201,7 +204,6 @@ export function CargaExcelBeneficiarios({
     setArchivoLocal(null);
     setFilas([]);
     setVeredaId("");
-    onArchivo(null);
   }
 
   const pideVereda = filas.some((fila) => !fila.municipio?.trim());
@@ -209,15 +211,19 @@ export function CargaExcelBeneficiarios({
     .map((fila) => motivoFilaOmitida(fila))
     .filter((motivo): motivo is string => motivo !== null);
 
+  const personasAVincular = filas.filter(
+    (fila) => motivoFilaOmitida(fila) === null,
+  ).length;
+
   async function confirmar() {
     if (!archivoLocal || !onImportar) return;
     if (pideVereda && !veredaId) return;
-    await onImportar(archivoLocal, veredaId);
+    if (!personasAVincular) return;
+    await onImportar(archivoLocal, veredaId, personasAVincular);
     setRevisando(false);
     setArchivoLocal(null);
     setFilas([]);
     setVeredaId("");
-    onArchivo(null);
   }
 
   const ayuda = (
@@ -452,7 +458,12 @@ export function CargaExcelBeneficiarios({
             </button>
             <button
               type="button"
-              disabled={(pideVereda && !veredaId) || importando || leyendo}
+              disabled={
+                (pideVereda && !veredaId) ||
+                importando ||
+                leyendo ||
+                personasAVincular === 0
+              }
               onClick={() => void confirmar()}
               className="rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white hover:bg-ruralia-teal-hover disabled:opacity-50"
             >

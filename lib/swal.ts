@@ -1,9 +1,16 @@
 import Swal from "sweetalert2";
+import type { ResultadoCargaMasivaBeneficiarios } from "@/lib/types";
 
 const iconoAdvertencia = `
   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 block">
     <path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a1 1 0 0 0 .87 1.5h18.62a1 1 0 0 0 .87-1.5L13.71 3.86a1 1 0 0 0-1.72 0Z"
       stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </svg>`;
+
+const iconoExito = `
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-7 w-7">
+    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
+    <path d="M8 12.5l2.5 2.5L16 9.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
 
 const iconoError = `
@@ -31,11 +38,50 @@ const swalRuralia = Swal.mixin({
   },
 });
 
-function iconoHtml(tipo: "advertencia" | "error") {
-  const svg = tipo === "advertencia" ? iconoAdvertencia : iconoError;
-  const color = tipo === "advertencia" ? "text-amber-500" : "text-red-600";
-  const fondo = tipo === "advertencia" ? "bg-amber-50" : "bg-red-50";
+const botonExito =
+  "!rounded-xl !bg-ruralia-teal !px-4 !py-2 !text-sm !font-semibold !text-white hover:!bg-ruralia-teal-hover focus:!outline-none focus:!ring-2 focus:!ring-ruralia-teal-border";
+
+function iconoHtml(tipo: "advertencia" | "error" | "exito") {
+  const svg =
+    tipo === "advertencia"
+      ? iconoAdvertencia
+      : tipo === "exito"
+        ? iconoExito
+        : iconoError;
+  const color =
+    tipo === "advertencia"
+      ? "text-amber-500"
+      : tipo === "exito"
+        ? "text-ruralia-teal"
+        : "text-red-600";
+  const fondo =
+    tipo === "advertencia"
+      ? "bg-amber-50"
+      : tipo === "exito"
+        ? "bg-ruralia-teal-soft"
+        : "bg-red-50";
   return `<div class="mx-auto mb-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${fondo} ${color}">${svg}</div>`;
+}
+
+export function mostrarResultadoCargaBeneficiarios(
+  resultado: ResultadoCargaMasivaBeneficiarios,
+) {
+  const lineas = [
+    `${resultado.creados.toLocaleString("es-CO")} nuevas`,
+    `${resultado.asignadosExistentes.toLocaleString("es-CO")} ya existían y se vincularon al proyecto`,
+    `${resultado.yaEnProyecto.toLocaleString("es-CO")} ya estaban en el proyecto`,
+  ];
+  if (resultado.errores) {
+    lineas.push(
+      `${resultado.errores.toLocaleString("es-CO")} con error`,
+    );
+  }
+  return swalRuralia.fire({
+    title: "Beneficiarios vinculados",
+    html: `${iconoHtml("exito")}<p>${lineas.join("<br>")}</p>`,
+    confirmButtonText: "Entendido",
+    customClass: { confirmButton: botonExito },
+  });
 }
 
 export function mostrarErrorApi(

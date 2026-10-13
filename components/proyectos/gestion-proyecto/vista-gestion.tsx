@@ -117,6 +117,7 @@ function VistaGestionProyectoCompleta({
   const [descripcionExpandida, setDescripcionExpandida] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const proyectoListoRef = useRef(false);
   const [guardando, setGuardando] = useState(false);
   const [planActualizadoEn, setPlanActualizadoEn] = useState<Date | null>(null);
 
@@ -135,23 +136,28 @@ function VistaGestionProyectoCompleta({
     return "/revision";
   })();
 
-  const cargar = useCallback(async () => {
+  const cargar = useCallback(async (opciones?: { silencioso?: boolean }) => {
     if (!token) return;
-    setCargando(true);
-    setError(null);
+    const silencioso = !!opciones?.silencioso && proyectoListoRef.current;
+    if (!silencioso) {
+      setCargando(true);
+      setError(null);
+    }
 
     // Las jornadas solo se usan en su pestaña: se piden en paralelo y no
-    // bloquean el resto de la vista.
-    const cargaId = ++cargaJornadasRef.current;
-    setJornadasCargadas(false);
-    void listarJornadas(token, { proyectoId, limite: 50 })
-      .then((jor) => jor.datos)
-      .catch(() => [] as Jornada[])
-      .then((datos) => {
-        if (cargaId !== cargaJornadasRef.current) return;
-        setJornadas(datos);
-        setJornadasCargadas(true);
-      });
+    // bloquean el resto de la vista. Una recarga silenciosa no las toca.
+    if (!silencioso) {
+      const cargaId = ++cargaJornadasRef.current;
+      setJornadasCargadas(false);
+      void listarJornadas(token, { proyectoId, limite: 50 })
+        .then((jor) => jor.datos)
+        .catch(() => [] as Jornada[])
+        .then((datos) => {
+          if (cargaId !== cargaJornadasRef.current) return;
+          setJornadas(datos);
+          setJornadasCargadas(true);
+        });
+    }
 
     try {
       const [p, pl] = await Promise.all([
@@ -159,13 +165,14 @@ function VistaGestionProyectoCompleta({
         obtenerPlanProyecto(token, proyectoId),
       ]);
       setProyecto(p);
+      proyectoListoRef.current = true;
       setPlan(pl);
-      setVersionResumen((v) => v + 1);
+      if (!silencioso) setVersionResumen((v) => v + 1);
       setPlanActualizadoEn(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar proyecto");
     } finally {
-      setCargando(false);
+      if (!silencioso) setCargando(false);
     }
   }, [token, proyectoId]);
 
@@ -259,9 +266,9 @@ function VistaGestionProyectoCompleta({
   if (!proyecto || !token) return <Alerta mensaje="Proyecto no encontrado" />;
 
   const tieneContraparte = !!(
-    proyecto.beneficiarioPrincipal ??
-    proyecto.beneficiarios?.[0] ??
-    proyecto.asociacionPrincipal ??
+    (proyecto.conteoBeneficiarios ?? proyecto.beneficiarios?.length ?? 0) >
+      0 ||
+    proyecto.asociacionPrincipal ||
     proyecto.asociaciones?.[0]
   );
 

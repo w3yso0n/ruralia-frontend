@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Building2,
@@ -32,6 +32,7 @@ import {
   crearJornada,
   eliminarJornada,
   ErrorApi,
+  listarBeneficiariosProyecto,
   listarGeocercasProyecto,
 } from "@/lib/api";
 import {
@@ -177,15 +178,22 @@ export function PanelJornadas({
     [proyecto.personal],
   );
 
-  const opcionesBeneficiarios = useMemo(
-    () =>
-      (proyecto.beneficiarios ?? []).map((b) => ({
+  const buscarBeneficiarios = useCallback(
+    async (termino: string) => {
+      const respuesta = await listarBeneficiariosProyecto(token, proyecto.id, {
+        busqueda: termino,
+        limite: 20,
+      });
+      return respuesta.datos.map((b) => ({
         id: b.id,
-        nombre: `${b.nombres} ${b.apellidos}`,
+        nombre: `${b.nombres} ${b.apellidos}`.trim(),
         subtitulo: b.numeroDocumento,
-      })),
-    [proyecto.beneficiarios],
+      }));
+    },
+    [token, proyecto.id],
   );
+  const hayBeneficiarios =
+    (proyecto.conteoBeneficiarios ?? proyecto.beneficiarios?.length ?? 0) > 0;
 
   const opcionesAsociaciones = useMemo(
     () =>
@@ -398,7 +406,8 @@ export function PanelJornadas({
             geocercas={geocercas}
             actividadesPlan={plan?.actividades ?? []}
             agentes={agentes}
-            beneficiarios={opcionesBeneficiarios}
+            buscarBeneficiarios={buscarBeneficiarios}
+            hayBeneficiarios={hayBeneficiarios}
             asociaciones={opcionesAsociaciones}
             fechaInicioProyecto={proyecto.fechaInicio}
             fechaFinProyecto={proyecto.fechaFin}
@@ -594,7 +603,8 @@ export function PanelJornadas({
                     veredas={proyecto.veredas ?? []}
                     geocercas={geocercas}
                     actividadesPlan={plan?.actividades ?? []}
-                    beneficiarios={opcionesBeneficiarios}
+                    buscarBeneficiarios={buscarBeneficiarios}
+                    hayBeneficiarios={hayBeneficiarios}
                     asociaciones={opcionesAsociaciones}
                     fechaInicioProyecto={proyecto.fechaInicio}
                     fechaFinProyecto={proyecto.fechaFin}

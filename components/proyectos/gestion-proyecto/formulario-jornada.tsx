@@ -45,6 +45,8 @@ interface FormularioJornadaProps {
   actividadesPlan: ActividadPlan[];
   agentes: AgenteOpcion[];
   beneficiarios?: AgenteOpcion[];
+  buscarBeneficiarios?: (termino: string) => Promise<AgenteOpcion[]>;
+  hayBeneficiarios?: boolean;
   asociaciones?: AgenteOpcion[];
   fechaInicioProyecto?: string;
   fechaFinProyecto?: string;
@@ -73,6 +75,8 @@ export function FormularioJornada({
   actividadesPlan,
   agentes,
   beneficiarios = [],
+  buscarBeneficiarios,
+  hayBeneficiarios,
   asociaciones = [],
   fechaInicioProyecto,
   fechaFinProyecto,
@@ -224,6 +228,8 @@ export function FormularioJornada({
 
       <AsignacionJornada
         beneficiarios={beneficiarios}
+        buscarBeneficiarios={buscarBeneficiarios}
+        hayBeneficiarios={hayBeneficiarios}
         asociaciones={asociaciones}
         destino={destino}
         beneficiarioIds={beneficiarioIds}

@@ -17,6 +17,7 @@ import type {
   AvancePeriodo,
   BandejaAprobacion,
   Beneficiario,
+  BeneficiarioResumen,
   EstadoFiltroBeneficiario,
   UsoBeneficiario,
   CompletarNodoPayload,
@@ -625,6 +626,46 @@ export async function asignarBeneficiariosProyecto(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function listarBeneficiariosProyecto(
+  token: string,
+  proyectoId: string,
+  params?: {
+    busqueda?: string;
+    pagina?: number;
+    limite?: number;
+    estado?: "activos" | "reemplazados";
+  },
+): Promise<RespuestaPaginada<BeneficiarioResumen>> {
+  return fetchConAuth<RespuestaPaginada<BeneficiarioResumen>>(
+    `/proyectos/${proyectoId}/beneficiarios${construirQuery(params)}`,
+    token,
+  );
+}
+
+export async function vincularBeneficiariosProyecto(
+  token: string,
+  proyectoId: string,
+  payload: AsignacionBeneficiariosPayload,
+): Promise<Proyecto> {
+  return fetchConAuth<Proyecto>(
+    `/proyectos/${proyectoId}/beneficiarios/vincular`,
+    token,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export async function desvincularBeneficiarioProyecto(
+  token: string,
+  proyectoId: string,
+  beneficiarioId: string,
+): Promise<Proyecto> {
+  return fetchConAuth<Proyecto>(
+    `/proyectos/${proyectoId}/beneficiarios/${beneficiarioId}`,
+    token,
+    { method: "DELETE" },
+  );
 }
 
 export async function asignarAsociacionesProyecto(

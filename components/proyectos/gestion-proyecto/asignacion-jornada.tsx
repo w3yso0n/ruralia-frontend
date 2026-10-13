@@ -35,6 +35,8 @@ export function errorAsignacionJornada(
 
 interface AsignacionJornadaProps {
   beneficiarios: OpcionAsignacion[];
+  buscarBeneficiarios?: (termino: string) => Promise<OpcionAsignacion[]>;
+  hayBeneficiarios?: boolean;
   asociaciones: OpcionAsignacion[];
   destino: DestinoAsignacionJornada;
   beneficiarioIds: string[];
@@ -48,6 +50,8 @@ interface AsignacionJornadaProps {
 
 export function AsignacionJornada({
   beneficiarios,
+  buscarBeneficiarios,
+  hayBeneficiarios,
   asociaciones,
   destino,
   beneficiarioIds,
@@ -60,7 +64,9 @@ export function AsignacionJornada({
 }: AsignacionJornadaProps) {
   const sinCatalogo =
     destino === "beneficiario"
-      ? beneficiarios.length === 0
+      ? buscarBeneficiarios
+        ? hayBeneficiarios === false
+        : beneficiarios.length === 0
       : asociaciones.length === 0;
 
   return (
@@ -106,6 +112,7 @@ export function AsignacionJornada({
         <SelectorCatalogo
           multiple
           opciones={beneficiarios}
+          buscar={buscarBeneficiarios}
           value={beneficiarioIds}
           onChange={onBeneficiarioIds}
           placeholder="Buscar beneficiario del proyecto..."

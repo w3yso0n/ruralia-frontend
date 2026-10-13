@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { DescargaExpediente } from "@/components/proyectos/gestion-proyecto/descarga-expediente";
 import { Alerta, Spinner } from "@/components/ui/modal";
+import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 import {
   OpcionDesplegable,
   SelectorDesplegable,
@@ -19,6 +20,7 @@ import {
 import {
   descargarPdfDocumento,
   eliminarDocumentoExterno,
+  listarBeneficiariosProyecto,
   obtenerExpedienteProyecto,
   subirDocumentoExterno,
 } from "@/lib/api";
@@ -316,10 +318,6 @@ export function PanelExpediente({
     }
   }
 
-  const beneficiariosOpciones: OpcionDesplegable[] = (
-    proyecto.beneficiarios ?? []
-  ).map((b) => ({ id: b.id, nombre: `${b.nombres} ${b.apellidos}` }));
-
   const asociacionesOpciones: OpcionDesplegable[] = (
     proyecto.asociaciones ?? []
   ).map((a) => ({ id: a.id, nombre: etiquetaOrganizacion(a) }));
@@ -366,7 +364,6 @@ export function PanelExpediente({
           token={token}
           proyectoId={proyectoId}
           actividadesOpciones={actividadesOpciones}
-          beneficiariosOpciones={beneficiariosOpciones}
           asociacionesOpciones={asociacionesOpciones}
           veredasOpciones={veredasOpciones}
           onSubido={async () => {
@@ -774,7 +771,6 @@ interface FormularioCargaDocumentoProps {
   token: string;
   proyectoId: string;
   actividadesOpciones: OpcionDesplegable[];
-  beneficiariosOpciones: OpcionDesplegable[];
   asociacionesOpciones: OpcionDesplegable[];
   veredasOpciones: OpcionDesplegable[];
   onSubido: () => void;
@@ -785,7 +781,6 @@ function FormularioCargaDocumento({
   token,
   proyectoId,
   actividadesOpciones,
-  beneficiariosOpciones,
   asociacionesOpciones,
   veredasOpciones,
   onSubido,
@@ -800,6 +795,21 @@ function FormularioCargaDocumento({
   const [asociacionId, setAsociacionId] = useState("");
   const [veredaId, setVeredaId] = useState("");
   const [subiendo, setSubiendo] = useState(false);
+
+  const buscarBeneficiarios = useCallback(
+    async (termino: string) => {
+      const respuesta = await listarBeneficiariosProyecto(token, proyectoId, {
+        busqueda: termino,
+        limite: 20,
+      });
+      return respuesta.datos.map((b) => ({
+        id: b.id,
+        nombre: `${b.nombres} ${b.apellidos}`.trim(),
+        subtitulo: b.numeroDocumento,
+      }));
+    },
+    [token, proyectoId],
+  );
 
   async function manejarSubmit() {
     if (!archivo || !titulo.trim()) return;
@@ -891,13 +901,13 @@ function FormularioCargaDocumento({
           <label className="mb-1.5 block text-sm font-medium text-zinc-700">
             Beneficiario (opcional)
           </label>
-          <SelectorDesplegable
+          <SelectorCatalogo
             value={beneficiarioId}
             onChange={setBeneficiarioId}
-            opciones={beneficiariosOpciones}
-            permitirVacio
-            etiquetaVacio="Sin beneficiario"
-            mensajeSinOpciones="Sin beneficiarios"
+            opciones={[]}
+            buscar={buscarBeneficiarios}
+            placeholder="Buscar beneficiario del proyecto…"
+            mensajeVacio="Opcional. Escribe para buscar."
           />
         </div>
         <div>

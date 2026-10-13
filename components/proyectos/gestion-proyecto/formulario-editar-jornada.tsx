@@ -40,6 +40,10 @@ interface FormularioEditarJornadaProps {
   geocercas: Geocerca[];
   actividadesPlan: ActividadPlan[];
   beneficiarios?: { id: string; nombre: string; subtitulo?: string }[];
+  buscarBeneficiarios?: (
+    termino: string,
+  ) => Promise<{ id: string; nombre: string; subtitulo?: string }[]>;
+  hayBeneficiarios?: boolean;
   asociaciones?: { id: string; nombre: string }[];
   fechaInicioProyecto?: string;
   fechaFinProyecto?: string;
@@ -72,6 +76,8 @@ export function FormularioEditarJornada({
   geocercas,
   actividadesPlan,
   beneficiarios = [],
+  buscarBeneficiarios,
+  hayBeneficiarios,
   asociaciones = [],
   fechaInicioProyecto,
   fechaFinProyecto,
@@ -266,7 +272,16 @@ export function FormularioEditarJornada({
       />
 
       <AsignacionJornada
-        beneficiarios={beneficiarios}
+        beneficiarios={
+          beneficiarios.length
+            ? beneficiarios
+            : (jornada.beneficiarios ?? []).map((b) => ({
+                id: b.id,
+                nombre: b.nombre,
+              }))
+        }
+        buscarBeneficiarios={buscarBeneficiarios}
+        hayBeneficiarios={hayBeneficiarios}
         asociaciones={asociaciones}
         destino={destino}
         beneficiarioIds={beneficiarioIds}
