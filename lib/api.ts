@@ -47,6 +47,8 @@ import type {
   EnvioFormularioResumen,
   EntidadRevisable,
   EstadisticasProyecto,
+  ResumenProyecto,
+  MiembroEquipoResumen,
   Jornada,
   KpisDashboard,
   DashboardCompleto,
@@ -494,6 +496,28 @@ export async function obtenerEstadisticasProyecto(
 ): Promise<EstadisticasProyecto> {
   return fetchConAuth<EstadisticasProyecto>(
     `/proyectos/${id}/estadisticas`,
+    token,
+  );
+}
+
+export async function obtenerResumenProyecto(
+  token: string,
+  id: string,
+): Promise<ResumenProyecto> {
+  return fetchConAuth<ResumenProyecto>(`/proyectos/${id}/resumen`, token);
+}
+
+/** `rolId = "sin-rol"` filtra al personal sin rol. */
+export async function listarEquipoResumenProyecto(
+  token: string,
+  id: string,
+  filtros: { rolId?: string } = {},
+): Promise<MiembroEquipoResumen[]> {
+  const params = new URLSearchParams();
+  if (filtros.rolId) params.set("rolId", filtros.rolId);
+  const qs = params.toString();
+  return fetchConAuth<MiembroEquipoResumen[]>(
+    `/proyectos/${id}/resumen/equipo${qs ? `?${qs}` : ""}`,
     token,
   );
 }

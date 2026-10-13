@@ -428,7 +428,9 @@ export function EquipoVinculos({
       {error ? <Alerta mensaje={error} /> : null}
       {exito ? <Alerta mensaje={exito} tipo="exito" /> : null}
 
-      <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
+      <section
+        id="equipo-interno"
+        className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-zinc-900">Equipo interno</h3>
@@ -455,7 +457,9 @@ export function EquipoVinculos({
         />
       </section>
 
-      <section className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
+      <section
+        id="contraparte"
+        className="rounded-2xl border border-ruralia-teal-border bg-white p-5">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-zinc-900">Beneficiarios</h3>
