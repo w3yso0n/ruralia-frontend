@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
-import { SelectorLugarJornada, type TipoLugarJornada } from "./selector-lugar-jornada";
+import {
+  SelectorLugarJornada,
+  type TipoLugarJornada,
+} from "./selector-lugar-jornada";
 import {
   AsignacionJornada,
   destinoInicialAsignacion,
@@ -96,7 +99,7 @@ export function FormularioJornada({
     [],
   );
   const [requiereRevision, setRequiereRevision] = useState(true);
-  const [agenteIds, setAgenteIds] = useState<string[]>([]);
+  const [agenteId, setAgenteId] = useState("");
   const [destino, setDestino] = useState<DestinoAsignacionJornada>(
     destinoInicialAsignacion([], []),
   );
@@ -113,6 +116,10 @@ export function FormularioJornada({
 
   const seleccion = resolverSeleccionFormulario(claveFormulario, plantillas);
   const esGrupal = seleccion.tipo === "GRUPAL";
+  const totalJornadas = Math.max(
+    destino === "beneficiario" ? beneficiarioIds.length : asociacionIds.length,
+    1,
+  );
 
   async function manejarSubmit(evento: React.FormEvent) {
     evento.preventDefault();
@@ -152,10 +159,8 @@ export function FormularioJornada({
       return;
     }
 
-    if (!agenteIds.length) {
-      setErrorLocal(
-        "Debes asignar al menos un agente del equipo del proyecto",
-      );
+    if (!agenteId) {
+      setErrorLocal("Debes asignar un agente del equipo del proyecto");
       return;
     }
 
@@ -179,7 +184,7 @@ export function FormularioJornada({
       metaId,
       tipo: seleccion.tipo,
       plantillaFormularioId: seleccion.plantillaFormularioId,
-      tecnicoResponsableIds: agenteIds,
+      tecnicoResponsableIds: [agenteId],
       requiereRevision,
       beneficiarioIds: destino === "beneficiario" ? beneficiarioIds : [],
       asociacionIds: destino === "asociacion" ? asociacionIds : [],
@@ -191,7 +196,7 @@ export function FormularioJornada({
     setMetaId("");
     setClaveFormulario(CLAVE_FORMULARIO_INDIVIDUAL);
     setRequiereRevision(true);
-    setAgenteIds([]);
+    setAgenteId("");
     setDestino("beneficiario");
     setBeneficiarioIds([]);
     setAsociacionIds([]);
@@ -206,20 +211,15 @@ export function FormularioJornada({
 
       <div>
         <label className="mb-1 block text-sm font-medium text-zinc-700">
-          Agentes de campo *
+          Agente de campo *
         </label>
         <SelectorCatalogo
-          multiple
           opciones={agentes}
-          value={agenteIds}
-          onChange={setAgenteIds}
-          placeholder="Buscar y asignar agentes del equipo..."
+          value={agenteId}
+          onChange={setAgenteId}
+          placeholder="Buscar y asignar un agente del equipo..."
           mensajeVacio="No hay personal asignado al proyecto. Configúralo en Equipo y contraparte."
         />
-        <p className="mt-1 text-xs text-zinc-500">
-          Si asignas varios, se crea una jornada independiente por agente (mismo
-          plan y fecha), ligadas para editar o cancelar en conjunto.
-        </p>
       </div>
 
       <AsignacionJornada
@@ -229,6 +229,7 @@ export function FormularioJornada({
         beneficiarioIds={beneficiarioIds}
         asociacionIds={asociacionIds}
         disabled={enviando}
+        ayudaSeleccionMultiple={`Si asignas varios, se crea una jornada independiente por ${destino === "beneficiario" ? "beneficiario" : "asociación"} (misma información), ligadas para editar o cancelar en conjunto.`}
         onDestino={(siguiente) => {
           setDestino(siguiente);
           if (siguiente === "beneficiario") setAsociacionIds([]);
@@ -338,9 +339,7 @@ export function FormularioJornada({
         </span>
       </label>
 
-      {errorLocal ? (
-        <p className="text-sm text-red-600">{errorLocal}</p>
-      ) : null}
+      {errorLocal ? <p className="text-sm text-red-600">{errorLocal}</p> : null}
 
       <button
         type="submit"
@@ -354,8 +353,12 @@ export function FormularioJornada({
         {enviando
           ? "Guardando..."
           : esGrupal
-            ? "Crear actividad grupal"
-            : "Crear jornada"}
+            ? totalJornadas > 1
+              ? `Crear ${totalJornadas} actividades grupales`
+              : "Crear actividad grupal"
+            : totalJornadas > 1
+              ? `Crear ${totalJornadas} jornadas`
+              : "Crear jornada"}
       </button>
     </form>
   );
