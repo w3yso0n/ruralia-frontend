@@ -1,3 +1,4 @@
+import { firebaseConfigurado, obtenerAuth } from "@/lib/firebase";
 import type {
   ActividadPlan,
   ActualizarPlantillaFormularioPayload,
@@ -112,16 +113,73 @@ export class ErrorApi extends Error {
   }
 }
 
+const MARGEN_RENOVACION_MS = 2 * 60 * 1000;
+
+/** Lee `exp` del JWT en el navegador. No llama a ningún servidor. */
+function tokenPorVencer(token: string): boolean {
+  try {
+    const parte = token.split(".")[1];
+    if (!parte) return false;
+    const json = JSON.parse(
+      atob(parte.replace(/-/g, "+").replace(/_/g, "/")),
+    ) as { exp?: number };
+    if (typeof json.exp !== "number") return false;
+    return json.exp * 1000 <= Date.now() + MARGEN_RENOVACION_MS;
+  } catch {
+    return false;
+  }
+}
+
+async function renovarToken(forzar: boolean): Promise<string | null> {
+  try {
+    if (!firebaseConfigurado()) return null;
+    const usuario = obtenerAuth().currentUser;
+    if (!usuario) return null;
+    return await usuario.getIdToken(forzar);
+  } catch {
+    return null;
+  }
+}
+
+let ultimaRenovacionForzada = 0;
+
+async function fetchConToken(
+  token: string,
+  url: string,
+  init?: RequestInit,
+): Promise<Response> {
+  const enviar = (bearer: string) => {
+    const headers = new Headers(init?.headers);
+    headers.set("Authorization", `Bearer ${bearer}`);
+    return fetch(url, { ...init, headers });
+  };
+
+  let tokenEnvio = token;
+  if (tokenPorVencer(token)) {
+    const renovado = await renovarToken(false);
+    if (renovado) tokenEnvio = renovado;
+  }
+
+  const respuesta = await enviar(tokenEnvio);
+  if (respuesta.status !== 401) return respuesta;
+
+  const ahora = Date.now();
+  if (ahora - ultimaRenovacionForzada < 15_000) return respuesta;
+  ultimaRenovacionForzada = ahora;
+  const renovado = await renovarToken(true);
+  if (!renovado || renovado === tokenEnvio) return respuesta;
+  return enviar(renovado);
+}
+
 async function fetchConAuth<T>(
   ruta: string,
   token: string,
   init?: RequestInit,
 ): Promise<T> {
   const tieneBody = init?.body !== undefined;
-  const respuesta = await fetch(`${API_URL}${ruta}`, {
+  const respuesta = await fetchConToken(token, `${API_URL}${ruta}`, {
     ...init,
     headers: {
-      Authorization: `Bearer ${token}`,
       ...(tieneBody ? { "Content-Type": "application/json" } : {}),
       ...init?.headers,
     },
@@ -196,7 +254,7 @@ export async function subirFotoPerfil(
 ): Promise<Usuario> {
   const formData = new FormData();
   formData.append("archivo", archivo);
-  const respuesta = await fetch(`${API_URL}/autenticacion/yo/foto`, {
+  const respuesta = await fetchConToken(token, `${API_URL}/autenticacion/yo/foto`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: formData,
@@ -570,7 +628,7 @@ function dispararDescargaBlob(blob: Blob, nombreArchivo: string) {
 export async function descargarPlantillaBeneficiarios(
   token: string,
 ): Promise<void> {
-  const respuesta = await fetch(
+  const respuesta = await fetchConToken(token, 
     `${API_URL}/proyectos/plantilla-beneficiarios-excel`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
@@ -590,7 +648,7 @@ export async function descargarPlantillaBeneficiarios(
 export async function descargarPlantillaBeneficiariosCatalogo(
   token: string,
 ): Promise<void> {
-  const respuesta = await fetch(
+  const respuesta = await fetchConToken(token, 
     `${API_URL}/beneficiarios/plantilla-excel`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
@@ -615,7 +673,7 @@ export async function importarBeneficiariosExcelCatalogo(
   const formData = new FormData();
   formData.append("archivo", archivo);
   if (veredaId) formData.append("veredaId", veredaId);
-  const respuesta = await fetch(`${API_URL}/beneficiarios/importar`, {
+  const respuesta = await fetchConToken(token, `${API_URL}/beneficiarios/importar`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: formData,
@@ -649,7 +707,7 @@ export async function previsualizarBeneficiariosExcel(
     contexto === "catalogo"
       ? `${API_URL}/beneficiarios/previsualizar`
       : `${API_URL}/proyectos/beneficiarios-excel/previsualizar`;
-  const respuesta = await fetch(ruta, {
+  const respuesta = await fetchConToken(token, ruta, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: formData,
@@ -689,7 +747,7 @@ export async function importarBeneficiariosExcelProyecto(
   const formData = new FormData();
   formData.append("archivo", archivo);
   if (veredaId) formData.append("veredaId", veredaId);
-  const respuesta = await fetch(
+  const respuesta = await fetchConToken(token, 
     `${API_URL}/proyectos/${proyectoId}/beneficiarios/importar`,
     {
       method: "POST",
@@ -1005,7 +1063,7 @@ export async function descargarExcelSeguimientoProyecto(
   token: string,
   proyectoId: string,
 ): Promise<Blob> {
-  const respuesta = await fetch(
+  const respuesta = await fetchConToken(token, 
     `${API_URL}/reportes/proyecto/${proyectoId}/seguimiento-excel`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
@@ -1025,7 +1083,7 @@ export async function descargarExcelSeguimientoDiarioProyecto(
   anio: number,
   mes: number,
 ): Promise<Blob> {
-  const respuesta = await fetch(
+  const respuesta = await fetchConToken(token, 
     `${API_URL}/reportes/proyecto/${proyectoId}/seguimiento-diario-excel${construirQuery({ anio, mes })}`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
@@ -1170,7 +1228,7 @@ export async function descargarPdfAsistenciaJornada(
   token: string,
   jornadaId: string,
 ): Promise<Blob> {
-  const respuesta = await fetch(
+  const respuesta = await fetchConToken(token, 
     `${API_URL}/jornadas/${jornadaId}/asistencia/pdf`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
@@ -1187,7 +1245,7 @@ export async function descargarPdfFormularioJornada(
   token: string,
   jornadaId: string,
 ): Promise<Blob> {
-  const respuesta = await fetch(
+  const respuesta = await fetchConToken(token, 
     `${API_URL}/jornadas/${jornadaId}/formulario/pdf`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
@@ -1555,7 +1613,7 @@ export async function descargarPdfDashboard(
   token: string,
   proyectoId?: string,
 ): Promise<Blob> {
-  const respuesta = await fetch(
+  const respuesta = await fetchConToken(token, 
     `${API_URL}/dashboard/reporte/pdf${construirQuery({ proyectoId })}`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
@@ -1851,7 +1909,7 @@ export async function descargarPdfEvaluaciones(
   if (filtros?.anio != null) params.set("anio", String(filtros.anio));
   if (filtros?.mes != null) params.set("mes", String(filtros.mes));
   const q = params.toString();
-  const respuesta = await fetch(
+  const respuesta = await fetchConToken(token, 
     `${API_URL}/evaluaciones/reporte/pdf${q ? `?${q}` : ""}`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
@@ -1874,7 +1932,7 @@ export async function descargarPdfFichaUsuario(
   if (filtros?.anio != null) params.set("anio", String(filtros.anio));
   if (filtros?.mes != null) params.set("mes", String(filtros.mes));
   const q = params.toString();
-  const respuesta = await fetch(
+  const respuesta = await fetchConToken(token, 
     `${API_URL}/evaluaciones/usuarios/${usuarioId}/reporte/pdf${q ? `?${q}` : ""}`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
@@ -2229,7 +2287,7 @@ export async function descargarPdfDocumento(
   versionId?: string,
 ): Promise<Blob> {
   const query = versionId ? `?versionId=${versionId}` : "";
-  const respuesta = await fetch(`${API_URL}/documentos/${documentoId}/archivo${query}`, {
+  const respuesta = await fetchConToken(token, `${API_URL}/documentos/${documentoId}/archivo${query}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!respuesta.ok) {
@@ -2334,7 +2392,7 @@ export async function subirDocumentoExterno(
   if (datos.asociacionId) formData.append("asociacionId", datos.asociacionId);
   if (datos.veredaId) formData.append("veredaId", datos.veredaId);
 
-  const respuesta = await fetch(`${API_URL}/documentos-externos`, {
+  const respuesta = await fetchConToken(token, `${API_URL}/documentos-externos`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: formData,
@@ -2405,7 +2463,7 @@ export async function descargarExpedienteZip(
     incluirExternos?: boolean;
   },
 ): Promise<{ blob: Blob; nombre: string }> {
-  const respuesta = await fetch(
+  const respuesta = await fetchConToken(token, 
     `${API_URL}/proyectos/${proyectoId}/expediente/descarga`,
     {
       method: "POST",

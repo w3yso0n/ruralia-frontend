@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  onAuthStateChanged,
+  onIdTokenChanged,
   signOut,
   type User,
 } from "firebase/auth";
@@ -11,6 +11,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { obtenerUsuarioActual } from "@/lib/api";
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [usuarioFirebase, setUsuarioFirebase] = useState<User | null>(null);
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const usuarioCargado = useRef(false);
 
   useEffect(() => {
     if (!firebaseConfigurado()) {
@@ -42,31 +44,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const auth = obtenerAuth();
-    const cancelar = onAuthStateChanged(auth, async (firebaseUser) => {
+    let cancelado = false;
+    const cancelar = onIdTokenChanged(auth, async (firebaseUser) => {
+      if (cancelado) return;
       setUsuarioFirebase(firebaseUser);
 
       if (firebaseUser) {
         try {
           const idToken = await firebaseUser.getIdToken();
+          if (cancelado) return;
           setToken(idToken);
-          const datos = await obtenerUsuarioActual(idToken);
-          setUsuario(datos);
+          if (!usuarioCargado.current) {
+            const datos = await obtenerUsuarioActual(idToken);
+            if (cancelado) return;
+            usuarioCargado.current = true;
+            setUsuario(datos);
+          }
         } catch {
-          setUsuario(null);
-          setToken(null);
+          if (!cancelado && !usuarioCargado.current) {
+            setUsuario(null);
+            setToken(null);
+          }
         }
       } else {
+        usuarioCargado.current = false;
         setUsuario(null);
         setToken(null);
       }
 
-      setCargando(false);
+      if (!cancelado) setCargando(false);
     });
 
-    return cancelar;
+    return () => {
+      cancelado = true;
+      cancelar();
+    };
   }, []);
 
   const cerrarSesion = useCallback(async () => {
+    usuarioCargado.current = false;
     if (firebaseConfigurado()) {
       await signOut(obtenerAuth());
     }
