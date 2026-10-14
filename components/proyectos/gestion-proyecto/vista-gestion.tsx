@@ -30,7 +30,8 @@ import type {
   Proyecto,
 } from "@/lib/types";
 
-type Tab = "resumen" | "territorio" | "plan" | "jornadas" | "equipo" | "expediente";
+type Tab =
+  "resumen" | "territorio" | "plan" | "jornadas" | "equipo" | "expediente";
 
 const TABS_VALIDOS: Tab[] = [
   "resumen",
@@ -84,7 +85,9 @@ interface VistaGestionProyectoProps {
   proyectoId: string;
 }
 
-export function VistaGestionProyecto({ proyectoId }: VistaGestionProyectoProps) {
+export function VistaGestionProyecto({
+  proyectoId,
+}: VistaGestionProyectoProps) {
   const { soloJornadasAsignadas } = usePermisos();
   if (soloJornadasAsignadas) {
     return <VistaProyectoTecnico proyectoId={proyectoId} />;
@@ -136,19 +139,22 @@ function VistaGestionProyectoCompleta({
     return "/revision";
   })();
 
-  const cargar = useCallback(async (opciones?: { silencioso?: boolean }) => {
-    if (!token) return;
-    const silencioso = !!opciones?.silencioso && proyectoListoRef.current;
-    if (!silencioso) {
-      setCargando(true);
+  // Carga completa (con spinner de página) solo la primera vez o al cambiar de
+  // proyecto. Las recargas tras guardar son silenciosas para no desmontar las
+  // pestañas y conservar su estado (selección del árbol, formularios, etc.).
+  // Una recarga silenciosa solo aplica si el proyecto ya se cargó una vez.
+  const cargar = useCallback(
+    async (opciones?: { silencioso?: boolean }) => {
+      if (!token) return;
+      const silencioso = !!opciones?.silencioso && proyectoListoRef.current;
+      if (!silencioso) setCargando(true);
       setError(null);
-    }
 
-    // Las jornadas solo se usan en su pestaña: se piden en paralelo y no
-    // bloquean el resto de la vista. Una recarga silenciosa no las toca.
-    if (!silencioso) {
+      // Las jornadas solo se usan en su pestaña: se piden en paralelo y no
+      // bloquean el resto de la vista. En recarga silenciosa se refrescan sin
+      // spinner para que el panel de jornadas no se desmonte.
       const cargaId = ++cargaJornadasRef.current;
-      setJornadasCargadas(false);
+      if (!silencioso) setJornadasCargadas(false);
       void listarJornadas(token, { proyectoId, limite: 50 })
         .then((jor) => jor.datos)
         .catch(() => [] as Jornada[])
@@ -157,24 +163,29 @@ function VistaGestionProyectoCompleta({
           setJornadas(datos);
           setJornadasCargadas(true);
         });
-    }
 
-    try {
-      const [p, pl] = await Promise.all([
-        obtenerProyecto(token, proyectoId),
-        obtenerPlanProyecto(token, proyectoId),
-      ]);
-      setProyecto(p);
-      proyectoListoRef.current = true;
-      setPlan(pl);
-      if (!silencioso) setVersionResumen((v) => v + 1);
-      setPlanActualizadoEn(new Date());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar proyecto");
-    } finally {
-      if (!silencioso) setCargando(false);
-    }
-  }, [token, proyectoId]);
+      try {
+        const [p, pl] = await Promise.all([
+          obtenerProyecto(token, proyectoId),
+          obtenerPlanProyecto(token, proyectoId),
+        ]);
+        setProyecto(p);
+        proyectoListoRef.current = true;
+        setPlan(pl);
+        setVersionResumen((v) => v + 1);
+        setPlanActualizadoEn(new Date());
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Error al cargar proyecto",
+        );
+      } finally {
+        if (!silencioso) setCargando(false);
+      }
+    },
+    [token, proyectoId],
+  );
+
+  const recargar = useCallback(() => cargar({ silencioso: true }), [cargar]);
 
   const recargarAvancePlan = useCallback(async () => {
     if (!token) return;
@@ -294,9 +305,11 @@ function VistaGestionProyectoCompleta({
     setError(null);
     try {
       await activarProyecto(token, proyectoId);
-      await cargar();
+      await recargar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al activar proyecto");
+      setError(
+        err instanceof Error ? err.message : "Error al activar proyecto",
+      );
     } finally {
       setActivando(false);
     }
@@ -320,9 +333,11 @@ function VistaGestionProyectoCompleta({
         descripcion: descripcionEdicion.trim() || undefined,
       });
       setEditando(false);
-      await cargar();
+      await recargar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar proyecto");
+      setError(
+        err instanceof Error ? err.message : "Error al guardar proyecto",
+      );
     } finally {
       setGuardando(false);
     }
@@ -343,7 +358,9 @@ function VistaGestionProyectoCompleta({
       await eliminarProyecto(token, proyectoId);
       router.push("/proyectos");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al eliminar proyecto");
+      setError(
+        err instanceof Error ? err.message : "Error al eliminar proyecto",
+      );
     }
   }
 
@@ -583,7 +600,7 @@ function VistaGestionProyectoCompleta({
             token={token}
             proyecto={proyecto}
             puedeGestionar={puedeGestionar}
-            onActualizar={cargar}
+            onActualizar={recargar}
           />
           <ResumenProyecto
             token={token}
@@ -610,9 +627,11 @@ function VistaGestionProyectoCompleta({
           proyectoId={proyectoId}
           plan={plan}
           puedeGestionar={puedeGestionar}
-          onActualizar={cargar}
+          onActualizar={recargar}
           onRecargarAvance={recargarAvancePlan}
           planActualizadoEn={planActualizadoEn}
+          fechaInicioProyecto={proyecto.fechaInicio}
+          fechaFinProyecto={proyecto.fechaFin}
         />
       ) : null}
 
@@ -626,7 +645,7 @@ function VistaGestionProyectoCompleta({
           plan={plan}
           jornadas={jornadas}
           puedeGestionar={puedeGestionar && proyecto.estado === "ACTIVO"}
-          onActualizar={cargar}
+          onActualizar={recargar}
         />
       ) : null}
 
@@ -648,7 +667,7 @@ function VistaGestionProyectoCompleta({
             proyectoId={proyectoId}
             proyecto={proyecto}
             puedeGestionar={puedeGestionar}
-            onActualizar={cargar}
+            onActualizar={recargar}
           />
         </>
       ) : null}

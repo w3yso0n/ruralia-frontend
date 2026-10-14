@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import {
+  ArrowUpDown,
+  Building2,
+  Flag,
+  MapPin,
+  Search,
+  Users,
+} from "lucide-react";
 import { Alerta, Spinner } from "@/components/ui/modal";
+import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
 import { TarjetaProyecto } from "@/components/proyectos/tarjeta-proyecto";
 import {
   listarAsociaciones,
@@ -14,6 +23,20 @@ import { useAuth } from "@/lib/auth-context";
 import { usePermisos } from "@/lib/use-permisos";
 import type { EstadoProyecto, OrdenProyecto, Proyecto } from "@/lib/types";
 import { etiquetaOrganizacion } from "@/lib/types";
+
+const OPCIONES_ESTADO: { id: EstadoProyecto; nombre: string }[] = [
+  { id: "BORRADOR", nombre: "Borrador" },
+  { id: "ACTIVO", nombre: "Activo" },
+  { id: "SUSPENDIDO", nombre: "Suspendido" },
+  { id: "COMPLETADO", nombre: "Completado" },
+];
+
+const OPCIONES_ORDEN: { id: OrdenProyecto; nombre: string }[] = [
+  { id: "creado_desc", nombre: "Más recientes" },
+  { id: "creado_asc", nombre: "Más antiguos" },
+  { id: "nombre_asc", nombre: "Nombre A-Z" },
+  { id: "nombre_desc", nombre: "Nombre Z-A" },
+];
 
 export function ListadoProyectos() {
   const { token } = useAuth();
@@ -137,88 +160,76 @@ export function ListadoProyectos() {
 
       {error ? <Alerta mensaje={error} /> : null}
 
-      <div className="mb-6 grid gap-3 lg:grid-cols-6">
-        <input
-          type="search"
-          placeholder="Buscar..."
-          value={busqueda}
-          onChange={(e) => {
-            setBusqueda(e.target.value);
-            setPagina(1);
-          }}
-          className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal lg:col-span-2"
-        />
-        <select
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ruralia-teal" />
+          <input
+            type="search"
+            placeholder="Buscar proyecto..."
+            value={busqueda}
+            onChange={(e) => {
+              setBusqueda(e.target.value);
+              setPagina(1);
+            }}
+            className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 hover:border-ruralia-teal-border focus:border-ruralia-teal focus:ring-2 focus:ring-ruralia-teal/20"
+          />
+        </div>
+        <SelectorDesplegable
           value={filtroEstado}
-          onChange={(e) => {
-            setFiltroEstado(e.target.value as EstadoProyecto | "");
+          onChange={(id) => {
+            setFiltroEstado(id as EstadoProyecto | "");
             setPagina(1);
           }}
-          className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
-        >
-          <option value="">Todos los estados</option>
-          <option value="BORRADOR">Borrador</option>
-          <option value="ACTIVO">Activo</option>
-          <option value="SUSPENDIDO">Suspendido</option>
-          <option value="COMPLETADO">Completado</option>
-        </select>
+          opciones={OPCIONES_ESTADO}
+          permitirVacio
+          placeholder="Todos los estados"
+          etiquetaVacio="Todos los estados"
+          icono={Flag}
+        />
         {soloJornadasAsignadas ? null : (
           <>
-            <select
+            <SelectorDesplegable
               value={personalId}
-              onChange={(e) => {
-                setPersonalId(e.target.value);
+              onChange={(id) => {
+                setPersonalId(id);
                 setPagina(1);
               }}
-              className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
-            >
-              <option value="">Todo el personal</option>
-              {opcionesPersonal.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
-                </option>
-              ))}
-            </select>
-            <select
+              opciones={opcionesPersonal}
+              permitirVacio
+              placeholder="Todo el personal"
+              etiquetaVacio="Todo el personal"
+              icono={Users}
+            />
+            <SelectorDesplegable
               value={asociacionId}
-              onChange={(e) => {
-                setAsociacionId(e.target.value);
+              onChange={(id) => {
+                setAsociacionId(id);
                 setPagina(1);
               }}
-              className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
-            >
-              <option value="">Todas las asociaciones</option>
-              {opcionesAsociaciones.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.nombre}
-                </option>
-              ))}
-            </select>
-            <select
-              value={orden}
-              onChange={(e) => setOrden(e.target.value as OrdenProyecto)}
-              className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
-            >
-              <option value="creado_desc">Más recientes</option>
-              <option value="creado_asc">Más antiguos</option>
-              <option value="nombre_asc">Nombre A-Z</option>
-              <option value="nombre_desc">Nombre Z-A</option>
-            </select>
-            <select
+              opciones={opcionesAsociaciones}
+              permitirVacio
+              placeholder="Todas las asociaciones"
+              etiquetaVacio="Todas las asociaciones"
+              icono={Building2}
+            />
+            <SelectorDesplegable
               value={veredaId}
-              onChange={(e) => {
-                setVeredaId(e.target.value);
+              onChange={(id) => {
+                setVeredaId(id);
                 setPagina(1);
               }}
-              className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm lg:col-span-2"
-            >
-              <option value="">Todas las veredas</option>
-              {opcionesVeredas.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.nombre}
-                </option>
-              ))}
-            </select>
+              opciones={opcionesVeredas}
+              permitirVacio
+              placeholder="Todas las veredas"
+              etiquetaVacio="Todas las veredas"
+              icono={MapPin}
+            />
+            <SelectorDesplegable
+              value={orden}
+              onChange={(id) => setOrden(id as OrdenProyecto)}
+              opciones={OPCIONES_ORDEN}
+              icono={ArrowUpDown}
+            />
           </>
         )}
       </div>

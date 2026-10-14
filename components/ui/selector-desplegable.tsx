@@ -40,7 +40,9 @@ export function SelectorDesplegable({
 
   const seleccionada = opciones.find((o) => o.id === value);
   const sinOpciones = opciones.length === 0;
-  const inactivo = disabled || sinOpciones;
+  // Con opción vacía ("Todos...") el selector sigue usable aunque la lista
+  // aún no haya cargado o venga vacía.
+  const inactivo = disabled || (sinOpciones && !permitirVacio);
 
   useEffect(() => {
     if (!abierto) return;
@@ -105,7 +107,7 @@ export function SelectorDesplegable({
               </>
             ) : (
               <span className="text-zinc-400">
-                {sinOpciones ? mensajeSinOpciones : placeholder}
+                {sinOpciones && !permitirVacio ? mensajeSinOpciones : placeholder}
               </span>
             )}
           </span>
