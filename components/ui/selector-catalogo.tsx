@@ -16,7 +16,7 @@ interface BaseProps {
   opciones: OpcionCatalogo[];
   placeholder?: string;
   mensajeVacio?: string;
-  /** Si está, la lista se pide al escribir al menos 2 letras. `opciones` solo etiqueta lo ya elegido. */
+  /** Si está, la lista se pide al abrir el selector y se filtra al escribir. `opciones` solo etiqueta lo ya elegido. */
   buscar?: (termino: string) => Promise<OpcionCatalogo[]>;
   /** Avisa la opción elegida para que el padre conserve el nombre si el selector se desmonta. */
   alElegir?: (opcion: OpcionCatalogo) => void;
@@ -80,28 +80,17 @@ function Pill({
 
 function ListaRemota({
   buscando,
-  remoto,
-  termino,
   opciones,
   onElegir,
   seleccionadoId,
 }: {
   buscando: boolean;
-  remoto: boolean;
-  termino: string;
   opciones: OpcionCatalogo[];
   onElegir: (opcion: OpcionCatalogo) => void;
   seleccionadoId?: string;
 }) {
-  if (buscando) {
+  if (buscando && opciones.length === 0) {
     return <li className="px-3 py-2 text-sm text-zinc-500">Buscando…</li>;
-  }
-  if (remoto && termino.length < 2) {
-    return (
-      <li className="px-3 py-2 text-sm text-zinc-500">
-        Escribe al menos 2 letras
-      </li>
-    );
   }
   return (
     <ListaOpciones
@@ -169,16 +158,11 @@ export function SelectorCatalogo(props: SelectorCatalogoProps) {
   const [elegidas, setElegidas] = useState<OpcionCatalogo[]>([]);
 
   useEffect(() => {
-    if (!buscar) return;
+    if (!buscar || !mostrarLista) return;
     const termino = busqueda.trim();
-    if (termino.length < 2) {
-      setResultados([]);
-      setBuscando(false);
-      return;
-    }
     let cancelado = false;
+    setBuscando(true);
     const timer = setTimeout(() => {
-      setBuscando(true);
       void buscar(termino)
         .then((datos) => {
           if (!cancelado) setResultados(datos);
@@ -189,12 +173,12 @@ export function SelectorCatalogo(props: SelectorCatalogoProps) {
         .finally(() => {
           if (!cancelado) setBuscando(false);
         });
-    }, 300);
+    }, termino ? 300 : 0);
     return () => {
       cancelado = true;
       clearTimeout(timer);
     };
-  }, [buscar, busqueda]);
+  }, [buscar, busqueda, mostrarLista]);
 
   const catalogo = useMemo(() => {
     const mapa = new Map<string, OpcionCatalogo>();
@@ -339,8 +323,6 @@ export function SelectorCatalogo(props: SelectorCatalogoProps) {
             <ul className="absolute z-20 mt-2 max-h-56 w-full overflow-y-auto rounded-2xl border border-ruralia-teal-border bg-white py-1.5 shadow-lg shadow-zinc-900/10">
               <ListaRemota
                 buscando={buscando}
-                remoto={!!buscar}
-                termino={busqueda.trim()}
                 opciones={disponibles}
                 onElegir={agregar}
               />
@@ -393,8 +375,6 @@ export function SelectorCatalogo(props: SelectorCatalogoProps) {
           <ul className="absolute z-20 mt-2 max-h-56 w-full overflow-y-auto rounded-2xl border border-ruralia-teal-border bg-white py-1.5 shadow-lg shadow-zinc-900/10">
             <ListaRemota
               buscando={buscando}
-              remoto={!!buscar}
-              termino={busqueda.trim()}
               opciones={opcionesFiltradas}
               onElegir={elegir}
               seleccionadoId={value}

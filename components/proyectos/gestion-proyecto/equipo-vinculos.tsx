@@ -182,8 +182,8 @@ export function EquipoVinculos({
   const buscarEnCatalogo = useCallback(
     async (termino: string) => {
       const respuesta = await listarBeneficiarios(token, {
-        busqueda: termino,
-        limite: 20,
+        busqueda: termino || undefined,
+        limite: 5,
       });
       return respuesta.datos
         .filter((b) => b.id !== reemplazo?.id)
@@ -714,7 +714,7 @@ export function EquipoVinculos({
           <div>
             <h3 className="font-semibold text-zinc-900">Territorio</h3>
             <p className="mt-1 text-sm text-zinc-500">
-              Elige el municipio. La vereda es opcional.
+              Agrega los municipios que necesites y guarda una sola vez. La vereda es opcional.
             </p>
           </div>
           <button

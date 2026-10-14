@@ -139,8 +139,8 @@ export function WizardCrearProyecto() {
     async (termino: string) => {
       if (!token) return [];
       const respuesta = await listarBeneficiarios(token, {
-        busqueda: termino,
-        limite: 20,
+        busqueda: termino || undefined,
+        limite: 5,
       });
       return respuesta.datos.map((b) => ({
         id: b.id,

@@ -799,8 +799,8 @@ function FormularioCargaDocumento({
   const buscarBeneficiarios = useCallback(
     async (termino: string) => {
       const respuesta = await listarBeneficiariosProyecto(token, proyectoId, {
-        busqueda: termino,
-        limite: 20,
+        busqueda: termino || undefined,
+        limite: 5,
       });
       return respuesta.datos.map((b) => ({
         id: b.id,
@@ -907,7 +907,7 @@ function FormularioCargaDocumento({
             opciones={[]}
             buscar={buscarBeneficiarios}
             placeholder="Buscar beneficiario del proyecto…"
-            mensajeVacio="Opcional. Escribe para buscar."
+            mensajeVacio="Opcional. Haz clic para ver la lista."
           />
         </div>
         <div>

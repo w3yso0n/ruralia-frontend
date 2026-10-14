@@ -109,17 +109,13 @@ export function CargaExcelBeneficiarios({
   useEffect(() => {
     if (!revisando || contexto === "proyecto") return;
     const termino = busquedaVereda.trim();
-    if (termino.length < 2) {
-      setVeredasBuscadas([]);
-      return;
-    }
     let cancelado = false;
+    setBuscandoVereda(true);
     const timer = setTimeout(() => {
-      setBuscandoVereda(true);
       void listarVeredas(token, {
-        busqueda: termino,
+        busqueda: termino || undefined,
         soloDane: true,
-        limite: 30,
+        limite: 5,
       })
         .then((respuesta) => {
           if (cancelado) return;
@@ -139,7 +135,7 @@ export function CargaExcelBeneficiarios({
         .finally(() => {
           if (!cancelado) setBuscandoVereda(false);
         });
-    }, 300);
+    }, termino ? 300 : 0);
     return () => {
       cancelado = true;
       clearTimeout(timer);
@@ -409,9 +405,9 @@ export function CargaExcelBeneficiarios({
               <p className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-400">
                 {contexto === "proyecto"
                   ? "Este proyecto no tiene veredas DANE vinculadas"
-                  : busquedaVereda.trim().length < 2
-                    ? "Escribe al menos 2 letras para buscar"
-                    : "Sin veredas DANE con ese nombre"}
+                  : busquedaVereda.trim()
+                    ? "Sin veredas DANE con ese nombre"
+                    : "No hay veredas DANE"}
               </p>
             ) : (
               <ul className="max-h-40 overflow-y-auto rounded-xl border border-zinc-200 bg-white">

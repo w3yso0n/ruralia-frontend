@@ -149,14 +149,14 @@ export function EditorAlcanceTerritorial({
   useEffect(() => {
     if (tipo !== "VEREDA") return;
     const termino = busqueda.trim();
-    if (termino.length < 2) {
-      setCatalogo([]);
-      return;
-    }
     let cancelado = false;
+    setCargandoOpciones(true);
     const timer = setTimeout(() => {
-      setCargandoOpciones(true);
-      void listarVeredas(token, { busqueda: termino, soloDane: true, limite: 30 })
+      void listarVeredas(token, {
+        busqueda: termino || undefined,
+        soloDane: true,
+        limite: 5,
+      })
         .then((respuesta) => {
           if (cancelado) return;
           setCatalogo(
@@ -175,7 +175,7 @@ export function EditorAlcanceTerritorial({
         .finally(() => {
           if (!cancelado) setCargandoOpciones(false);
         });
-    }, 300);
+    }, termino ? 300 : 0);
     return () => {
       cancelado = true;
       clearTimeout(timer);
@@ -228,7 +228,7 @@ export function EditorAlcanceTerritorial({
 
   const placeholder =
     tipo === "VEREDA"
-      ? "Buscar vereda DANE (mínimo 2 letras)"
+      ? "Buscar vereda DANE"
       : eligiendoDepartamento
         ? "Buscar departamento"
         : `Buscar ${etiquetaTipo(tipo).toLowerCase()}`;
@@ -301,9 +301,7 @@ export function EditorAlcanceTerritorial({
           <li className="px-4 py-2.5 text-sm text-zinc-500">Cargando…</li>
         ) : visibles.length === 0 ? (
           <li className="px-4 py-2.5 text-sm text-zinc-400">
-            {tipo === "VEREDA" && termino.length < 2
-              ? "Escribe al menos 2 letras"
-              : "Sin resultados"}
+            Sin resultados
           </li>
         ) : (
           visibles.map((opcion) => (

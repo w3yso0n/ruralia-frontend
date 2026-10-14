@@ -181,8 +181,8 @@ export function PanelJornadas({
   const buscarBeneficiarios = useCallback(
     async (termino: string) => {
       const respuesta = await listarBeneficiariosProyecto(token, proyecto.id, {
-        busqueda: termino,
-        limite: 20,
+        busqueda: termino || undefined,
+        limite: 5,
       });
       return respuesta.datos.map((b) => ({
         id: b.id,
