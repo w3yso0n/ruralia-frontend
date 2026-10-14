@@ -411,8 +411,7 @@ export function GestionUsuarios() {
             Gestión de usuarios
           </h2>
           <p className="mt-1 text-zinc-600">
-            Crear, editar, activar o eliminar usuarios del equipo. La matriz de
-            permisos está en Roles y permisos.
+            Crear, editar, activar o eliminar usuarios del equipo.
           </p>
         </div>
         {puede("usuarios.crear") ? (
