@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Alerta, Spinner } from "@/components/ui/modal";
+import { CadenaAprobacionProyecto } from "@/components/proyectos/gestion-proyecto/cadena-aprobacion-proyecto";
 import { EquipoVinculos } from "@/components/proyectos/gestion-proyecto/equipo-vinculos";
 import { PanelExpediente } from "@/components/proyectos/gestion-proyecto/panel-expediente";
 import { PanelJornadas } from "@/components/proyectos/gestion-proyecto/panel-jornadas";
@@ -31,7 +32,13 @@ import type {
 } from "@/lib/types";
 
 type Tab =
-  "resumen" | "territorio" | "plan" | "jornadas" | "equipo" | "expediente";
+  | "resumen"
+  | "territorio"
+  | "plan"
+  | "jornadas"
+  | "equipo"
+  | "aprobaciones"
+  | "expediente";
 
 const TABS_VALIDOS: Tab[] = [
   "resumen",
@@ -39,6 +46,7 @@ const TABS_VALIDOS: Tab[] = [
   "plan",
   "jornadas",
   "equipo",
+  "aprobaciones",
   "expediente",
 ];
 
@@ -251,12 +259,16 @@ function VistaGestionProyectoCompleta({
     return () => clearInterval(intervalo);
   }, [tab, recargarAvancePlan]);
 
+  const puedeConfigurarAprobaciones = puede("proyectos.configurar_aprobaciones");
   const tabs: { id: Tab; etiqueta: string }[] = [
     { id: "resumen", etiqueta: "Resumen" },
     { id: "territorio", etiqueta: "Territorio" },
     { id: "plan", etiqueta: "Plan del proyecto" },
     { id: "jornadas", etiqueta: "Jornadas" },
     { id: "equipo", etiqueta: "Equipo y contraparte" },
+    ...(puedeConfigurarAprobaciones
+      ? [{ id: "aprobaciones" as const, etiqueta: "Aprobaciones" }]
+      : []),
     { id: "expediente", etiqueta: "Expediente" },
   ];
 
@@ -670,6 +682,14 @@ function VistaGestionProyectoCompleta({
             onActualizar={recargar}
           />
         </>
+      ) : null}
+
+      {tab === "aprobaciones" && puedeConfigurarAprobaciones ? (
+        <CadenaAprobacionProyecto
+          token={token}
+          proyectoId={proyectoId}
+          puedeGestionar={puedeConfigurarAprobaciones}
+        />
       ) : null}
 
       {tab === "expediente" ? (

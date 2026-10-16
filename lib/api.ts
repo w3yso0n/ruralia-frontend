@@ -2271,6 +2271,41 @@ export async function obtenerBandejaAprobaciones(
   );
 }
 
+export async function reasignarPasoRevision(
+  token: string,
+  jornadaId: string,
+  payload: { usuarioId?: string; rolId?: string },
+): Promise<unknown> {
+  return fetchConAuth(
+    `/aprobaciones/jornada/${jornadaId}/reasignar`,
+    token,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export async function listarNivelesAprobacion(
+  token: string,
+  proyectoId: string,
+): Promise<
+  Array<{ id: string; orden: number; usuarioId: string | null; rolId: string | null }>
+> {
+  return fetchConAuth(`/aprobaciones/proyecto/${proyectoId}/niveles`, token);
+}
+
+export async function guardarNivelesAprobacion(
+  token: string,
+  proyectoId: string,
+  niveles: Array<{ orden: number; usuarioId?: string; rolId?: string }>,
+): Promise<{
+  niveles: Array<{ id: string; orden: number; usuarioId: string | null; rolId: string | null }>;
+  advertencias: string[];
+}> {
+  return fetchConAuth(`/aprobaciones/proyecto/${proyectoId}/niveles`, token, {
+    method: "PUT",
+    body: JSON.stringify({ niveles }),
+  });
+}
+
 export async function obtenerContadoresAprobacion(
   token: string,
 ): Promise<ContadoresAprobacion> {

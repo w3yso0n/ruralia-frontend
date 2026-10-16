@@ -69,6 +69,25 @@ function esUrlHttp(valor: string): boolean {
   return /^https?:\/\//i.test(valor) || valor.startsWith("/");
 }
 
+function leerUbicacion(valor: unknown): {
+  latitud: number;
+  longitud: number;
+  precisionMetros?: number;
+  capturadoEn?: string;
+} | null {
+  if (!valor || typeof valor !== "object" || Array.isArray(valor)) return null;
+  const u = valor as Record<string, unknown>;
+  if (typeof u.latitud !== "number" || typeof u.longitud !== "number") return null;
+  if (!Number.isFinite(u.latitud) || !Number.isFinite(u.longitud)) return null;
+  return {
+    latitud: u.latitud,
+    longitud: u.longitud,
+    precisionMetros:
+      typeof u.precisionMetros === "number" ? u.precisionMetros : undefined,
+    capturadoEn: typeof u.capturadoEn === "string" ? u.capturadoEn : undefined,
+  };
+}
+
 function resolverTipo(
   respuesta: RespuestaFormularioDetalle,
 ): TipoCampoFormulario | "DESCONOCIDO" {
@@ -80,9 +99,21 @@ function resolverTipo(
     return esDataUrlImagen(respuesta.urlArchivo) ? "FIRMA" : "ARCHIVO";
   }
   if (respuesta.valorJson != null) {
-    const json = respuesta.valorJson as { filas?: unknown };
+    const json = respuesta.valorJson as {
+      filas?: unknown;
+      latitud?: unknown;
+      longitud?: unknown;
+    };
     if (json && typeof json === "object" && Array.isArray(json.filas)) {
       return "TABLA";
+    }
+    if (
+      json &&
+      typeof json === "object" &&
+      typeof json.latitud === "number" &&
+      typeof json.longitud === "number"
+    ) {
+      return "GPS";
     }
   }
   const texto = respuesta.valorTexto?.trim() ?? "";
@@ -263,18 +294,62 @@ function CampoFormularioVista({
   }
 
   if (tipo === "GPS") {
-    const texto =
-      respuesta.valorTexto ??
-      (respuesta.valorJson != null
-        ? JSON.stringify(respuesta.valorJson)
-        : null);
+    const ubicacion = leerUbicacion(respuesta.valorJson);
+    const mapa = ubicacion
+      ? `https://www.google.com/maps/search/?api=1&query=${ubicacion.latitud},${ubicacion.longitud}`
+      : null;
     return (
       <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 sm:col-span-2">
         <p className="text-xs font-medium text-zinc-500">{etiqueta}</p>
-        <p className="mt-2 flex items-start gap-2 text-sm text-zinc-900">
-          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-ruralia-teal" />
-          <span className="break-all font-medium">{texto ?? "Sin ubicación"}</span>
-        </p>
+        {ubicacion ? (
+          <div className="mt-2 space-y-1 text-sm text-zinc-900">
+            <p className="flex items-center gap-2 font-medium">
+              <MapPin className="h-4 w-4 shrink-0 text-ruralia-teal" />
+              Ubicación registrada
+            </p>
+            {ubicacion.capturadoEn ? (
+              <p className="text-xs text-zinc-500">
+                {new Date(ubicacion.capturadoEn).toLocaleString("es-CO", {
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            ) : null}
+            <p>Latitud: {ubicacion.latitud.toFixed(6)}</p>
+            <p>Longitud: {ubicacion.longitud.toFixed(6)}</p>
+            <p>
+              Precisión:{" "}
+              {ubicacion.precisionMetros != null
+                ? `±${Math.round(ubicacion.precisionMetros)} m`
+                : "no disponible"}
+            </p>
+            {mapa ? (
+              <>
+                <iframe
+                  title={`Mapa de ${etiqueta}`}
+                  src={`https://maps.google.com/maps?q=${ubicacion.latitud},${ubicacion.longitud}&z=16&output=embed`}
+                  className="mt-2 h-44 w-full rounded-xl border border-zinc-100"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+                <a
+                  href={mapa}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex text-sm font-medium text-ruralia-teal hover:underline"
+                >
+                  Ver en el mapa
+                </a>
+              </>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-zinc-400">
+            {respuesta.valorTexto ?? "Sin ubicación"}
+          </p>
+        )}
       </div>
     );
   }

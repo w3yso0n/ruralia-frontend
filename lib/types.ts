@@ -689,6 +689,15 @@ export interface RechazoAbiertoBandeja {
   rejectedBy: string | null;
 }
 
+export interface PasoSeguimientoBandeja {
+  orden: number;
+  estado: "PENDIENTE" | "APROBADO" | "RECHAZADO";
+  tipo: "USUARIO" | "ROL";
+  etiqueta: string;
+  resueltoPor: string | null;
+  contenidoCambio: boolean;
+}
+
 export interface ItemBandejaAprobacion {
   id: string;
   fecha: string;
@@ -701,6 +710,13 @@ export interface ItemBandejaAprobacion {
   meta: { id: string; nombre: string } | null;
   vereda: { id: string; nombre: string } | null;
   editable: boolean;
+  modo?: "LEGACY" | "NIVELES";
+  pasos?: PasoSeguimientoBandeja[];
+  pasoPendiente?: { orden: number; total: number } | null;
+  puedeAprobar?: boolean;
+  puedeRechazar?: boolean;
+  /** Solo llega a quien tiene proyectos.editar. */
+  sinCandidatos?: boolean;
   rechazosAbiertos: RechazoAbiertoBandeja[];
 }
 

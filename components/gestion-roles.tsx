@@ -23,7 +23,6 @@ import {
   etiquetaNivelAcceso,
   etiquetaRol,
   NIVELES_ACCESO_ROL,
-  PERMISOS_CRITICOS_CUANTIVA,
   type NivelAccesoRol,
 } from "@/lib/types";
 import { usePermisos } from "@/lib/use-permisos";
@@ -163,7 +162,11 @@ export function GestionRoles() {
   const esCuantivaEditando = editando?.nombre === "CUANTIVA";
 
   function esCritico(clave: string): boolean {
-    return esCuantivaEditando && PERMISOS_CRITICOS_CUANTIVA.includes(clave);
+    if (esCuantivaEditando) return true;
+    return (
+      clave === "proyectos.configurar_aprobaciones" &&
+      editando?.nombre !== "ADMINISTRADOR"
+    );
   }
 
   function togglePermiso(id: string) {
@@ -297,13 +300,12 @@ export function GestionRoles() {
     if (!esCuantivaEditando) return;
     setPermisoIds((prev) => {
       const next = new Set(prev);
-      for (const clave of PERMISOS_CRITICOS_CUANTIVA) {
-        const id = mapaClaveAId.get(clave);
-        if (id) next.add(id);
+      for (const modulo of modulos) {
+        for (const permiso of modulo.permisos) next.add(permiso.id);
       }
       return next;
     });
-  }, [esCuantivaEditando, mapaClaveAId, editando?.id]);
+  }, [esCuantivaEditando, modulos, editando?.id]);
 
   if (!puede("roles.ver")) {
     return (

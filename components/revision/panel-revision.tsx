@@ -20,6 +20,7 @@ import {
   ModalComparacionVersiones,
   versionesOrdenadas,
 } from "@/components/revision/modal-comparacion-versiones";
+import { AvisoPasoAtascado } from "@/components/revision/aviso-paso-atascado";
 import { ModalDetalleJornadaRevision } from "@/components/revision/modal-detalle-jornada-revision";
 import {
   aprobarEntidad,
@@ -40,7 +41,36 @@ import type {
   DocumentoJornada,
   EstadoFuncional,
   ItemBandejaAprobacion,
+  PasoSeguimientoBandeja,
 } from "@/lib/types";
+import { etiquetaRol as nombreDeRol } from "@/lib/types";
+
+function quienDelPaso(paso: PasoSeguimientoBandeja): string {
+  return paso.tipo === "ROL" ? `rol ${nombreDeRol(paso.etiqueta)}` : paso.etiqueta;
+}
+
+function lineaDePaso(
+  paso: PasoSeguimientoBandeja,
+  total: number,
+  ordenPendiente: number | null,
+): string {
+  const nivel = `Nivel ${paso.orden} de ${total}`;
+  if (paso.estado === "APROBADO") {
+    const quien = paso.resueltoPor ?? quienDelPaso(paso);
+    const base = `${nivel} · Aprobado por ${quien}`;
+    return paso.contenidoCambio
+      ? `${base}. Aprobado sobre una versión anterior; el contenido cambió después.`
+      : base;
+  }
+  if (paso.estado === "RECHAZADO") {
+    const quien = paso.resueltoPor ?? "alguien";
+    return `${nivel} · Rechazado por ${quien}. Los niveles anteriores siguen válidos.`;
+  }
+  if (ordenPendiente != null && paso.orden > ordenPendiente) {
+    return `${nivel} · En espera`;
+  }
+  return `${nivel} · Pendiente: ${quienDelPaso(paso)}`;
+}
 
 const ESTADOS_FILTRO: Array<EstadoFuncional | "TODOS"> = [
   "TODOS",
@@ -590,6 +620,27 @@ export function PanelRevision() {
                         {etiquetaEstado(item.estadoFuncional)}
                       </span>
                     </div>
+                    {item.pasos && item.pasos.length > 0 ? (
+                      <p className="mt-2 text-xs text-stone-600">
+                        {lineaDePaso(
+                          (item.estadoFuncional === "RECHAZADO"
+                            ? item.pasos.find((p) => p.estado === "RECHAZADO")
+                            : item.pasos.find((p) => p.estado === "PENDIENTE")) ??
+                            item.pasos[item.pasos.length - 1],
+                          item.pasos.length,
+                          item.pasoPendiente?.orden ?? null,
+                        )}
+                      </p>
+                    ) : null}
+                    {item.sinCandidatos ? (
+                      <p className="mt-2 text-xs font-medium text-amber-800">
+                        Nadie puede aprobar
+                        {item.pasoPendiente
+                          ? ` el nivel ${item.pasoPendiente.orden}`
+                          : ""}
+                        . Hay que reasignar el paso.
+                      </p>
+                    ) : null}
                     {item.rechazosAbiertos.length > 0 && (
                       <p className="mt-2 line-clamp-2 text-xs text-rose-700">
                         {item.rechazosAbiertos[0].requestedCorrection}
@@ -650,6 +701,20 @@ export function PanelRevision() {
                   ) : null}
                 </div>
               </div>
+
+              {seleccion.pasos && seleccion.pasos.length > 0 ? (
+                <ol className="space-y-1 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3">
+                  {seleccion.pasos.map((paso) => (
+                    <li key={paso.orden} className="text-sm text-stone-700">
+                      {lineaDePaso(
+                        paso,
+                        seleccion.pasos?.length ?? paso.orden,
+                        seleccion.pasoPendiente?.orden ?? null,
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
 
               {seleccion.rechazosAbiertos.length > 0 && (
                 <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
@@ -848,7 +913,21 @@ export function PanelRevision() {
                     </div>
                   )}
 
-                {puede("jornadas.aprobar") &&
+                {puede("proyectos.editar") &&
+                seleccion.pasoPendiente &&
+                seleccion.estadoFuncional === "EN_REVISION" &&
+                seleccion.proyecto ? (
+                  <AvisoPasoAtascado
+                    token={token!}
+                    jornadaId={seleccion.id}
+                    proyectoId={seleccion.proyecto.id}
+                    orden={seleccion.pasoPendiente.orden}
+                    atascado={seleccion.sinCandidatos === true}
+                    onListo={() => void cargar()}
+                  />
+                ) : null}
+
+                {seleccion.puedeAprobar &&
                   seleccion.estadoFuncional === "EN_REVISION" && (
                     <button
                       type="button"
@@ -860,7 +939,7 @@ export function PanelRevision() {
                     </button>
                   )}
 
-                {puede("jornadas.rechazar") &&
+                {seleccion.puedeRechazar &&
                   seleccion.estadoFuncional === "EN_REVISION" &&
                   !mostrarFormularioRechazo && (
                     <button
@@ -874,7 +953,7 @@ export function PanelRevision() {
                   )}
               </div>
 
-              {puede("jornadas.rechazar") &&
+              {seleccion.puedeRechazar &&
                 seleccion.estadoFuncional === "EN_REVISION" &&
                 mostrarFormularioRechazo && (
                   <div className="space-y-2 rounded-xl border border-red-200 bg-red-50/50 p-4">
