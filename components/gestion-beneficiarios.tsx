@@ -10,6 +10,7 @@ import {
   eliminarBeneficiario,
   importarBeneficiariosExcelCatalogo,
   listarBeneficiarios,
+  listarCamposBeneficiarioCatalogo,
   obtenerBeneficiario,
   obtenerUsoBeneficiario,
   reactivarBeneficiario,
@@ -19,6 +20,15 @@ import {
   CargaExcelBeneficiarios,
 } from "@/components/proyectos/carga-excel-beneficiarios";
 import { useAuth } from "@/lib/auth-context";
+import {
+  paresDatosAdicionales,
+  valorDesdeFormulario,
+  valorParaFormulario,
+} from "@/lib/datos-adicionales";
+import {
+  campoDeClave,
+  DatosAdicionalesFormulario,
+} from "@/components/datos-adicionales-formulario";
 import { usePermisos } from "@/lib/use-permisos";
 import { SelectorVereda } from "@/components/ui/selector-vereda";
 import {
@@ -27,8 +37,11 @@ import {
   btnAccionSecundaria,
 } from "@/lib/estilos-boton";
 import type {
+  ActualizarBeneficiarioPayload,
   Beneficiario,
+  CampoBeneficiario,
   CrearBeneficiarioPayload,
+  MapeoColumnasExcel,
   EstadoFiltroBeneficiario,
   Genero,
   TipoDocumento,
@@ -110,6 +123,14 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
   const [exito, setExito] = useState<string | null>(null);
   const [modo, setModo] = useState<ModoModal>(null);
   const [seleccionado, setSeleccionado] = useState<Beneficiario | null>(null);
+  const [camposCatalogo, setCamposCatalogo] = useState<CampoBeneficiario[]>([]);
+  const [adicionalesForm, setAdicionalesForm] = useState<Record<string, string>>(
+    {},
+  );
+  const adicionalesSeleccionado = paresDatosAdicionales(
+    seleccionado?.datosAdicionales,
+    camposCatalogo,
+  );
   const [formulario, setFormulario] = useState<FormularioBeneficiario>(FORM_VACIO);
   const [enviando, setEnviando] = useState(false);
   const [confirmarDesactivar, setConfirmarDesactivar] =
@@ -161,7 +182,13 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
   async function abrirVer(id: string) {
     if (!token) return;
     try {
-      const item = await obtenerBeneficiario(token, id);
+      const [item, campos] = await Promise.all([
+        obtenerBeneficiario(token, id),
+        listarCamposBeneficiarioCatalogo(token).catch(
+          () => [] as CampoBeneficiario[],
+        ),
+      ]);
+      setCamposCatalogo(campos);
       setSeleccionado(item);
       setModo("ver");
     } catch (err) {
@@ -172,7 +199,21 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
   async function abrirEditar(id: string) {
     if (!token) return;
     try {
-      const item = await obtenerBeneficiario(token, id);
+      const [item, campos] = await Promise.all([
+        obtenerBeneficiario(token, id),
+        listarCamposBeneficiarioCatalogo(token).catch(
+          () => [] as CampoBeneficiario[],
+        ),
+      ]);
+      setCamposCatalogo(campos);
+      setAdicionalesForm(
+        Object.fromEntries(
+          Object.entries(item.datosAdicionales ?? {}).map(([clave, valor]) => [
+            clave,
+            valorParaFormulario(valor),
+          ]),
+        ),
+      );
       setSeleccionado(item);
       setVeredaSeleccionada(
         item.vereda
@@ -209,6 +250,24 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
     setSeleccionado(null);
     setVeredaSeleccionada(null);
     setFormulario(FORM_VACIO);
+    setAdicionalesForm({});
+  }
+
+  /** Lo que hay en el formulario más null para los datos que se quitaron (así se borran). */
+  function datosAdicionalesPayload(): ActualizarBeneficiarioPayload["datosAdicionales"] {
+    const claves = new Set([
+      ...Object.keys(seleccionado?.datosAdicionales ?? {}),
+      ...Object.keys(adicionalesForm),
+    ]);
+    return Object.fromEntries(
+      [...claves].map((clave) => [
+        clave,
+        valorDesdeFormulario(
+          adicionalesForm[clave] ?? "",
+          campoDeClave(clave, camposCatalogo).tipo,
+        ),
+      ]),
+    );
   }
 
   function aPayload(): CrearBeneficiarioPayload {
@@ -243,7 +302,10 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
         await crearBeneficiario(token, aPayload());
         setExito("Beneficiario creado correctamente");
       } else if (modo === "editar" && seleccionado) {
-        await actualizarBeneficiario(token, seleccionado.id, aPayload());
+        await actualizarBeneficiario(token, seleccionado.id, {
+          ...aPayload(),
+          datosAdicionales: datosAdicionalesPayload(),
+        });
         setExito("Beneficiario actualizado correctamente");
       }
       cerrarModal();
@@ -255,7 +317,12 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
     }
   }
 
-  async function importarExcel(archivo: File, veredaId: string) {
+  async function importarExcel(
+    archivo: File,
+    veredaId: string,
+    _total: number,
+    mapeo: MapeoColumnasExcel,
+  ) {
     if (!token) return;
     setImportando(true);
     setError(null);
@@ -266,10 +333,15 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
         token,
         archivo,
         veredaId,
+        mapeo,
       );
       setDetalleCarga(resultado.detalle);
       setExito(
         `Carga lista: ${resultado.creados} dadas de alta, ${resultado.asignadosExistentes} ya existían${
+          resultado.actualizados
+            ? ` (${resultado.actualizados} con datos actualizados)`
+            : ""
+        }${
           resultado.errores
             ? `. ${resultado.errores} no se pudieron agregar`
             : ""
@@ -615,6 +687,21 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
                 {seleccionado.estaActivo ? "Activo" : "Desactivado"}
               </dd>
             </div>
+            {adicionalesSeleccionado.length ? (
+              <div className="sm:col-span-2">
+                <p className="mb-2 border-t border-zinc-100 pt-4 text-sm font-semibold text-zinc-900">
+                  Datos adicionales
+                </p>
+                <dl className="grid gap-4 sm:grid-cols-2">
+                  {adicionalesSeleccionado.map((par) => (
+                    <div key={par.clave}>
+                      <dt className="text-zinc-500">{par.etiqueta}</dt>
+                      <dd className="font-medium break-words">{par.valor}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ) : null}
           </dl>
         ) : (
           <form onSubmit={manejarSubmit} className="space-y-4">
@@ -824,6 +911,13 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
                 />
               </div>
             </div>
+            {modo === "editar" ? (
+              <DatosAdicionalesFormulario
+                campos={camposCatalogo}
+                valores={adicionalesForm}
+                onChange={setAdicionalesForm}
+              />
+            ) : null}
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"

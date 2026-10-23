@@ -30,6 +30,7 @@ import {
 import { mostrarResultadoCargaBeneficiarios } from "@/lib/swal";
 import { useAuth } from "@/lib/auth-context";
 import type {
+  MapeoColumnasExcel,
   MunicipioResumen,
   ResultadoCargaMasivaBeneficiarios,
   TipoProyecto,
@@ -80,6 +81,7 @@ export function WizardCrearProyecto() {
   >([]);
   const [veredasDane, setVeredasDane] = useState<VeredaCargaOpcion[]>([]);
   const [veredaCargaId, setVeredaCargaId] = useState("");
+  const [mapeoExcel, setMapeoExcel] = useState<MapeoColumnasExcel | null>(null);
   const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
   const [beneficiarioIds, setBeneficiarioIds] = useState<string[]>([]);
   const [etiquetasBeneficiarios, setEtiquetasBeneficiarios] = useState<
@@ -154,6 +156,7 @@ export function WizardCrearProyecto() {
   function quitarExcel() {
     setArchivoExcel(null);
     setVeredaCargaId("");
+    setMapeoExcel(null);
     setPersonasExcel(0);
   }
 
@@ -233,6 +236,7 @@ export function WizardCrearProyecto() {
           proyecto.id,
           archivoExcel,
           veredaCargaId,
+          mapeoExcel ?? undefined,
         );
       }
 
@@ -471,9 +475,10 @@ export function WizardCrearProyecto() {
                 }}
                 disabled={enviando}
                 veredas={veredasDane}
-                onImportar={async (archivo, veredaId, total) => {
+                onImportar={async (archivo, veredaId, total, mapeo) => {
                   setArchivoExcel(archivo);
                   setVeredaCargaId(veredaId);
+                  setMapeoExcel(mapeo);
                   setPersonasExcel(total);
                   setError(null);
                 }}

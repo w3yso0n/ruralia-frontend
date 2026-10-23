@@ -213,6 +213,8 @@ export interface BeneficiarioResumen {
   reemplazaA?: BeneficiarioResumen;
   reemplazadoPor?: BeneficiarioResumen;
   reemplazadoEn?: string | null;
+  /** Solo en el listado paginado del proyecto. */
+  datosAdicionales?: DatosAdicionales;
 }
 
 export type TipoAsociacion = "ASOCIACION" | "OAM";
@@ -894,6 +896,7 @@ export interface Beneficiario {
   lineaProductiva?: string | null;
   nombreAsociacion?: string | null;
   estaActivo: boolean;
+  datosAdicionales?: DatosAdicionales;
   vereda?: VeredaResumen;
 }
 
@@ -960,6 +963,8 @@ export interface CrearBeneficiarioPayload {
 }
 
 export interface ActualizarBeneficiarioPayload {
+  /** Un valor null borra ese dato; las claves que no vienen no se tocan. */
+  datosAdicionales?: DatosAdicionales;
   nombres?: string;
   apellidos?: string;
   tipoDocumento?: TipoDocumento;
@@ -1235,6 +1240,8 @@ export interface ResultadoFilaCargaBeneficiario {
   resultado: "creado" | "asignado_existente" | "ya_en_proyecto" | "error";
   mensaje?: string;
   beneficiarioId?: string;
+  /** La cédula ya existía: datos de la persona que se sobrescribieron. */
+  cambios?: CambioDatoBeneficiario[];
 }
 
 export interface ResultadoCargaMasivaBeneficiarios {
@@ -1242,8 +1249,86 @@ export interface ResultadoCargaMasivaBeneficiarios {
   creados: number;
   asignadosExistentes: number;
   yaEnProyecto: number;
+  /** Personas que ya existían y a las que se les modificó algún dato. */
+  actualizados?: number;
   errores: number;
   detalle: ResultadoFilaCargaBeneficiario[];
+}
+
+export interface CambioDatoBeneficiario {
+  campo: string;
+  etiqueta: string;
+  antes: string | null;
+  despues: string | null;
+}
+
+export type ValorDatoAdicional = string | number | boolean | null;
+
+/** Columnas extra de las cargas masivas. Viven en la persona (una sola por cédula). */
+export type DatosAdicionales = Record<string, ValorDatoAdicional>;
+
+export type TipoCampoBeneficiario = "texto" | "numero" | "fecha" | "booleano";
+
+export interface CampoBeneficiario {
+  id: string;
+  clave: string;
+  etiqueta: string;
+  tipo: TipoCampoBeneficiario;
+  orden: number;
+  columnaOrigen?: string | null;
+}
+
+export type CampoModeloBeneficiario =
+  | "numeroDocumento"
+  | "tipoDocumento"
+  | "primerNombre"
+  | "segundoNombre"
+  | "primerApellido"
+  | "segundoApellido"
+  | "nombres"
+  | "apellidos"
+  | "telefono"
+  | "correo"
+  | "genero"
+  | "edad"
+  | "fechaNacimiento"
+  | "municipio"
+  | "lineaProductiva"
+  | "nombreAsociacion"
+  | "estado";
+
+export type DestinoColumnaExcel =
+  | { destino: "modelo"; campo: CampoModeloBeneficiario }
+  | {
+      destino: "extra";
+      clave: string;
+      etiqueta: string;
+      tipo: TipoCampoBeneficiario;
+    }
+  | { destino: "ignorar" };
+
+export type ColumnaMapeoExcel = DestinoColumnaExcel & { columna: number };
+
+export interface MapeoColumnasExcel {
+  filaEncabezado: number;
+  columnas: ColumnaMapeoExcel[];
+}
+
+export interface ColumnaExcelAnalizada {
+  columna: number;
+  letra: string;
+  encabezado: string;
+  muestras: string[];
+  conDatos: number;
+  tipoDetectado: TipoCampoBeneficiario;
+  sugerencia: DestinoColumnaExcel;
+}
+
+export interface AnalisisExcelBeneficiarios {
+  hoja: string;
+  filaEncabezado: number;
+  totalFilas: number;
+  columnas: ColumnaExcelAnalizada[];
 }
 
 export interface ReemplazarBeneficiarioPayload {

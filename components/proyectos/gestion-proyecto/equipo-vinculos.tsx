@@ -18,6 +18,7 @@ import {
   listarAsociaciones,
   listarBeneficiarios,
   listarBeneficiariosProyecto,
+  listarCamposBeneficiarioProyecto,
   listarTodasLasPaginas,
   listarUsuarios,
   reemplazarBeneficiarioProyecto,
@@ -25,7 +26,9 @@ import {
 } from "@/lib/api";
 import type {
   BeneficiarioResumen,
+  CampoBeneficiario,
   HistorialBeneficiarioProyecto,
+  MapeoColumnasExcel,
   Proyecto,
   RespuestaPaginada,
   ResultadoCargaMasivaBeneficiarios,
@@ -33,6 +36,7 @@ import type {
 } from "@/lib/types";
 import { etiquetaOrganizacion } from "@/lib/types";
 import { mostrarResultadoCargaBeneficiarios } from "@/lib/swal";
+import { paresDatosAdicionales } from "@/lib/datos-adicionales";
 
 interface EquipoVinculosProps {
   token: string;
@@ -88,6 +92,7 @@ export function EquipoVinculos({
   );
   const [cargandoLista, setCargandoLista] = useState(false);
   const [recargaLista, setRecargaLista] = useState(0);
+  const [camposProyecto, setCamposProyecto] = useState<CampoBeneficiario[]>([]);
   const [modoReemplazo, setModoReemplazo] = useState<"existente" | "nuevo">(
     "nuevo",
   );
@@ -138,6 +143,21 @@ export function EquipoVinculos({
         );
       });
   }, [token]);
+
+  useEffect(() => {
+    if (!listaAbierta) return;
+    let cancelado = false;
+    void listarCamposBeneficiarioProyecto(token, proyectoId)
+      .then((campos) => {
+        if (!cancelado) setCamposProyecto(campos);
+      })
+      .catch(() => {
+        if (!cancelado) setCamposProyecto([]);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [listaAbierta, token, proyectoId, recargaLista]);
 
   useEffect(() => {
     if (!listaAbierta) return;
@@ -242,7 +262,12 @@ export function EquipoVinculos({
     }
   }
 
-  async function importarExcel(archivo: File, veredaId: string) {
+  async function importarExcel(
+    archivo: File,
+    veredaId: string,
+    _total: number,
+    mapeo: MapeoColumnasExcel,
+  ) {
     setImportando(true);
     setError(null);
     setExito(null);
@@ -252,6 +277,7 @@ export function EquipoVinculos({
         proyectoId,
         archivo,
         veredaId,
+        mapeo,
       );
       setResultadoCarga(resultado);
       setArchivoExcel(null);
@@ -367,6 +393,10 @@ export function EquipoVinculos({
     proyecto.conteoBeneficiarios ?? proyecto.beneficiarios?.length ?? 0;
 
   function filaBeneficiario(b: BeneficiarioResumen, conAcciones: boolean) {
+    // Solo los datos que maneja este proyecto; el resto se ve en la ficha del catálogo.
+    const adicionales = paresDatosAdicionales(b.datosAdicionales, camposProyecto, {
+      soloDefinidos: true,
+    });
     return (
       <li
         key={b.id}
@@ -383,6 +413,17 @@ export function EquipoVinculos({
               {b.reemplazaA.numeroDocumento
                 ? ` (${b.reemplazaA.numeroDocumento})`
                 : ""}
+            </p>
+          ) : null}
+          {adicionales.length ? (
+            <p className="mt-0.5 text-xs text-zinc-500">
+              {adicionales.map((par, indice) => (
+                <span key={par.clave}>
+                  {indice ? " · " : ""}
+                  <span className="text-zinc-400">{par.etiqueta}:</span>{" "}
+                  {par.valor}
+                </span>
+              ))}
             </p>
           ) : null}
         </div>
@@ -442,8 +483,8 @@ export function EquipoVinculos({
             setBusquedaLista(e.target.value);
             setPaginaLista(1);
           }}
-          placeholder="Buscar por nombre o documento"
-          className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal"
+          placeholder="Buscar por nombre, documento o dato adicional"
+          className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-ruralia-teal"
         />
         {cargandoLista && !lista ? (
           <p className="text-sm text-zinc-500">Cargando…</p>
@@ -657,6 +698,7 @@ export function EquipoVinculos({
             disabled={enviando || importando}
             importando={importando}
             onImportar={importarExcel}
+            proyectoId={proyectoId}
             veredas={(proyecto.veredas ?? [])
               .filter((vereda) => !!vereda.codigo && /^[0-9]+$/.test(vereda.codigo))
               .map((vereda) => ({
@@ -674,6 +716,9 @@ export function EquipoVinculos({
               {resultadoCarga.asignadosExistentes} ya existían y se vincularon
               {resultadoCarga.yaEnProyecto
                 ? ` · ${resultadoCarga.yaEnProyecto} ya estaban en el proyecto`
+                : ""}
+              {resultadoCarga.actualizados
+                ? ` · ${resultadoCarga.actualizados} con datos actualizados`
                 : ""}
             </p>
             <AvisosCargaBeneficiarios detalle={resultadoCarga.detalle} />

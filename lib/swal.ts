@@ -19,23 +19,29 @@ const iconoError = `
     <path d="M9.5 9.5l5 5m0-5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
   </svg>`;
 
+/**
+ * SweetAlert no combina `customClass`: si un `fire` pasa el suyo, reemplaza todo el del
+ * mixin (y el popup queda transparente). Para cambiar un botón, esparcir estas clases.
+ */
+const clasesRuralia = {
+  popup:
+    "!rounded-2xl !bg-white !p-6 !shadow-2xl !max-w-md !text-left !font-sans",
+  title: "!text-lg !font-semibold !text-zinc-900 !p-0 !mt-1",
+  htmlContainer: "!text-sm !text-zinc-600 !mt-2 !mx-0",
+  actions: "!mt-6 !gap-2 !w-full",
+  confirmButton:
+    "!rounded-xl !bg-red-600 !px-4 !py-2 !text-sm !font-semibold !text-white hover:!bg-red-700 focus:!outline-none focus:!ring-2 focus:!ring-red-300",
+  denyButton:
+    "!rounded-xl !bg-ruralia-teal !px-4 !py-2 !text-sm !font-semibold !text-white hover:!bg-ruralia-teal-hover focus:!outline-none focus:!ring-2 focus:!ring-ruralia-teal-border",
+  cancelButton:
+    "!rounded-xl !bg-zinc-100 !px-4 !py-2 !text-sm !font-semibold !text-zinc-600 hover:!bg-zinc-200 focus:!outline-none focus:!ring-2 focus:!ring-zinc-300",
+};
+
 const swalRuralia = Swal.mixin({
   buttonsStyling: false,
   reverseButtons: true,
   background: "transparent",
-  customClass: {
-    popup:
-      "!rounded-2xl !bg-white !p-6 !shadow-2xl !max-w-md !text-left !font-sans",
-    title: "!text-lg !font-semibold !text-zinc-900 !p-0 !mt-1",
-    htmlContainer: "!text-sm !text-zinc-600 !mt-2 !mx-0",
-    actions: "!mt-6 !gap-2 !w-full",
-    confirmButton:
-      "!rounded-xl !bg-red-600 !px-4 !py-2 !text-sm !font-semibold !text-white hover:!bg-red-700 focus:!outline-none focus:!ring-2 focus:!ring-red-300",
-    denyButton:
-      "!rounded-xl !bg-ruralia-teal !px-4 !py-2 !text-sm !font-semibold !text-white hover:!bg-ruralia-teal-hover focus:!outline-none focus:!ring-2 focus:!ring-ruralia-teal-border",
-    cancelButton:
-      "!rounded-xl !bg-zinc-100 !px-4 !py-2 !text-sm !font-semibold !text-zinc-600 hover:!bg-zinc-200 focus:!outline-none focus:!ring-2 focus:!ring-zinc-300",
-  },
+  customClass: clasesRuralia,
 });
 
 const botonExito =
@@ -71,6 +77,11 @@ export function mostrarResultadoCargaBeneficiarios(
     `${resultado.asignadosExistentes.toLocaleString("es-CO")} ya existían y se vincularon al proyecto`,
     `${resultado.yaEnProyecto.toLocaleString("es-CO")} ya estaban en el proyecto`,
   ];
+  if (resultado.actualizados) {
+    lineas.push(
+      `${resultado.actualizados.toLocaleString("es-CO")} ya existían y se actualizaron sus datos`,
+    );
+  }
   if (resultado.errores) {
     lineas.push(
       `${resultado.errores.toLocaleString("es-CO")} con error`,
@@ -80,7 +91,7 @@ export function mostrarResultadoCargaBeneficiarios(
     title: "Beneficiarios vinculados",
     html: `${iconoHtml("exito")}<p>${lineas.join("<br>")}</p>`,
     confirmButtonText: "Entendido",
-    customClass: { confirmButton: botonExito },
+    customClass: { ...clasesRuralia, confirmButton: botonExito },
   });
 }
 

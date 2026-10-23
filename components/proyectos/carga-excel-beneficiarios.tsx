@@ -1,16 +1,37 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FileSpreadsheet } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  FileSpreadsheet,
+  RefreshCw,
+} from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import {
+  construirMapeo,
+  destinosIniciales,
+  MapeoColumnasExcel,
+  problemasDelMapeo,
+  type DestinosPorColumna,
+} from "@/components/proyectos/mapeo-columnas-excel";
+import {
+  analizarBeneficiariosExcel,
   descargarPlantillaBeneficiarios,
   descargarPlantillaBeneficiariosCatalogo,
   listarVeredas,
   previsualizarBeneficiariosExcel,
   type FilaExcelBeneficiarioPreview,
 } from "@/lib/api";
-import type { ResultadoFilaCargaBeneficiario } from "@/lib/types";
+import type {
+  AnalisisExcelBeneficiarios,
+  CambioDatoBeneficiario,
+  MapeoColumnasExcel as MapeoColumnas,
+  ResultadoFilaCargaBeneficiario,
+} from "@/lib/types";
+
+const MENSAJE_SOLO_XLSX =
+  'El archivo debe ser Excel .xlsx. Si es .xls (Excel 97-2003), ábrelo en Excel y usa "Guardar como" > "Libro de Excel (.xlsx)".';
 
 export interface VeredaCargaOpcion {
   id: string;
@@ -39,25 +60,92 @@ function motivoFilaOmitida(fila: FilaExcelBeneficiarioPreview): string | null {
   return null;
 }
 
+function ListaCambios({ cambios }: { cambios: CambioDatoBeneficiario[] }) {
+  return (
+    <ul className="mt-1 space-y-0.5 text-xs text-amber-900">
+      {cambios.map((cambio) => (
+        <li key={cambio.campo} className="flex flex-wrap items-center gap-1">
+          <span className="font-medium">{cambio.etiqueta}:</span>
+          <span className="text-amber-800/80">{cambio.antes ?? "(vacío)"}</span>
+          <ArrowRight className="h-3 w-3 shrink-0" />
+          <span>{cambio.despues ?? "(vacío)"}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Personas que ya existían: no se duplican, se sobrescriben sus datos. */
+function AvisoActualizaciones({
+  personas,
+  titulo,
+}: {
+  personas: Array<{
+    clave: string;
+    nombre: string;
+    identificador: string;
+    cambios: CambioDatoBeneficiario[];
+  }>;
+  titulo: string;
+}) {
+  if (!personas.length) return null;
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <p className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+        <RefreshCw className="h-4 w-4 shrink-0" />
+        {titulo}
+      </p>
+      <ul className="mt-2 max-h-56 space-y-2 overflow-y-auto">
+        {personas.map((persona) => (
+          <li key={persona.clave} className="text-sm text-amber-950">
+            <p className="font-medium">
+              {persona.nombre} · {persona.identificador}
+            </p>
+            <ListaCambios cambios={persona.cambios} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function AvisosCargaBeneficiarios({
   detalle,
 }: {
   detalle: ResultadoFilaCargaBeneficiario[];
 }) {
   const errores = detalle.filter((fila) => fila.resultado === "error");
-  if (!errores.length) return null;
+  const actualizadas = detalle.filter((fila) => fila.cambios?.length);
+  if (!errores.length && !actualizadas.length) return null;
   return (
-    <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-      <p className="text-sm font-semibold text-red-800">
-        No se {errores.length === 1 ? "pudo agregar este registro" : `pudieron agregar estos ${errores.length} registros`}
-      </p>
-      <ul className="mt-2 max-h-56 space-y-1 overflow-y-auto text-sm text-red-900">
-        {errores.map((fila) => (
-          <li key={`${fila.fila}-${fila.identificador}-${fila.nombres}`}>
-            {fila.mensaje ?? `Fila ${fila.fila}`}
-          </li>
-        ))}
-      </ul>
+    <div className="mt-3 space-y-3">
+      <AvisoActualizaciones
+        titulo={
+          actualizadas.length === 1
+            ? "Esta persona ya existía y se actualizaron sus datos"
+            : `Estas ${actualizadas.length} personas ya existían y se actualizaron sus datos`
+        }
+        personas={actualizadas.map((fila) => ({
+          clave: `${fila.fila}-${fila.identificador}`,
+          nombre: `${fila.nombres} ${fila.apellidos}`.trim(),
+          identificador: fila.identificador,
+          cambios: fila.cambios ?? [],
+        }))}
+      />
+      {errores.length ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+          <p className="text-sm font-semibold text-red-800">
+            No se {errores.length === 1 ? "pudo agregar este registro" : `pudieron agregar estos ${errores.length} registros`}
+          </p>
+          <ul className="mt-2 max-h-56 space-y-1 overflow-y-auto text-sm text-red-900">
+            {errores.map((fila) => (
+              <li key={`${fila.fila}-${fila.identificador}-${fila.nombres}`}>
+                {fila.mensaje ?? `Fila ${fila.fila}`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -71,9 +159,12 @@ interface CargaExcelBeneficiariosProps {
     archivo: File,
     veredaId: string,
     totalPersonas: number,
+    mapeo: MapeoColumnas,
   ) => Promise<void>;
   importando?: boolean;
   contexto?: "proyecto" | "catalogo";
+  /** Si ya existe, se reutilizan los datos adicionales que el proyecto tiene de cargas anteriores. */
+  proyectoId?: string;
   /** Veredas DANE ya vinculadas. En el catálogo se buscan al confirmar. */
   veredas?: VeredaCargaOpcion[];
   /** "boton": solo un botón compacto; plantilla y selección de archivo van en un modal. */
@@ -86,6 +177,7 @@ export function CargaExcelBeneficiarios({
   onImportar,
   importando,
   contexto = "proyecto",
+  proyectoId,
   veredas = [],
   variante = "panel",
 }: CargaExcelBeneficiariosProps) {
@@ -93,6 +185,12 @@ export function CargaExcelBeneficiarios({
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [archivoLocal, setArchivoLocal] = useState<File | null>(null);
+  const [analizando, setAnalizando] = useState(false);
+  const [analisis, setAnalisis] = useState<AnalisisExcelBeneficiarios | null>(
+    null,
+  );
+  const [destinos, setDestinos] = useState<DestinosPorColumna>({});
+  const [mapeo, setMapeo] = useState<MapeoColumnas | null>(null);
   const [leyendo, setLeyendo] = useState(false);
   const [descargando, setDescargando] = useState(false);
   const [revisando, setRevisando] = useState(false);
@@ -160,26 +258,66 @@ export function CargaExcelBeneficiarios({
     }
   }
 
-  async function abrirRevision(file: File) {
-    setModalInicioAbierto(false);
-    setError(null);
-    setArchivoLocal(file);
+  function reiniciar() {
+    setArchivoLocal(null);
+    setAnalisis(null);
+    setDestinos({});
+    setMapeo(null);
     setFilas([]);
     setVeredaId("");
     setBusquedaVereda("");
     setVeredasBuscadas([]);
+  }
+
+  async function abrirArchivo(file: File) {
+    setModalInicioAbierto(false);
+    setError(null);
+    reiniciar();
+    setArchivoLocal(file);
+    setAnalizando(true);
+    try {
+      const resultado = await analizarBeneficiariosExcel(
+        token,
+        file,
+        contexto,
+        proyectoId,
+      );
+      if (!resultado.totalFilas) {
+        setError("El archivo no tiene personas para cargar");
+        setArchivoLocal(null);
+        return;
+      }
+      setAnalisis(resultado);
+      setDestinos(destinosIniciales(resultado));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "No se pudo leer el Excel",
+      );
+      setArchivoLocal(null);
+    } finally {
+      setAnalizando(false);
+    }
+  }
+
+  async function abrirRevision() {
+    if (!archivoLocal || !analisis) return;
+    const mapeoElegido = construirMapeo(analisis, destinos);
+    setMapeo(mapeoElegido);
+    setError(null);
+    setFilas([]);
     setRevisando(true);
     setLeyendo(true);
     try {
       const preview = await previsualizarBeneficiariosExcel(
         token,
-        file,
+        archivoLocal,
         contexto,
+        mapeoElegido,
+        proyectoId,
       );
       if (!preview.length) {
         setError("El archivo no tiene personas para cargar");
         setRevisando(false);
-        setArchivoLocal(null);
         return;
       }
       setFilas(preview);
@@ -188,18 +326,27 @@ export function CargaExcelBeneficiarios({
         err instanceof Error ? err.message : "No se pudo leer el Excel",
       );
       setRevisando(false);
-      setArchivoLocal(null);
     } finally {
       setLeyendo(false);
     }
   }
 
+  function cerrarMapeo() {
+    if (revisando) return;
+    reiniciar();
+  }
+
+  /** Vuelve a la asignación de columnas sin perder lo elegido. */
+  function volverAColumnas() {
+    if (importando) return;
+    setRevisando(false);
+    setFilas([]);
+  }
+
   function cerrarRevision() {
     if (importando) return;
     setRevisando(false);
-    setArchivoLocal(null);
-    setFilas([]);
-    setVeredaId("");
+    reiniciar();
   }
 
   const pideVereda = filas.some((fila) => !fila.municipio?.trim());
@@ -210,26 +357,33 @@ export function CargaExcelBeneficiarios({
   const personasAVincular = filas.filter(
     (fila) => motivoFilaOmitida(fila) === null,
   ).length;
+  const existentes = filas.filter(
+    (fila) => fila.yaExiste && motivoFilaOmitida(fila) === null,
+  );
+  const conCambios = existentes.filter((fila) => fila.cambios?.length);
+  const extrasDelMapeo = (mapeo?.columnas ?? []).flatMap((columna) =>
+    columna.destino === "extra" ? [columna.etiqueta] : [],
+  );
+  const problemasMapeo = problemasDelMapeo(destinos);
 
   async function confirmar() {
-    if (!archivoLocal || !onImportar) return;
+    if (!archivoLocal || !onImportar || !mapeo) return;
     if (pideVereda && !veredaId) return;
     if (!personasAVincular) return;
-    await onImportar(archivoLocal, veredaId, personasAVincular);
+    await onImportar(archivoLocal, veredaId, personasAVincular, mapeo);
     setRevisando(false);
-    setArchivoLocal(null);
-    setFilas([]);
-    setVeredaId("");
+    reiniciar();
   }
 
   const ayuda = (
     <p className="text-xs text-zinc-500">
-      La plantilla trae las columnas de la matriz: cédula, nombres, apellidos,
-      sexo, edad, contacto, asociación, municipio, línea productiva y estado.
-      Elegir el archivo no guarda nada: primero revisas la lista.
+      Sirve la plantilla de la matriz o cualquier Excel: después de elegirlo
+      indicas qué es cada columna, y las que no existan en la ficha se guardan
+      como datos adicionales. Elegir el archivo no guarda nada: primero revisas
+      la lista.
       {contexto === "proyecto"
-        ? " La cédula es la clave: si la persona no existe se crea, y si ya está en la base no se duplica pero sí se vincula a este proyecto."
-        : " La cédula es la clave: si ya existe, no se duplica el registro."}
+        ? " La cédula es la clave: si la persona no existe se crea, y si ya está en la base no se duplica, se actualizan sus datos y se vincula a este proyecto."
+        : " La cédula es la clave: si ya existe, no se duplica el registro y se actualizan sus datos."}
     </p>
   );
 
@@ -245,11 +399,11 @@ export function CargaExcelBeneficiarios({
       </button>
       <button
         type="button"
-        disabled={disabled || !onImportar}
+        disabled={disabled || !onImportar || analizando}
         onClick={() => inputRef.current?.click()}
         className="rounded-lg bg-ruralia-teal px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-ruralia-teal-hover disabled:opacity-50"
       >
-        Elegir archivo
+        {analizando ? "Leyendo…" : "Elegir archivo"}
       </button>
       <input
         ref={inputRef}
@@ -259,15 +413,23 @@ export function CargaExcelBeneficiarios({
         onChange={(e) => {
           const file = e.target.files?.[0] ?? null;
           e.target.value = "";
-          if (file) void abrirRevision(file);
+          if (!file) return;
+          if (!/\.xlsx$/i.test(file.name)) {
+            setError(MENSAJE_SOLO_XLSX);
+            return;
+          }
+          void abrirArchivo(file);
         }}
       />
     </div>
   );
 
   const mensajeError =
-    error && !revisando ? (
-      <p className="text-sm text-red-600">{error}</p>
+    error && !revisando && !analisis ? (
+      <p className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        {error}
+      </p>
     ) : null;
 
   return (
@@ -293,9 +455,9 @@ export function CargaExcelBeneficiarios({
           >
             <div className="space-y-4">
               <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-600">
-                <li>Descarga la plantilla de la matriz y llénala, o usa el Excel que ya tienes con esas columnas.</li>
-                <li>Elige el archivo: verás la lista antes de guardar.</li>
-                <li>Confirma la carga. El municipio va en cada fila.</li>
+                <li>Usa la plantilla de la matriz o el Excel que ya tienes, con cualquier formato.</li>
+                <li>Indica qué es cada columna: las que no están en la ficha quedan como datos adicionales.</li>
+                <li>Revisa la lista y confirma la carga.</li>
               </ol>
               {ayuda}
               {acciones}
@@ -311,6 +473,48 @@ export function CargaExcelBeneficiarios({
           {mensajeError ? <div className="mt-2">{mensajeError}</div> : null}
         </div>
       )}
+
+      <Modal
+        abierto={!!analisis && !revisando}
+        onCerrar={cerrarMapeo}
+        titulo="¿Qué trae cada columna?"
+        ancho="xl"
+      >
+        {analisis ? (
+          <div className="space-y-4">
+            <p className="text-sm text-zinc-600">
+              {archivoLocal?.name ?? "Archivo"} · hoja {analisis.hoja} ·{" "}
+              {analisis.totalFilas.toLocaleString("es-CO")}{" "}
+              {analisis.totalFilas === 1 ? "fila" : "filas"} con datos. Los
+              títulos se tomaron de la fila {analisis.filaEncabezado}. Revisa
+              la propuesta y corrige lo que no corresponda.
+            </p>
+            <MapeoColumnasExcel
+              analisis={analisis}
+              destinos={destinos}
+              onChange={setDestinos}
+            />
+            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={cerrarMapeo}
+                className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={problemasMapeo.length > 0}
+                onClick={() => void abrirRevision()}
+                className="rounded-xl bg-ruralia-teal px-4 py-2 text-sm font-semibold text-white hover:bg-ruralia-teal-hover disabled:opacity-50"
+              >
+                Ver personas
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal
         abierto={revisando}
@@ -333,6 +537,39 @@ export function CargaExcelBeneficiarios({
             <p className="text-sm text-zinc-500">Leyendo el archivo…</p>
           ) : (
             <>
+              {extrasDelMapeo.length ? (
+                <p className="rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-3 text-sm text-ruralia-teal-text">
+                  Además se guardarán {extrasDelMapeo.length}{" "}
+                  {extrasDelMapeo.length === 1
+                    ? "dato adicional"
+                    : "datos adicionales"}
+                  : {extrasDelMapeo.join(", ")}.
+                </p>
+              ) : null}
+              {existentes.length ? (
+                <p className="text-sm text-zinc-600">
+                  {existentes.length === 1
+                    ? "1 persona ya está en la plataforma"
+                    : `${existentes.length.toLocaleString("es-CO")} personas ya están en la plataforma`}
+                  : no se duplican.
+                  {conCambios.length
+                    ? ` A ${conCambios.length.toLocaleString("es-CO")} se les van a modificar datos.`
+                    : " Sus datos no cambian."}
+                </p>
+              ) : null}
+              <AvisoActualizaciones
+                titulo={
+                  conCambios.length === 1
+                    ? "Esta persona ya existe y se van a modificar sus datos"
+                    : `Estas ${conCambios.length} personas ya existen y se van a modificar sus datos`
+                }
+                personas={conCambios.map((fila) => ({
+                  clave: `${fila.fila}-${fila.identificador}`,
+                  nombre: `${fila.nombres} ${fila.apellidos}`.trim(),
+                  identificador: fila.identificador,
+                  cambios: fila.cambios ?? [],
+                }))}
+              />
               {omitidas.length ? (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
                   <p className="text-sm font-semibold text-red-800">
@@ -355,8 +592,13 @@ export function CargaExcelBeneficiarios({
                       key={`${fila.fila}-${fila.identificador}`}
                       className={`px-3 py-2 ${omitida ? "bg-red-50" : ""}`}
                     >
-                      <p className="text-sm font-medium text-zinc-900">
+                      <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-zinc-900">
                         {fila.nombres || "Sin nombre"} {fila.apellidos}
+                        {!omitida && fila.yaExiste ? (
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                            {fila.cambios?.length ? "Ya existe · se actualiza" : "Ya existe"}
+                          </span>
+                        ) : null}
                       </p>
                       <p className={`text-xs ${omitida ? "text-red-700" : "text-zinc-500"}`}>
                         {omitida ?? (
@@ -368,6 +610,9 @@ export function CargaExcelBeneficiarios({
                             {fila.municipio ? ` · ${fila.municipio}` : ""}
                             {fila.nombreAsociacion ? ` · ${fila.nombreAsociacion}` : ""}
                             {fila.lineaProductiva ? ` · ${fila.lineaProductiva}` : ""}
+                            {fila.extras && Object.keys(fila.extras).length
+                              ? ` · +${Object.keys(fila.extras).length} adicionales`
+                              : ""}
                           </>
                         )}
                       </p>
@@ -443,7 +688,15 @@ export function CargaExcelBeneficiarios({
           </div>
           ) : null}
 
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={volverAColumnas}
+              disabled={importando || leyendo}
+              className="mr-auto rounded-xl px-3 py-2 text-sm font-semibold text-ruralia-teal-text hover:bg-ruralia-teal-soft disabled:opacity-50"
+            >
+              Volver a columnas
+            </button>
             <button
               type="button"
               onClick={cerrarRevision}

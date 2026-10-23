@@ -102,6 +102,11 @@ import type {
   ResultadoCargaMasivaBeneficiarios,
   ReemplazarBeneficiarioPayload,
   HistorialBeneficiarioProyecto,
+  AnalisisExcelBeneficiarios,
+  CambioDatoBeneficiario,
+  CampoBeneficiario,
+  DatosAdicionales,
+  MapeoColumnasExcel,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -734,10 +739,12 @@ export async function importarBeneficiariosExcelCatalogo(
   token: string,
   archivo: File,
   veredaId: string,
+  mapeo?: MapeoColumnasExcel,
 ): Promise<ResultadoCargaMasivaBeneficiarios> {
   const formData = new FormData();
   formData.append("archivo", archivo);
   if (veredaId) formData.append("veredaId", veredaId);
+  if (mapeo) formData.append("mapeo", JSON.stringify(mapeo));
   const respuesta = await fetchConToken(token, `${API_URL}/beneficiarios/importar`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
@@ -761,13 +768,56 @@ export async function importarBeneficiariosExcelCatalogo(
   return respuesta.json() as Promise<ResultadoCargaMasivaBeneficiarios>;
 }
 
+async function errorDeRespuesta(respuesta: Response): Promise<ErrorApi> {
+  const cuerpo = await respuesta.text();
+  let mensaje = cuerpo || respuesta.statusText;
+  try {
+    const json = JSON.parse(cuerpo) as { message?: string | string[] };
+    if (json.message) {
+      mensaje = Array.isArray(json.message)
+        ? json.message.join(". ")
+        : json.message;
+    }
+  } catch {
+    /* el cuerpo no es JSON */
+  }
+  return new ErrorApi(mensaje, respuesta.status);
+}
+
+/** Lee las columnas de cualquier Excel y devuelve a qué campo propone llevar cada una. */
+export async function analizarBeneficiariosExcel(
+  token: string,
+  archivo: File,
+  contexto: "proyecto" | "catalogo",
+  proyectoId?: string,
+): Promise<AnalisisExcelBeneficiarios> {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  if (proyectoId) formData.append("proyectoId", proyectoId);
+  const ruta =
+    contexto === "catalogo"
+      ? `${API_URL}/beneficiarios/analizar-excel`
+      : `${API_URL}/proyectos/beneficiarios-excel/analizar`;
+  const respuesta = await fetchConToken(token, ruta, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
+  return respuesta.json() as Promise<AnalisisExcelBeneficiarios>;
+}
+
 export async function previsualizarBeneficiariosExcel(
   token: string,
   archivo: File,
   contexto: "proyecto" | "catalogo",
+  mapeo?: MapeoColumnasExcel,
+  proyectoId?: string,
 ): Promise<FilaExcelBeneficiarioPreview[]> {
   const formData = new FormData();
   formData.append("archivo", archivo);
+  if (mapeo) formData.append("mapeo", JSON.stringify(mapeo));
+  if (proyectoId) formData.append("proyectoId", proyectoId);
   const ruta =
     contexto === "catalogo"
       ? `${API_URL}/beneficiarios/previsualizar`
@@ -777,14 +827,30 @@ export async function previsualizarBeneficiariosExcel(
     headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
-  if (!respuesta.ok) {
-    const cuerpo = await respuesta.text();
-    throw new ErrorApi(cuerpo || respuesta.statusText, respuesta.status);
-  }
+  if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
   const json = (await respuesta.json()) as {
     filas: FilaExcelBeneficiarioPreview[];
   };
   return json.filas;
+}
+
+export async function listarCamposBeneficiarioProyecto(
+  token: string,
+  proyectoId: string,
+): Promise<CampoBeneficiario[]> {
+  return fetchConAuth<CampoBeneficiario[]>(
+    `/proyectos/${proyectoId}/beneficiarios/campos`,
+    token,
+  );
+}
+
+export async function listarCamposBeneficiarioCatalogo(
+  token: string,
+): Promise<CampoBeneficiario[]> {
+  return fetchConAuth<CampoBeneficiario[]>(
+    "/beneficiarios/campos-adicionales",
+    token,
+  );
 }
 
 export interface FilaExcelBeneficiarioPreview {
@@ -800,7 +866,12 @@ export interface FilaExcelBeneficiarioPreview {
   municipio?: string | null;
   lineaProductiva?: string | null;
   nombreAsociacion?: string | null;
+  fechaNacimiento?: string | null;
   estaActivo?: boolean;
+  extras?: DatosAdicionales;
+  /** La cédula ya está en la plataforma: no se duplica, se actualiza. */
+  yaExiste?: boolean;
+  cambios?: CambioDatoBeneficiario[];
 }
 
 export async function importarBeneficiariosExcelProyecto(
@@ -808,10 +879,12 @@ export async function importarBeneficiariosExcelProyecto(
   proyectoId: string,
   archivo: File,
   veredaId: string,
+  mapeo?: MapeoColumnasExcel,
 ): Promise<ResultadoCargaMasivaBeneficiarios> {
   const formData = new FormData();
   formData.append("archivo", archivo);
   if (veredaId) formData.append("veredaId", veredaId);
+  if (mapeo) formData.append("mapeo", JSON.stringify(mapeo));
   const respuesta = await fetchConToken(token, 
     `${API_URL}/proyectos/${proyectoId}/beneficiarios/importar`,
     {
