@@ -5,12 +5,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Building2,
   Calendar,
+  ClipboardList,
   FileText,
+  Link2,
   MapPin,
   UserRound,
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { AutocompletadoJornadaVista } from "@/components/proyectos/gestion-proyecto/autocompletado-jornada";
+import { usePermisos } from "@/lib/use-permisos";
 import {
   EstadoJornadaPill,
   formatearFechaJornada,
@@ -139,6 +143,15 @@ export function PanelJornadas({
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [geocercas, setGeocercas] = useState<Geocerca[]>([]);
+  const [pestanaDetalle, setPestanaDetalle] = useState<"respuestas" | "ficha">(
+    "respuestas",
+  );
+  const { puedeAlguno } = usePermisos();
+  // Quien arma formularios o corrige respuestas puede revisar qué llega de la ficha.
+  const verDatosFicha = puedeAlguno(
+    "formularios.editar",
+    "formularios.corregir_respuestas",
+  );
 
   useEffect(() => {
     void listarGeocercasProyecto(token, proyectoId)
@@ -716,7 +729,49 @@ export function PanelJornadas({
                       </div>
                     )}
 
-                    {jornadaSeleccionada.tipo === "GRUPAL" ? (
+                    {verDatosFicha ? (
+                      <div
+                        role="tablist"
+                        aria-label="Detalle del formulario"
+                        className="mt-6 inline-flex rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft/40 p-1"
+                      >
+                        {(
+                          [
+                            ["respuestas", "Respuestas", ClipboardList],
+                            ["ficha", "Datos de la ficha", Link2],
+                          ] as const
+                        ).map(([valor, etiqueta, Icono]) => {
+                          const activa = pestanaDetalle === valor;
+                          return (
+                            <button
+                              key={valor}
+                              type="button"
+                              role="tab"
+                              aria-selected={activa}
+                              onClick={() => setPestanaDetalle(valor)}
+                              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                                activa
+                                  ? "bg-white text-ruralia-teal-text shadow-sm"
+                                  : "text-zinc-600 hover:text-ruralia-teal-text"
+                              }`}
+                            >
+                              <Icono className="h-4 w-4" />
+                              {etiqueta}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+
+                    {verDatosFicha && pestanaDetalle === "ficha" ? (
+                      <div className="mt-4">
+                        <AutocompletadoJornadaVista
+                          key={jornadaSeleccionada.id}
+                          token={token}
+                          jornada={jornadaSeleccionada}
+                        />
+                      </div>
+                    ) : jornadaSeleccionada.tipo === "GRUPAL" ? (
                       <ControlAsistenciaJornada
                         token={token}
                         jornada={jornadaSeleccionada}

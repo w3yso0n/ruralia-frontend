@@ -13,6 +13,7 @@ import {
   CircleDot,
   ClipboardList,
   Hash,
+  Link2,
   MapPin,
   Paperclip,
   PenLine,
@@ -29,16 +30,23 @@ import {
   opcionesDesdeTexto,
   textoDesdeOpciones,
 } from "@/components/formularios/editor-opciones";
+import {
+  admiteAutocompletado,
+  etiquetaOrigen,
+  SelectorAutocompletado,
+} from "@/components/formularios/selector-autocompletado";
 import { Alerta, Spinner } from "@/components/ui/modal";
 import {
   actualizarPlantillaFormulario,
   crearPlantillaFormulario,
+  listarOrigenesAutocompletado,
   obtenerPlantillaFormulario,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type {
   CampoFormularioPayload,
   ColumnaCampoTabla,
+  OrigenesAutocompletado,
   TipoCampoColumnaTabla,
   TipoCampoFormulario,
   TipoPlantillaFormulario,
@@ -183,6 +191,7 @@ function parsearColumnas(
     etiqueta: col.etiqueta,
     tipoCampo: col.tipoCampo,
     esObligatorio: col.esObligatorio ?? false,
+    autocompletar: col.autocompletar ?? null,
     claveOpciones: Array.isArray(col.opciones?.valores)
       ? col.opciones.valores.join("\n")
       : "",
@@ -395,6 +404,22 @@ export function EditorPlantillaFormulario({
   const [estaActivo, setEstaActivo] = useState(false);
 
   const [campos, setCampos] = useState<CampoEnEdicion[]>([campoVacio(0)]);
+  const [origenes, setOrigenes] = useState<OrigenesAutocompletado | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelado = false;
+    listarOrigenesAutocompletado(token)
+      .then((datos) => {
+        if (!cancelado) setOrigenes(datos);
+      })
+      .catch(() => {
+        if (!cancelado) setOrigenes({ ficha: [], adicionales: [] });
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [token]);
 
   useEffect(() => {
     if (!esEdicion || !token || !plantillaId) return;
@@ -417,6 +442,7 @@ export function EditorPlantillaFormulario({
               esObligatorio: campo.esObligatorio,
               orden: campo.orden,
               opciones: campo.opciones,
+              autocompletar: campo.autocompletar ?? null,
               claveOpciones: Array.isArray(
                 (campo.opciones as { valores?: string[] } | undefined)
                   ?.valores,
@@ -443,6 +469,10 @@ export function EditorPlantillaFormulario({
       const actualizados = prev.map((campo, i) => {
         if (i !== indice) return campo;
         const siguiente = { ...campo, ...cambios };
+        // Otro tipo de pregunta puede no aceptar el dato elegido: se vuelve a elegir.
+        if (cambios.tipoCampo && cambios.tipoCampo !== campo.tipoCampo) {
+          siguiente.autocompletar = null;
+        }
         if (
           cambios.tipoCampo === "TABLA" &&
           (!siguiente.columnas || siguiente.columnas.length === 0)
@@ -489,9 +519,14 @@ export function EditorPlantillaFormulario({
         if (i !== indiceCampo) return campo;
         return {
           ...campo,
-          columnas: campo.columnas.map((col, j) =>
-            j === indiceColumna ? { ...col, ...cambios } : col,
-          ),
+          columnas: campo.columnas.map((col, j) => {
+            if (j !== indiceColumna) return col;
+            const siguiente = { ...col, ...cambios };
+            if (cambios.tipoCampo && cambios.tipoCampo !== col.tipoCampo) {
+              siguiente.autocompletar = null;
+            }
+            return siguiente;
+          }),
         };
       }),
     );
@@ -522,6 +557,10 @@ export function EditorPlantillaFormulario({
 
   function cambiarTipoPlantilla(tipo: TipoPlantillaFormulario) {
     setTipoPlantilla(tipo);
+    if (tipo === "GRUPAL") {
+      // Con varias personas, solo las columnas de las listas se llenan con la ficha.
+      setCampos((prev) => prev.map((campo) => ({ ...campo, autocompletar: null })));
+    }
     if (tipo === "INDIVIDUAL") {
       setCampos((prev) =>
         prev.map((campo) =>
@@ -578,6 +617,9 @@ export function EditorPlantillaFormulario({
                   tipoCampo: col.tipoCampo,
                   esObligatorio: col.esObligatorio ?? false,
                 };
+                if (col.autocompletar && admiteAutocompletado(col.tipoCampo)) {
+                  base.autocompletar = col.autocompletar;
+                }
                 if (col.tipoCampo === "SELECCION_UNICA") {
                   base.opciones = {
                     valores: opcionesDesdeTexto(col.claveOpciones),
@@ -600,6 +642,12 @@ export function EditorPlantillaFormulario({
             esObligatorio: campo.esObligatorio,
             orden: indice,
             opciones,
+            autocompletar:
+              tipoPlantilla === "INDIVIDUAL" &&
+              campo.autocompletar &&
+              admiteAutocompletado(campo.tipoCampo)
+                ? campo.autocompletar
+                : null,
           };
         },
       );
@@ -785,8 +833,18 @@ export function EditorPlantillaFormulario({
                 className="rounded-2xl border border-zinc-200 p-4 sm:p-5"
               >
                 <div className="mb-4 flex items-center justify-between gap-2">
-                  <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-ruralia-teal-soft px-2 text-xs font-bold text-ruralia-teal-text">
-                    {indice + 1}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-ruralia-teal-soft px-2 text-xs font-bold text-ruralia-teal-text">
+                      {indice + 1}
+                    </span>
+                    {campo.autocompletar ? (
+                      <span className="inline-flex min-w-0 items-center gap-1 truncate rounded-full border border-ruralia-teal-border bg-white px-2.5 py-0.5 text-xs font-medium text-ruralia-teal-text">
+                        <Link2 className="h-3 w-3 shrink-0" />
+                        <span className="truncate">
+                          Ficha: {etiquetaOrigen(campo.autocompletar.origen, origenes)}
+                        </span>
+                      </span>
+                    ) : null}
                   </span>
                   <div className="flex items-center gap-1">
                     <button
@@ -866,6 +924,26 @@ export function EditorPlantillaFormulario({
                   </div>
                 ) : null}
 
+                {tipoPlantilla === "INDIVIDUAL" &&
+                admiteAutocompletado(campo.tipoCampo) ? (
+                  <div className="mt-4">
+                    <SelectorAutocompletado
+                      tipoCampo={campo.tipoCampo}
+                      valor={campo.autocompletar}
+                      onChange={(autocompletar) =>
+                        actualizarCampo(indice, { autocompletar })
+                      }
+                      origenes={origenes}
+                    />
+                    {campo.autocompletar ? (
+                      <p className="mt-1.5 text-xs text-zinc-500">
+                        Con una pregunta así, el formulario se llena una vez por
+                        cada beneficiario de la jornada, cada uno con sus datos.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 {campo.tipoCampo === "TABLA" ? (
                   <div className="mt-4 space-y-3 rounded-xl bg-zinc-50 p-3 sm:p-4">
                     <div className="flex items-center justify-between gap-2">
@@ -881,6 +959,14 @@ export function EditorPlantillaFormulario({
                         Columna
                       </button>
                     </div>
+                    {campo.columnas.some((col) => col.autocompletar) ? (
+                      <p className="flex items-start gap-1.5 rounded-lg border border-ruralia-teal-border bg-ruralia-teal-soft/50 px-3 py-2 text-xs text-ruralia-teal-text">
+                        <Link2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        La lista sale con una fila por cada beneficiario de la
+                        jornada, sin poder quitar ni agregar filas. Agrega una
+                        columna como &quot;Asistió&quot; para marcar quién llegó.
+                      </p>
+                    ) : null}
                     {campo.columnas.map((columna, indiceCol) => (
                       <div
                         key={indiceCol}
@@ -958,6 +1044,21 @@ export function EditorPlantillaFormulario({
                                   claveOpciones: textoDesdeOpciones(valores),
                                 })
                               }
+                            />
+                          </div>
+                        ) : null}
+                        {admiteAutocompletado(columna.tipoCampo) ? (
+                          <div className="mt-3">
+                            <SelectorAutocompletado
+                              compacto
+                              tipoCampo={columna.tipoCampo}
+                              valor={columna.autocompletar}
+                              onChange={(autocompletar) =>
+                                actualizarColumna(indice, indiceCol, {
+                                  autocompletar,
+                                })
+                              }
+                              origenes={origenes}
                             />
                           </div>
                         ) : null}

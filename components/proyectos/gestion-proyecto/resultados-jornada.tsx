@@ -7,15 +7,25 @@ import {
   Download,
   FileText,
   Hash,
+  Lock,
   MapPin,
+  PencilLine,
+  ShieldCheck,
+  UserRound,
   X,
 } from "lucide-react";
 import {
   descargarPdfFormularioJornada,
   listarEnviosPorJornada,
   listarPlantillasPorJornada,
+  obtenerPlantillaFormulario,
   obtenerRespuestasEnvio,
 } from "@/lib/api";
+import {
+  CLAVE_FILA_BENEFICIARIO,
+  CorreccionEnvioFormulario,
+} from "@/components/proyectos/gestion-proyecto/correccion-envio-formulario";
+import { usePermisos } from "@/lib/use-permisos";
 import type {
   EnvioFormularioResumen,
   Jornada,
@@ -129,13 +139,42 @@ function Pill({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Indica si la respuesta vino de la ficha del beneficiario o la corrigió administración. */
+function MarcaOrigen({ origen }: { origen?: "ficha" | "corregida" }) {
+  if (origen === "corregida") {
+    return (
+      <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+        <ShieldCheck className="h-3 w-3" />
+        Corregida
+      </span>
+    );
+  }
+  if (origen === "ficha") {
+    return (
+      <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-[10px] font-semibold text-ruralia-teal-text">
+        <Lock className="h-3 w-3" />
+        De la ficha
+      </span>
+    );
+  }
+  return null;
+}
+
 function CampoFormularioVista({
   respuesta,
+  origen,
 }: {
   respuesta: RespuestaFormularioDetalle;
+  origen?: "ficha" | "corregida";
 }) {
   const tipo = resolverTipo(respuesta);
-  const etiqueta = respuesta.etiquetaCampo ?? respuesta.claveCampo;
+  const etiquetaBase = respuesta.etiquetaCampo ?? respuesta.claveCampo;
+  const etiqueta = (
+    <>
+      {etiquetaBase}
+      <MarcaOrigen origen={origen} />
+    </>
+  );
 
   if (tipo === "SI_NO") {
     const afirmativo =
@@ -242,7 +281,7 @@ function CampoFormularioVista({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={fuente}
-              alt={`Firma: ${etiqueta}`}
+              alt={`Firma: ${etiquetaBase}`}
               className="max-h-24 max-w-full object-contain"
             />
           </div>
@@ -251,7 +290,7 @@ function CampoFormularioVista({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={fuente}
-              alt={`Firma: ${etiqueta}`}
+              alt={`Firma: ${etiquetaBase}`}
               className="max-h-24 w-full object-contain"
             />
           </div>
@@ -282,7 +321,7 @@ function CampoFormularioVista({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={url}
-              alt={etiqueta}
+              alt={etiquetaBase}
               className="max-h-48 w-full object-contain bg-zinc-50"
             />
           </div>
@@ -328,7 +367,7 @@ function CampoFormularioVista({
             {mapa ? (
               <>
                 <iframe
-                  title={`Mapa de ${etiqueta}`}
+                  title={`Mapa de ${etiquetaBase}`}
                   src={`https://maps.google.com/maps?q=${ubicacion.latitud},${ubicacion.longitud}&z=16&output=embed`}
                   className="mt-2 h-44 w-full rounded-xl border border-zinc-100"
                   loading="lazy"
@@ -364,7 +403,9 @@ function CampoFormularioVista({
         : [];
     const columnas =
       filas.length > 0
-        ? Object.keys(filas[0]).filter((k) => k !== "id")
+        ? Object.keys(filas[0]).filter(
+            (k) => k !== "id" && k !== CLAVE_FILA_BENEFICIARIO,
+          )
         : [];
 
     return (
@@ -466,6 +507,33 @@ export function ResultadosJornada({ token, jornada }: ResultadosJornadaProps) {
   const [error, setError] = useState<string | null>(null);
   const [envios, setEnvios] = useState<EnvioConRespuestas[]>([]);
   const [plantillas, setPlantillas] = useState<PlantillaFormulario[]>([]);
+  const [recarga, setRecarga] = useState(0);
+  const [corrigiendo, setCorrigiendo] = useState<{
+    envio: EnvioFormularioResumen;
+    respuestas: RespuestaFormularioDetalle[];
+    plantilla: PlantillaFormulario;
+  } | null>(null);
+  const [abriendoCorreccion, setAbriendoCorreccion] = useState<string | null>(null);
+  const { puede } = usePermisos();
+  const puedeCorregir = puede("formularios.corregir_respuestas");
+
+  async function abrirCorreccion(item: EnvioConRespuestas) {
+    if (!item.envio.plantillaFormularioId) return;
+    setAbriendoCorreccion(item.envio.id);
+    setError(null);
+    try {
+      // La de la jornada pudo cambiar: se corrige contra la plantilla del envío.
+      const plantilla = await obtenerPlantillaFormulario(
+        token,
+        item.envio.plantillaFormularioId,
+      );
+      setCorrigiendo({ ...item, plantilla });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo abrir la corrección");
+    } finally {
+      setAbriendoCorreccion(null);
+    }
+  }
 
   useEffect(() => {
     let cancelado = false;
@@ -507,7 +575,7 @@ export function ResultadosJornada({ token, jornada }: ResultadosJornadaProps) {
     return () => {
       cancelado = true;
     };
-  }, [token, jornada.id]);
+  }, [token, jornada.id, recarga]);
 
   const plantillaPorId = useMemo(() => {
     const mapa = new Map<string, PlantillaFormulario>();
@@ -608,6 +676,12 @@ export function ResultadosJornada({ token, jornada }: ResultadosJornadaProps) {
           (envios.length > 1
             ? `Registro ${envio.indiceFila + 1}`
             : "Respuestas del formulario");
+        const deFicha = new Set(
+          (envio.origenRespuestas?.autocompletado ?? [])
+            .filter((r) => !r.columna)
+            .map((r) => r.clave),
+        );
+        const corregidas = new Set(envio.origenRespuestas?.corregidasPorAdmin ?? []);
 
         return (
           <article
@@ -623,6 +697,12 @@ export function ResultadosJornada({ token, jornada }: ResultadosJornadaProps) {
                   <p className="text-sm font-semibold text-zinc-900">
                     {nombreFormulario}
                   </p>
+                  {envio.beneficiarioNombre ? (
+                    <p className="flex items-center gap-1 text-xs font-medium text-ruralia-teal-text">
+                      <UserRound className="h-3 w-3" />
+                      {envio.beneficiarioNombre}
+                    </p>
+                  ) : null}
                   <p className="text-xs text-zinc-500">
                     Enviado el{" "}
                     {new Date(envio.enviadoEn).toLocaleString("es-CO", {
@@ -632,11 +712,24 @@ export function ResultadosJornada({ token, jornada }: ResultadosJornadaProps) {
                   </p>
                 </div>
               </div>
-              {envios.length > 1 ? (
-                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-500 ring-1 ring-zinc-200">
-                  Fila {envio.indiceFila + 1}
-                </span>
-              ) : null}
+              <div className="flex items-center gap-2">
+                {envios.length > 1 && !envio.beneficiarioNombre ? (
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-500 ring-1 ring-zinc-200">
+                    Fila {envio.indiceFila + 1}
+                  </span>
+                ) : null}
+                {puedeCorregir && envio.plantillaFormularioId ? (
+                  <button
+                    type="button"
+                    disabled={abriendoCorreccion === envio.id}
+                    onClick={() => void abrirCorreccion({ envio, respuestas })}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                  >
+                    <PencilLine className="h-3.5 w-3.5" />
+                    {abriendoCorreccion === envio.id ? "Abriendo…" : "Corregir"}
+                  </button>
+                ) : null}
+              </div>
             </header>
 
             {respuestas.length === 0 ? (
@@ -649,6 +742,13 @@ export function ResultadosJornada({ token, jornada }: ResultadosJornadaProps) {
                   <CampoFormularioVista
                     key={respuesta.id}
                     respuesta={respuesta}
+                    origen={
+                      corregidas.has(respuesta.claveCampo)
+                        ? "corregida"
+                        : deFicha.has(respuesta.claveCampo)
+                          ? "ficha"
+                          : undefined
+                    }
                   />
                 ))}
               </div>
@@ -656,6 +756,20 @@ export function ResultadosJornada({ token, jornada }: ResultadosJornadaProps) {
           </article>
         );
       })}
+
+      {corrigiendo ? (
+        <CorreccionEnvioFormulario
+          token={token}
+          envio={corrigiendo.envio}
+          plantilla={corrigiendo.plantilla}
+          respuestas={corrigiendo.respuestas}
+          onCerrar={() => setCorrigiendo(null)}
+          onGuardado={() => {
+            setCorrigiendo(null);
+            setRecarga((n) => n + 1);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

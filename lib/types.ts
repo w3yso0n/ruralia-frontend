@@ -1391,6 +1391,46 @@ export interface ColumnaCampoTabla {
   tipoCampo: TipoCampoColumnaTabla;
   esObligatorio?: boolean;
   opciones?: { valores?: string[] };
+  /** Una fila por beneficiario de la jornada; esta columna sale de su ficha. */
+  autocompletar?: ConfigAutocompletado | null;
+}
+
+/** La pregunta se llena sola con este dato del beneficiario y el técnico no la cambia. */
+export interface ConfigAutocompletado {
+  origen: string;
+}
+
+export interface OrigenAutocompletado {
+  origen: string;
+  etiqueta: string;
+  tipo: TipoCampoBeneficiario;
+  grupo: "ficha" | "adicional";
+}
+
+export interface OrigenesAutocompletado {
+  ficha: OrigenAutocompletado[];
+  adicionales: OrigenAutocompletado[];
+}
+
+export type ValorAutocompletado = string | number | boolean;
+
+/** Valores ya resueltos con la ficha de cada beneficiario de la jornada, por plantilla. */
+export interface AutocompletadoJornada {
+  beneficiarios: Array<{ id: string; nombre: string; numeroDocumento: string }>;
+  plantillas: Record<
+    string,
+    {
+      porPersona: boolean;
+      tablasFijas: string[];
+      valores: Record<
+        string,
+        {
+          campos: Record<string, ValorAutocompletado>;
+          columnas: Record<string, Record<string, ValorAutocompletado>>;
+        }
+      >;
+    }
+  >;
 }
 
 export type TipoPlantillaFormulario = "INDIVIDUAL" | "GRUPAL";
@@ -1414,6 +1454,7 @@ export interface CampoFormulario {
     | { columnas?: ColumnaCampoTabla[] }
     | Record<string, unknown>;
   reglasValidacion?: Record<string, unknown>;
+  autocompletar?: ConfigAutocompletado | null;
 }
 
 export interface PlantillaFormulario {
@@ -1441,6 +1482,17 @@ export interface EnvioFormularioResumen {
   usuarioId: string;
   plantillaFormularioId?: string;
   indiceFila: number;
+  beneficiarioId?: string | null;
+  beneficiarioNombre?: string | null;
+  origenRespuestas?: {
+    autocompletado: Array<{
+      clave: string;
+      origen: string;
+      columna?: string;
+      beneficiarioId?: string;
+    }>;
+    corregidasPorAdmin: string[];
+  };
 }
 
 export interface RespuestaFormularioDetalle {
@@ -1472,6 +1524,7 @@ export interface CampoFormularioPayload {
   orden?: number;
   opciones?: Record<string, unknown>;
   reglasValidacion?: Record<string, unknown>;
+  autocompletar?: ConfigAutocompletado | null;
 }
 
 export interface CrearPlantillaFormularioPayload {

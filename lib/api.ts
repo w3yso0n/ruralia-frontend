@@ -107,6 +107,8 @@ import type {
   CampoBeneficiario,
   DatosAdicionales,
   MapeoColumnasExcel,
+  OrigenesAutocompletado,
+  AutocompletadoJornada,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -2665,4 +2667,38 @@ export async function descargarExpedienteZip(
     blob: await respuesta.blob(),
     nombre: coincidencia?.[1] || "expediente.zip",
   };
+}
+
+/** Datos del beneficiario con los que se puede llenar una pregunta en el editor. */
+export async function listarOrigenesAutocompletado(
+  token: string,
+): Promise<OrigenesAutocompletado> {
+  return fetchConAuth<OrigenesAutocompletado>(
+    "/formularios/autocompletado/origenes",
+    token,
+  );
+}
+
+/** Con qué dato de la ficha se llena cada pregunta, para cada beneficiario de la jornada. */
+export async function obtenerAutocompletadoJornada(
+  token: string,
+  jornadaId: string,
+): Promise<AutocompletadoJornada> {
+  return fetchConAuth<AutocompletadoJornada>(
+    `/formularios/autocompletado/jornada/${jornadaId}`,
+    token,
+  );
+}
+
+/** Corrección de un administrador: cambia cualquier respuesta y queda en la auditoría. */
+export async function corregirEnvioFormulario(
+  token: string,
+  envioId: string,
+  payload: { respuestas: Array<{ claveCampo: string; valor: unknown }>; motivo: string },
+): Promise<EnvioFormularioResumen> {
+  return fetchConAuth<EnvioFormularioResumen>(
+    `/formularios/envios/${envioId}/correccion`,
+    token,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
 }
