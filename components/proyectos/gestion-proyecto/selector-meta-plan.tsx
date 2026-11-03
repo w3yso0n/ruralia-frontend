@@ -8,12 +8,20 @@ import {
   Target,
 } from "lucide-react";
 import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
-import type { ActividadPlan, ProcesoPlan } from "@/lib/types";
+import type {
+  ActividadPlan,
+  ProcesoPlan,
+  SubactividadPlan,
+} from "@/lib/types";
 
 interface SelectorMetaPlanProps {
   actividadesPlan: ActividadPlan[];
   metaId: string;
   onChange: (metaId: string) => void;
+  /** Avisa la subactividad elegida (o null) para sugerir beneficiarios por su línea. */
+  onSubactividad?: (subactividad: SubactividadPlan | null) => void;
+  /** Muestra la línea productiva de cada subactividad (solo proyectos agrícolas). */
+  mostrarLinea?: boolean;
   disabled?: boolean;
 }
 
@@ -41,6 +49,8 @@ export function SelectorMetaPlan({
   actividadesPlan,
   metaId,
   onChange,
+  onSubactividad,
+  mostrarLinea = false,
   disabled = false,
 }: SelectorMetaPlanProps) {
   const [actividadId, setActividadId] = useState("");
@@ -71,6 +81,12 @@ export function SelectorMetaPlan({
     (p) => p.id === procesoId,
   );
 
+  useEffect(() => {
+    onSubactividad?.(subactividadSel ?? null);
+    // Solo cuando cambia la subactividad elegida.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subactividadSel?.id, subactividadSel?.lineaProductiva?.id]);
+
   const opcionesActividad = useMemo(
     () => actividadesPlan.map((a) => ({ id: a.id, nombre: a.nombre })),
     [actividadesPlan],
@@ -81,8 +97,12 @@ export function SelectorMetaPlan({
       (actividadSel?.subactividades ?? []).map((s) => ({
         id: s.id,
         nombre: s.nombre,
+        subtitulo:
+          mostrarLinea && s.lineaProductiva
+            ? `Línea productiva: ${s.lineaProductiva.nombre}`
+            : undefined,
       })),
-    [actividadSel],
+    [actividadSel, mostrarLinea],
   );
 
   const opcionesProceso = useMemo(

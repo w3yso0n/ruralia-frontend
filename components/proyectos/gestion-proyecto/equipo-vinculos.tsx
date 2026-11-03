@@ -5,6 +5,10 @@ import {
   AvisosCargaBeneficiarios,
   CargaExcelBeneficiarios,
 } from "@/components/proyectos/carga-excel-beneficiarios";
+import {
+  AgregarBeneficiariosPorLinea,
+  FiltroLineasBeneficiarios,
+} from "@/components/proyectos/gestion-proyecto/beneficiarios-por-linea";
 import { Alerta, Modal } from "@/components/ui/modal";
 import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 import { SelectorVeredasMultiple } from "@/components/ui/selector-veredas-multiple";
@@ -35,7 +39,11 @@ import type {
   TipoDocumento,
 } from "@/lib/types";
 import { etiquetaOrganizacion } from "@/lib/types";
-import { mostrarResultadoCargaBeneficiarios } from "@/lib/swal";
+import {
+  confirmarEliminacionSimple,
+  mostrarResultadoCargaBeneficiarios,
+} from "@/lib/swal";
+import { textoBeneficiarios } from "@/lib/lineas-productivas";
 import { paresDatosAdicionales } from "@/lib/datos-adicionales";
 
 interface EquipoVinculosProps {
@@ -86,6 +94,9 @@ export function EquipoVinculos({
     "activos",
   );
   const [busquedaLista, setBusquedaLista] = useState("");
+  /** "" = todas; id de línea o "sin-linea". Solo en proyectos agrícolas. */
+  const [lineaLista, setLineaLista] = useState("");
+  const esAgricola = proyecto.tipo === "AGRICOLA";
   const [paginaLista, setPaginaLista] = useState(1);
   const [lista, setLista] = useState<RespuestaPaginada<BeneficiarioResumen> | null>(
     null,
@@ -169,6 +180,10 @@ export function EquipoVinculos({
         pagina: paginaLista,
         limite: 20,
         estado: estadoLista,
+        linea:
+          esAgricola && estadoLista === "activos" && lineaLista
+            ? lineaLista
+            : undefined,
       })
         .then((datos) => {
           if (!cancelado) setLista(datos);
@@ -194,6 +209,8 @@ export function EquipoVinculos({
     busquedaLista,
     paginaLista,
     estadoLista,
+    lineaLista,
+    esAgricola,
     token,
     proyectoId,
     recargaLista,
@@ -219,6 +236,7 @@ export function EquipoVinculos({
   function abrirLista(estado: "activos" | "reemplazados") {
     setEstadoLista(estado);
     setBusquedaLista("");
+    setLineaLista("");
     setPaginaLista(1);
     setLista(null);
     setListaAbierta(true);
@@ -351,10 +369,38 @@ export function EquipoVinculos({
     }
   }
 
-  async function quitarBeneficiario(persona: BeneficiarioResumen) {
-    if (!confirm(`¿Quitar a ${etiquetaBeneficiario(persona)} de este proyecto?`)) {
-      return;
+  async function vincularPorLinea(
+    ids: string[],
+    linea: { nombre: string },
+  ): Promise<boolean> {
+    setEnviando(true);
+    setError(null);
+    setExito(null);
+    try {
+      await vincularBeneficiariosProyecto(token, proyectoId, {
+        beneficiarios: ids.map((beneficiarioId) => ({ beneficiarioId })),
+      });
+      setExito(
+        `Se agregaron ${textoBeneficiarios(ids.length)} de ${linea.nombre} al proyecto.`,
+      );
+      await onActualizar({ silencioso: true });
+      setRecargaLista((n) => n + 1);
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudieron agregar");
+      return false;
+    } finally {
+      setEnviando(false);
     }
+  }
+
+  async function quitarBeneficiario(persona: BeneficiarioResumen) {
+    const confirmado = await confirmarEliminacionSimple({
+      titulo: "Quitar del proyecto",
+      texto: `${etiquetaBeneficiario(persona)} dejará de estar en este proyecto. Sus jornadas ya hechas se conservan.`,
+      textoConfirmar: "Sí, quitar",
+    });
+    if (!confirmado) return;
     setEnviando(true);
     setError(null);
     try {
@@ -403,8 +449,13 @@ export function EquipoVinculos({
         className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5"
       >
         <div className="min-w-0">
-          <p className="text-sm font-medium text-zinc-800">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-medium text-zinc-800">
             {etiquetaBeneficiario(b)}
+            {esAgricola && b.lineaProductiva && !lineaLista ? (
+              <span className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-[11px] font-semibold text-ruralia-teal-text">
+                {b.lineaProductiva}
+              </span>
+            ) : null}
           </p>
           {b.reemplazaA ? (
             <p className="text-xs text-amber-800">
@@ -476,6 +527,19 @@ export function EquipoVinculos({
       ancho="lg"
     >
       <div className="space-y-3">
+        {esAgricola && estadoLista === "activos" ? (
+          <FiltroLineasBeneficiarios
+            token={token}
+            proyectoId={proyectoId}
+            total={conteoBeneficiarios}
+            recarga={recargaLista}
+            value={lineaLista}
+            onChange={(linea) => {
+              setLineaLista(linea);
+              setPaginaLista(1);
+            }}
+          />
+        ) : null}
         <input
           type="search"
           value={busquedaLista}
@@ -688,8 +752,23 @@ export function EquipoVinculos({
           value=""
           onChange={(id) => void vincularUno(id)}
           placeholder="Buscar en la base para añadir uno…"
-          mensajeVacio="Opcional. Si son muchos, usa el Excel."
+          mensajeVacio={
+            esAgricola
+              ? "Opcional. Si son muchos, agrégalos por línea productiva o usa el Excel."
+              : "Opcional. Si son muchos, usa el Excel."
+          }
         />
+        {esAgricola ? (
+          <div className="mt-2">
+            <AgregarBeneficiariosPorLinea
+              token={token}
+              proyectoId={proyectoId}
+              recarga={recargaLista}
+              disabled={enviando || importando}
+              onAgregar={vincularPorLinea}
+            />
+          </div>
+        ) : null}
         <div className="mt-4">
           <CargaExcelBeneficiarios
             token={token}

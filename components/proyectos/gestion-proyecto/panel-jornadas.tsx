@@ -200,7 +200,9 @@ export function PanelJornadas({
       return respuesta.datos.map((b) => ({
         id: b.id,
         nombre: `${b.nombres} ${b.apellidos}`.trim(),
-        subtitulo: b.numeroDocumento,
+        subtitulo: [b.numeroDocumento, b.lineaProductiva]
+          .filter(Boolean)
+          .join(" · "),
       }));
     },
     [token, proyecto.id],
@@ -414,6 +416,8 @@ export function PanelJornadas({
         <section className="rounded-2xl border border-ruralia-teal-border bg-ruralia-teal-soft/30 p-6">
           <h3 className="mb-4 font-semibold text-zinc-900">Nueva jornada</h3>
           <FormularioJornada
+            proyectoId={proyecto.id}
+            esAgricola={proyecto.tipo === "AGRICOLA"}
             municipios={proyecto.municipios ?? []}
             veredas={proyecto.veredas ?? []}
             geocercas={geocercas}

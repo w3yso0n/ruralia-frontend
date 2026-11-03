@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { claveLineaProductiva } from "@/lib/lineas-productivas";
 import {
   AlertCircle,
   ArrowRight,
@@ -361,6 +362,21 @@ export function CargaExcelBeneficiarios({
     (fila) => fila.yaExiste && motivoFilaOmitida(fila) === null,
   );
   const conCambios = existentes.filter((fila) => fila.cambios?.length);
+  const lineasNuevas = [
+    ...new Map(
+      filas
+        .filter(
+          (fila) =>
+            fila.lineaProductivaNueva &&
+            fila.lineaProductiva?.trim() &&
+            motivoFilaOmitida(fila) === null,
+        )
+        .map((fila) => {
+          const nombre = (fila.lineaProductiva ?? "").replace(/\s+/g, " ").trim();
+          return [claveLineaProductiva(nombre), nombre] as const;
+        }),
+    ).values(),
+  ].sort((a, b) => a.localeCompare(b, "es"));
   const extrasDelMapeo = (mapeo?.columnas ?? []).flatMap((columna) =>
     columna.destino === "extra" ? [columna.etiqueta] : [],
   );
@@ -544,6 +560,14 @@ export function CargaExcelBeneficiarios({
                     ? "dato adicional"
                     : "datos adicionales"}
                   : {extrasDelMapeo.join(", ")}.
+                </p>
+              ) : null}
+              {lineasNuevas.length ? (
+                <p className="rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft/40 px-4 py-3 text-sm text-ruralia-teal-text">
+                  {lineasNuevas.length === 1
+                    ? "Se creará 1 línea productiva nueva"
+                    : `Se crearán ${lineasNuevas.length} líneas productivas nuevas`}
+                  : {lineasNuevas.join(", ")}.
                 </p>
               ) : null}
               {existentes.length ? (

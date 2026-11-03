@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Building2, UserRound } from "lucide-react";
 import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 
@@ -43,6 +44,8 @@ interface AsignacionJornadaProps {
   asociacionIds: string[];
   disabled?: boolean;
   ayudaSeleccionMultiple?: string;
+  /** Contenido extra sobre el buscador de beneficiarios (sugerencia por línea productiva). */
+  extraBeneficiarios?: ReactNode;
   onDestino: (destino: DestinoAsignacionJornada) => void;
   onBeneficiarioIds: (ids: string[]) => void;
   onAsociacionIds: (ids: string[]) => void;
@@ -58,6 +61,7 @@ export function AsignacionJornada({
   asociacionIds,
   disabled = false,
   ayudaSeleccionMultiple,
+  extraBeneficiarios,
   onDestino,
   onBeneficiarioIds,
   onAsociacionIds,
@@ -108,6 +112,9 @@ export function AsignacionJornada({
         </button>
       </div>
 
+      {destino === "beneficiario" && extraBeneficiarios ? (
+        <div className="space-y-2">{extraBeneficiarios}</div>
+      ) : null}
       {destino === "beneficiario" ? (
         <SelectorCatalogo
           multiple

@@ -209,6 +209,9 @@ export interface BeneficiarioResumen {
   nombres: string;
   apellidos: string;
   numeroDocumento?: string;
+  lineaProductiva?: string | null;
+  /** Solo al listar candidatos por línea productiva. */
+  municipio?: string | null;
   estaActivoEnProyecto?: boolean;
   reemplazaA?: BeneficiarioResumen;
   reemplazadoPor?: BeneficiarioResumen;
@@ -520,6 +523,7 @@ export interface SubactividadPlan {
   completadaEn?: string;
   completadaPor?: CompletadaPor;
   progresoPorcentaje: number;
+  lineaProductiva?: LineaProductiva | null;
   procesos?: ProcesoPlan[];
 }
 
@@ -894,10 +898,38 @@ export interface Beneficiario {
   fechaNacimiento?: string;
   municipio?: string | null;
   lineaProductiva?: string | null;
+  lineaProductivaId?: string | null;
   nombreAsociacion?: string | null;
   estaActivo: boolean;
   datosAdicionales?: DatosAdicionales;
   vereda?: VeredaResumen;
+}
+
+export interface LineaProductiva {
+  id: string;
+  nombre: string;
+}
+
+/** Línea con el número de beneficiarios activos de un proyecto. */
+export interface LineaProductivaProyecto extends LineaProductiva {
+  beneficiarios: number;
+}
+
+export interface LineaProductivaAdministracion extends LineaProductiva {
+  beneficiarios: number;
+  subactividades: number;
+}
+
+export interface AdministracionLineasProductivas {
+  lineas: LineaProductivaAdministracion[];
+  /** Grupos de ids con nombres casi iguales. */
+  posiblesDuplicados: string[][];
+}
+
+export interface ResultadoUnificarLineas {
+  linea: LineaProductiva;
+  beneficiariosActualizados: number;
+  subactividadesActualizadas: number;
 }
 
 export interface OrganizacionResumen {
@@ -1117,6 +1149,8 @@ export interface CrearSubactividadPayload {
   descripcion?: string;
   objetivo?: string;
   orden?: number;
+  /** Nombre de la línea; si no existe se crea. null la quita. */
+  lineaProductiva?: string | null;
 }
 
 export interface CrearProcesoPayload {

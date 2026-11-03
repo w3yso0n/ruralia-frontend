@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, EyeOff, Trash2 } from "lucide-react";
 import { Alerta, Modal, Spinner } from "@/components/ui/modal";
+import { SelectorLineaProductiva } from "@/components/ui/selector-linea-productiva";
 import {
   actualizarBeneficiario,
   crearBeneficiario,
@@ -899,16 +900,15 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
                 <label className="mb-1 block text-sm font-medium text-zinc-700">
                   Línea productiva
                 </label>
-                <input
+                <SelectorLineaProductiva
                   value={formulario.lineaProductiva}
-                  onChange={(e) =>
-                    setFormulario((f) => ({
-                      ...f,
-                      lineaProductiva: e.target.value,
-                    }))
+                  onChange={(nombre) =>
+                    setFormulario((f) => ({ ...f, lineaProductiva: nombre }))
                   }
-                  className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
                 />
+                <p className="mt-1 text-xs text-zinc-500">
+                  Opcional. Si no existe, escríbela y elige Crear.
+                </p>
               </div>
             </div>
             {modo === "editar" ? (

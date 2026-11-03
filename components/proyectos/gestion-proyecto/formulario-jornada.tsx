@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 import {
   SelectorLugarJornada,
@@ -16,16 +16,27 @@ import {
   fechaFueraDeProyecto,
   SelectorFechaJornada,
 } from "@/components/ui/selector-fecha-jornada";
-import { listarCatalogoFormulariosJornada } from "@/lib/api";
+import {
+  listarBeneficiariosDeLinea,
+  listarCatalogoFormulariosJornada,
+  listarLineasProductivasProyecto,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type {
   ActividadPlan,
   Geocerca,
+  LineaProductivaProyecto,
   MunicipioResumen,
   PlantillaFormularioCatalogo,
+  SubactividadPlan,
   TipoJornada,
   VeredaResumen,
 } from "@/lib/types";
+import {
+  AgregarPorLinea,
+  SugerenciaLineaJornada,
+  type MiembroLinea,
+} from "./seleccion-por-linea";
 import { SelectorMetaPlan } from "./selector-meta-plan";
 import {
   CLAVE_FORMULARIO_INDIVIDUAL,
@@ -36,9 +47,14 @@ import {
 interface AgenteOpcion {
   id: string;
   nombre: string;
+  subtitulo?: string;
 }
 
 interface FormularioJornadaProps {
+  /** Necesario para sugerir beneficiarios por línea productiva. */
+  proyectoId?: string;
+  /** Las sugerencias por línea productiva solo se muestran en proyectos agrícolas. */
+  esAgricola?: boolean;
   municipios: MunicipioResumen[];
   veredas: VeredaResumen[];
   geocercas: Geocerca[];
@@ -69,6 +85,8 @@ interface FormularioJornadaProps {
 }
 
 export function FormularioJornada({
+  proyectoId,
+  esAgricola = false,
   municipios,
   veredas,
   geocercas,
@@ -110,6 +128,18 @@ export function FormularioJornada({
   const [beneficiarioIds, setBeneficiarioIds] = useState<string[]>([]);
   const [asociacionIds, setAsociacionIds] = useState<string[]>([]);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
+  const [subactividad, setSubactividad] = useState<SubactividadPlan | null>(
+    null,
+  );
+  const [lineasProyecto, setLineasProyecto] = useState<
+    LineaProductivaProyecto[]
+  >([]);
+  const [miembrosPorLinea, setMiembrosPorLinea] = useState<
+    Record<string, MiembroLinea[]>
+  >({});
+  const [cargandoLinea, setCargandoLinea] = useState(false);
+  /** Nombres de quienes se agregaron en lote, para mostrarlos en la selección. */
+  const [conocidos, setConocidos] = useState<Record<string, AgenteOpcion>>({});
 
   useEffect(() => {
     if (!token) return;
@@ -117,6 +147,74 @@ export function FormularioJornada({
       .then(setPlantillas)
       .catch(() => setPlantillas([]));
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !proyectoId || !esAgricola) return;
+    void listarLineasProductivasProyecto(token, proyectoId)
+      .then(setLineasProyecto)
+      .catch(() => setLineasProyecto([]));
+  }, [token, proyectoId, esAgricola]);
+
+  const cargarMiembros = useCallback(
+    async (lineaId: string): Promise<MiembroLinea[]> => {
+      const enCache = miembrosPorLinea[lineaId];
+      if (enCache) return enCache;
+      if (!token || !proyectoId) return [];
+      setCargandoLinea(true);
+      try {
+        const datos = await listarBeneficiariosDeLinea(token, proyectoId, lineaId);
+        const miembros = datos.map((b) => ({
+          id: b.id,
+          nombre: `${b.nombres} ${b.apellidos}`.trim(),
+          subtitulo: b.numeroDocumento,
+        }));
+        setMiembrosPorLinea((prev) => ({ ...prev, [lineaId]: miembros }));
+        return miembros;
+      } catch {
+        setErrorLocal("No se pudieron cargar los beneficiarios de esa línea");
+        return [];
+      } finally {
+        setCargandoLinea(false);
+      }
+    },
+    [miembrosPorLinea, token, proyectoId],
+  );
+
+  function recordarNombres(miembros: MiembroLinea[]) {
+    setConocidos((prev) => {
+      const siguiente = { ...prev };
+      for (const m of miembros) siguiente[m.id] = m;
+      return siguiente;
+    });
+  }
+
+  function agregarMiembros(miembros: MiembroLinea[]) {
+    if (!miembros.length) return;
+    recordarNombres(miembros);
+    setDestino("beneficiario");
+    setAsociacionIds([]);
+    setBeneficiarioIds((prev) => {
+      const actuales = new Set(prev);
+      return [...prev, ...miembros.map((m) => m.id).filter((id) => !actuales.has(id))];
+    });
+  }
+
+  function quitarMiembros(miembros: MiembroLinea[]) {
+    const fuera = new Set(miembros.map((m) => m.id));
+    setBeneficiarioIds((prev) => prev.filter((id) => !fuera.has(id)));
+  }
+
+  const lineaSubactividad = esAgricola
+    ? (subactividad?.lineaProductiva ?? null)
+    : null;
+  const totalLineaSubactividad = lineaSubactividad
+    ? (lineasProyecto.find((l) => l.id === lineaSubactividad.id)?.beneficiarios ?? 0)
+    : 0;
+  const seleccionados = useMemo(() => new Set(beneficiarioIds), [beneficiarioIds]);
+  const opcionesBeneficiarios = useMemo(
+    () => [...beneficiarios, ...Object.values(conocidos)],
+    [beneficiarios, conocidos],
+  );
 
   const seleccion = resolverSeleccionFormulario(claveFormulario, plantillas);
   const esGrupal = seleccion.tipo === "GRUPAL";
@@ -206,28 +304,63 @@ export function FormularioJornada({
     setAsociacionIds([]);
   }
 
+  const extraBeneficiarios =
+    esAgricola && (lineaSubactividad || lineasProyecto.length) ? (
+      <>
+        {lineaSubactividad ? (
+          <SugerenciaLineaJornada
+            linea={lineaSubactividad}
+            total={totalLineaSubactividad}
+            miembros={miembrosPorLinea[lineaSubactividad.id]}
+            seleccionados={seleccionados}
+            cargando={cargandoLinea}
+            disabled={enviando}
+            onPedirMiembros={() => void cargarMiembros(lineaSubactividad.id)}
+            onAgregarTodos={async () =>
+              agregarMiembros(await cargarMiembros(lineaSubactividad.id))
+            }
+            onQuitarTodos={() =>
+              quitarMiembros(miembrosPorLinea[lineaSubactividad.id] ?? [])
+            }
+            onAlternar={(miembro) =>
+              seleccionados.has(miembro.id)
+                ? quitarMiembros([miembro])
+                : agregarMiembros([miembro])
+            }
+          />
+        ) : null}
+        <AgregarPorLinea
+          lineas={lineasProyecto}
+          excluirId={lineaSubactividad?.id}
+          disabled={enviando || cargandoLinea}
+          onElegir={async (linea) => agregarMiembros(await cargarMiembros(linea.id))}
+        />
+      </>
+    ) : null;
+
   return (
     <form onSubmit={(e) => void manejarSubmit(e)} className="space-y-4">
-      <p className="text-sm text-zinc-600">
-        Elige la meta del plan y el formulario: el individual o grupal del
-        proceso, o cualquier plantilla publicada del catálogo.
-      </p>
+      {esAgricola ? (
+        <p className="text-sm text-zinc-600">
+          Empieza por la meta del plan: si su subactividad tiene línea
+          productiva, te sugerimos a sus beneficiarios.
+        </p>
+      ) : null}
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-zinc-700">
-          Agente de campo *
-        </label>
-        <SelectorCatalogo
-          opciones={agentes}
-          value={agenteId}
-          onChange={setAgenteId}
-          placeholder="Buscar y asignar un agente del equipo..."
-          mensajeVacio="No hay personal asignado al proyecto. Configúralo en Equipo y contraparte."
+      <div className="space-y-3 rounded-2xl border border-ruralia-teal-border bg-white p-4">
+        <p className="text-sm font-medium text-zinc-800">Meta del plan *</p>
+        <SelectorMetaPlan
+          actividadesPlan={actividadesPlan}
+          metaId={metaId}
+          onChange={setMetaId}
+          onSubactividad={setSubactividad}
+          mostrarLinea={esAgricola}
+          disabled={enviando}
         />
       </div>
 
       <AsignacionJornada
-        beneficiarios={beneficiarios}
+        beneficiarios={opcionesBeneficiarios}
         buscarBeneficiarios={buscarBeneficiarios}
         hayBeneficiarios={hayBeneficiarios}
         asociaciones={asociaciones}
@@ -241,9 +374,23 @@ export function FormularioJornada({
           if (siguiente === "beneficiario") setAsociacionIds([]);
           else setBeneficiarioIds([]);
         }}
+        extraBeneficiarios={extraBeneficiarios}
         onBeneficiarioIds={setBeneficiarioIds}
         onAsociacionIds={setAsociacionIds}
       />
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-zinc-700">
+          Agente de campo *
+        </label>
+        <SelectorCatalogo
+          opciones={agentes}
+          value={agenteId}
+          onChange={setAgenteId}
+          placeholder="Buscar y asignar un agente del equipo..."
+          mensajeVacio="No hay personal asignado al proyecto. Configúralo en Equipo y contraparte."
+        />
+      </div>
 
       <div>
         <label className="mb-1 block text-sm font-medium text-zinc-700">
@@ -291,15 +438,6 @@ export function FormularioJornada({
         disabled={enviando}
       />
 
-      <div className="space-y-3 rounded-2xl border border-ruralia-teal-border bg-white p-4">
-        <p className="text-sm font-medium text-zinc-800">Meta del plan *</p>
-        <SelectorMetaPlan
-          actividadesPlan={actividadesPlan}
-          metaId={metaId}
-          onChange={setMetaId}
-          disabled={enviando}
-        />
-      </div>
 
       <div>
         <label className="mb-1 block text-sm font-medium text-zinc-700">

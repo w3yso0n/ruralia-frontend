@@ -34,6 +34,7 @@ const ETIQUETAS_MODULO: Record<string, string> = {
   proyectos: "Proyectos",
   actividades: "Actividades",
   contrapartes: "Contrapartes",
+  lineas_productivas: "Líneas productivas",
   jornadas: "Jornadas",
   formularios: "Formularios",
   indicadores: "Indicadores",

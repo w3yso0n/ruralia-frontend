@@ -1,5 +1,9 @@
 import { firebaseConfigurado, obtenerAuth } from "@/lib/firebase";
 import type {
+  AdministracionLineasProductivas,
+  LineaProductiva,
+  LineaProductivaProyecto,
+  ResultadoUnificarLineas,
   ActividadPlan,
   ActualizarPlantillaFormularioPayload,
   ActualizarProyectoPayload,
@@ -643,6 +647,8 @@ export async function listarBeneficiariosProyecto(
     pagina?: number;
     limite?: number;
     estado?: "activos" | "reemplazados";
+    /** Id de línea productiva o "sin-linea". */
+    linea?: string;
   },
 ): Promise<RespuestaPaginada<BeneficiarioResumen>> {
   return fetchConAuth<RespuestaPaginada<BeneficiarioResumen>>(
@@ -873,6 +879,8 @@ export interface FilaExcelBeneficiarioPreview {
   extras?: DatosAdicionales;
   /** La cédula ya está en la plataforma: no se duplica, se actualiza. */
   yaExiste?: boolean;
+  /** La línea productiva no existe todavía: se creará al cargar. */
+  lineaProductivaNueva?: boolean;
   cambios?: CambioDatoBeneficiario[];
 }
 
@@ -2701,4 +2709,102 @@ export async function corregirEnvioFormulario(
     token,
     { method: "PATCH", body: JSON.stringify(payload) },
   );
+}
+
+// ---------------------------------------------------------------------------
+// Líneas productivas
+// ---------------------------------------------------------------------------
+
+export async function buscarLineasProductivas(
+  token: string,
+  busqueda?: string,
+): Promise<LineaProductiva[]> {
+  return fetchConAuth<LineaProductiva[]>(
+    `/lineas-productivas${construirQuery({ busqueda: busqueda || undefined, limite: 20 })}`,
+    token,
+  );
+}
+
+export async function listarLineasProductivasProyecto(
+  token: string,
+  proyectoId: string,
+): Promise<LineaProductivaProyecto[]> {
+  return fetchConAuth<LineaProductivaProyecto[]>(
+    `/proyectos/${proyectoId}/lineas-productivas`,
+    token,
+  );
+}
+
+export async function listarBeneficiariosDeLinea(
+  token: string,
+  proyectoId: string,
+  lineaId: string,
+): Promise<BeneficiarioResumen[]> {
+  return fetchConAuth<BeneficiarioResumen[]>(
+    `/proyectos/${proyectoId}/lineas-productivas/${lineaId}/beneficiarios`,
+    token,
+  );
+}
+
+/** Líneas con beneficiarios del catálogo que aún no están en el proyecto (solo agrícolas). */
+export async function listarLineasDisponiblesProyecto(
+  token: string,
+  proyectoId: string,
+): Promise<LineaProductivaProyecto[]> {
+  return fetchConAuth<LineaProductivaProyecto[]>(
+    `/proyectos/${proyectoId}/lineas-productivas/disponibles`,
+    token,
+  );
+}
+
+export async function listarDisponiblesDeLinea(
+  token: string,
+  proyectoId: string,
+  lineaId: string,
+): Promise<BeneficiarioResumen[]> {
+  return fetchConAuth<BeneficiarioResumen[]>(
+    `/proyectos/${proyectoId}/lineas-productivas/${lineaId}/disponibles`,
+    token,
+  );
+}
+
+export async function obtenerAdministracionLineas(
+  token: string,
+): Promise<AdministracionLineasProductivas> {
+  return fetchConAuth<AdministracionLineasProductivas>(
+    "/lineas-productivas/administracion",
+    token,
+  );
+}
+
+export async function renombrarLineaProductiva(
+  token: string,
+  id: string,
+  nombre: string,
+): Promise<LineaProductiva> {
+  return fetchConAuth<LineaProductiva>(`/lineas-productivas/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ nombre }),
+  });
+}
+
+export async function unificarLineasProductivas(
+  token: string,
+  destinoId: string,
+  origenIds: string[],
+): Promise<ResultadoUnificarLineas> {
+  return fetchConAuth<ResultadoUnificarLineas>(
+    "/lineas-productivas/unificar",
+    token,
+    { method: "POST", body: JSON.stringify({ destinoId, origenIds }) },
+  );
+}
+
+export async function eliminarLineaProductiva(
+  token: string,
+  id: string,
+): Promise<void> {
+  return fetchConAuth<void>(`/lineas-productivas/${id}`, token, {
+    method: "DELETE",
+  });
 }

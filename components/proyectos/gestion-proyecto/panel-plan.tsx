@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import { Alerta, Modal } from "@/components/ui/modal";
 import { confirmarEliminacionSimple } from "@/lib/swal";
 import {
@@ -20,6 +26,9 @@ import {
   WandSparkles,
 } from "lucide-react";
 import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
+import { SelectorLineaProductiva } from "@/components/ui/selector-linea-productiva";
+import { listarLineasProductivasProyecto } from "@/lib/api";
+import type { LineaProductivaProyecto } from "@/lib/types";
 import { PanelAvanceGant } from "@/components/proyectos/gestion-proyecto/panel-avance-gant";
 import { SeccionFormulariosProceso } from "@/components/proyectos/gestion-proyecto/seccion-formularios-proceso";
 import {
@@ -59,6 +68,8 @@ interface PanelPlanProps {
   planActualizadoEn?: Date | null;
   fechaInicioProyecto?: string;
   fechaFinProyecto?: string;
+  /** Las líneas productivas solo se usan en proyectos agrícolas. */
+  esAgricola?: boolean;
 }
 
 const MESES_COMPLETOS = [
@@ -363,6 +374,9 @@ interface EdicionPlan {
   ejecutar: <T>(accion: () => Promise<T>) => Promise<T | undefined>;
   fechaInicioProyecto?: string;
   fechaFinProyecto?: string;
+  /** Líneas de los beneficiarios del proyecto (selector de la subactividad). */
+  lineasProyecto?: LineaProductivaProyecto[];
+  esAgricola: boolean;
 }
 
 const EdicionPlanContext = createContext<EdicionPlan | null>(null);
@@ -428,9 +442,11 @@ function DetalleActividad({
   migas: MigaPlan[];
   onNavegar: (sel: SeleccionPlan) => void;
 }) {
-  const { token, puedeGestionar, enviando, ejecutar } = useEdicionPlan();
+  const { token, puedeGestionar, enviando, ejecutar, lineasProyecto, esAgricola } =
+    useEdicionPlan();
   const [nombre, setNombre] = useState(actividad.nombre);
   const [nuevaSub, setNuevaSub] = useState("");
+  const [lineaNuevaSub, setLineaNuevaSub] = useState("");
   const subs = actividad.subactividades ?? [];
   const siguiente = SIGUIENTE_NIVEL.actividad;
 
@@ -490,7 +506,10 @@ function DetalleActividad({
         items={subs.map((sub) => ({
           id: sub.id,
           nombre: sub.nombre,
-          extra: `${sub.progresoPorcentaje}%`,
+          extra:
+            esAgricola && sub.lineaProductiva
+            ? `${sub.lineaProductiva.nombre} · ${sub.progresoPorcentaje}%`
+            : `${sub.progresoPorcentaje}%`,
           seleccion: {
             tipo: "subactividad",
             id: sub.id,
@@ -514,8 +533,12 @@ function DetalleActividad({
               void ejecutar(async () => {
                 await crearSubactividad(token, actividad.id, {
                   nombre: nuevaSub.trim(),
+                  ...(esAgricola
+                    ? { lineaProductiva: lineaNuevaSub || null }
+                    : {}),
                 });
                 setNuevaSub("");
+                setLineaNuevaSub("");
               });
             }}
           >
@@ -525,6 +548,14 @@ function DetalleActividad({
               placeholder="Ej: Implementar mejoramiento técnico"
               className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm"
             />
+            {esAgricola ? (
+              <CampoLineaSubactividad
+                value={lineaNuevaSub}
+                onChange={setLineaNuevaSub}
+                lineasProyecto={lineasProyecto}
+                disabled={enviando}
+              />
+            ) : null}
             <button
               type="submit"
               disabled={enviando || !nuevaSub.trim()}
@@ -535,6 +566,37 @@ function DetalleActividad({
           </form>
         </TarjetaSeccion>
       ) : null}
+    </div>
+  );
+}
+
+function CampoLineaSubactividad({
+  value,
+  onChange,
+  lineasProyecto,
+  disabled,
+}: {
+  value: string;
+  onChange: (nombre: string) => void;
+  lineasProyecto?: LineaProductivaProyecto[];
+  disabled?: boolean;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-zinc-700">
+        Línea productiva
+      </label>
+      <SelectorLineaProductiva
+        value={value}
+        onChange={onChange}
+        lineasProyecto={lineasProyecto}
+        disabled={disabled}
+        placeholder="Sin línea productiva"
+      />
+      <p className="mt-1 text-xs text-zinc-500">
+        Opcional. Al crear una jornada se sugieren los beneficiarios de esta
+        línea.
+      </p>
     </div>
   );
 }
@@ -550,9 +612,11 @@ function DetalleSubactividad({
   migas: MigaPlan[];
   onNavegar: (sel: SeleccionPlan) => void;
 }) {
-  const { token, puedeGestionar, enviando, ejecutar } = useEdicionPlan();
+  const { token, puedeGestionar, enviando, ejecutar, lineasProyecto, esAgricola } =
+    useEdicionPlan();
   const [nombre, setNombre] = useState(sub.nombre);
   const [objetivo, setObjetivo] = useState(sub.objetivo ?? "");
+  const [linea, setLinea] = useState(sub.lineaProductiva?.nombre ?? "");
   const [nuevoProceso, setNuevoProceso] = useState("");
   const procesos = sub.procesos ?? [];
   const siguiente = SIGUIENTE_NIVEL.subactividad;
@@ -571,7 +635,7 @@ function DetalleSubactividad({
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             disabled={!puedeGestionar}
-            className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm disabled:bg-zinc-50"
           />
           <textarea
             value={objetivo}
@@ -579,8 +643,16 @@ function DetalleSubactividad({
             disabled={!puedeGestionar}
             placeholder="Objetivo (opcional)"
             rows={2}
-            className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm disabled:bg-zinc-50"
           />
+          {esAgricola ? (
+            <CampoLineaSubactividad
+              value={linea}
+              onChange={setLinea}
+              lineasProyecto={lineasProyecto}
+              disabled={!puedeGestionar || enviando}
+            />
+          ) : null}
         </div>
         {puedeGestionar ? (
           <div className="mt-3 flex gap-2">
@@ -589,7 +661,11 @@ function DetalleSubactividad({
               disabled={enviando}
               onClick={() =>
                 void ejecutar(() =>
-                  actualizarSubactividad(token, sub.id, { nombre, objetivo }),
+                  actualizarSubactividad(token, sub.id, {
+                    nombre,
+                    objetivo,
+                    ...(esAgricola ? { lineaProductiva: linea || null } : {}),
+                  }),
                 )
               }
               className="rounded-lg bg-ruralia-teal px-3 py-1.5 text-xs font-semibold text-white"
@@ -1373,6 +1449,7 @@ export function PanelPlan({
   planActualizadoEn,
   fechaInicioProyecto,
   fechaFinProyecto,
+  esAgricola = false,
 }: PanelPlanProps) {
   const [subTab, setSubTab] = useState<SubTab>("estructura");
   const [seleccion, setSeleccion] = useState<SeleccionPlan | null>(null);
@@ -1382,6 +1459,24 @@ export function PanelPlan({
   const [error, setError] = useState<string | null>(null);
 
   const actividades = plan?.actividades ?? [];
+  const [lineasProyecto, setLineasProyecto] = useState<
+    LineaProductivaProyecto[] | undefined
+  >(undefined);
+
+  useEffect(() => {
+    if (!token || !puedeGestionar || !esAgricola) return;
+    let cancelado = false;
+    void listarLineasProductivasProyecto(token, proyectoId)
+      .then((datos) => {
+        if (!cancelado) setLineasProyecto(datos);
+      })
+      .catch(() => {
+        if (!cancelado) setLineasProyecto([]);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [token, proyectoId, puedeGestionar, esAgricola]);
 
   async function manejarRecargarAvance() {
     setRecargandoAvance(true);
@@ -1439,6 +1534,8 @@ export function PanelPlan({
     ejecutar,
     fechaInicioProyecto,
     fechaFinProyecto,
+    lineasProyecto,
+    esAgricola,
   };
 
   function renderDetalle() {

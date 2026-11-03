@@ -644,6 +644,7 @@ function VistaGestionProyectoCompleta({
           planActualizadoEn={planActualizadoEn}
           fechaInicioProyecto={proyecto.fechaInicio}
           fechaFinProyecto={proyecto.fechaFin}
+          esAgricola={proyecto.tipo === "AGRICOLA"}
         />
       ) : null}
 

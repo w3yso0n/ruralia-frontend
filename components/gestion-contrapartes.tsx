@@ -3,16 +3,21 @@
 import { useState } from "react";
 import { GestionAsociaciones } from "@/components/gestion-asociaciones";
 import { GestionBeneficiarios } from "@/components/gestion-beneficiarios";
+import { GestionLineasProductivas } from "@/components/gestion-lineas-productivas";
 import { useAuth } from "@/lib/auth-context";
 
-type Tab = "beneficiarios" | "asociaciones" | "oam";
+type Tab = "beneficiarios" | "asociaciones" | "oam" | "lineas";
+
+const PERMISO_ADMINISTRAR_LINEAS = "lineas_productivas.administrar";
 
 export function GestionContrapartes() {
   const { usuario } = useAuth();
   const [tab, setTab] = useState<Tab>("beneficiarios");
 
-  const puedeGestionar = !!usuario && (usuario.permisos ?? []).includes("contrapartes.editar");
-
+  const permisos = usuario?.permisos ?? [];
+  const puedeGestionar = permisos.includes("contrapartes.editar");
+  const puedeAdministrarLineas = permisos.includes(PERMISO_ADMINISTRAR_LINEAS);
+  const tabVisible = tab === "lineas" && !puedeAdministrarLineas ? "beneficiarios" : tab;
 
   return (
     <>
@@ -26,7 +31,7 @@ export function GestionContrapartes() {
         </p>
       </div>
 
-      <div className="mb-6 flex gap-2 border-b border-zinc-200">
+      <div className="mb-6 flex gap-2 overflow-x-auto border-b border-zinc-200">
         <button
           type="button"
           onClick={() => setTab("beneficiarios")}
@@ -60,11 +65,26 @@ export function GestionContrapartes() {
         >
           OAM
         </button>
+        {puedeAdministrarLineas ? (
+          <button
+            type="button"
+            onClick={() => setTab("lineas")}
+            className={`border-b-2 px-4 py-2 text-sm font-medium ${
+              tab === "lineas"
+                ? "border-ruralia-teal text-ruralia-teal-text"
+                : "border-transparent text-zinc-500 hover:text-zinc-800"
+            }`}
+          >
+            Líneas productivas
+          </button>
+        ) : null}
       </div>
 
-      {tab === "beneficiarios" ? (
+      {tabVisible === "lineas" ? (
+        <GestionLineasProductivas />
+      ) : tabVisible === "beneficiarios" ? (
         <GestionBeneficiarios puedeGestionar={puedeGestionar} />
-      ) : tab === "oam" ? (
+      ) : tabVisible === "oam" ? (
         <GestionAsociaciones puedeGestionar={puedeGestionar} tipo="OAM" />
       ) : (
         <GestionAsociaciones puedeGestionar={puedeGestionar} tipo="ASOCIACION" />
