@@ -9,7 +9,9 @@ import {
   AgregarBeneficiariosPorLinea,
   FiltroLineasBeneficiarios,
 } from "@/components/proyectos/gestion-proyecto/beneficiarios-por-linea";
+import { BotonExcelLineaBase } from "@/components/proyectos/gestion-proyecto/panel-linea-base";
 import { Alerta, Modal } from "@/components/ui/modal";
+import { usePermisos } from "@/lib/use-permisos";
 import { SelectorCatalogo } from "@/components/ui/selector-catalogo";
 import { SelectorVeredasMultiple } from "@/components/ui/selector-veredas-multiple";
 import {
@@ -70,6 +72,7 @@ export function EquipoVinculos({
   puedeGestionar,
   onActualizar,
 }: EquipoVinculosProps) {
+  const { puede } = usePermisos();
   const [veredaIds, setVeredaIds] = useState<string[]>([]);
   const [municipioIds, setMunicipioIds] = useState<string[]>([]);
   const [usuarioIds, setUsuarioIds] = useState<string[]>([]);
@@ -745,6 +748,9 @@ export function EquipoVinculos({
           >
             Historial de reemplazos
           </button>
+          {puede("linea_base.exportar") ? (
+            <BotonExcelLineaBase token={token} proyectoId={proyectoId} compacto />
+          ) : null}
         </div>
         <SelectorCatalogo
           opciones={[]}
