@@ -1447,7 +1447,7 @@ export const ETIQUETA_FASE: Record<FaseFormulario, string> = {
 /** Pregunta de línea base que, al aprobar, guarda la respuesta en este dato del beneficiario. */
 export interface VinculoBeneficiario {
   destino: string;
-  /** Hoy siempre false: la pregunta sale fija si la persona ya tiene el dato. */
+  /** true (por defecto): la pregunta sale prellenada y editable. false: sale fija si la persona ya tiene el dato. */
   permitirCambio?: boolean;
 }
 
@@ -1492,6 +1492,8 @@ export interface ColumnaCampoTabla {
 /** La pregunta se llena sola con este dato del beneficiario y el técnico no la cambia. */
 export interface ConfigAutocompletado {
   origen: string;
+  /** Sale prellenada pero el técnico la puede cambiar (línea base con opción a cambio). */
+  editable?: boolean;
 }
 
 export interface OrigenAutocompletado {
