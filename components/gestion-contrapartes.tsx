@@ -4,9 +4,10 @@ import { useState } from "react";
 import { GestionAsociaciones } from "@/components/gestion-asociaciones";
 import { GestionBeneficiarios } from "@/components/gestion-beneficiarios";
 import { GestionLineasProductivas } from "@/components/gestion-lineas-productivas";
+import { MapaTerritorioBeneficiarios } from "@/components/territorio/mapa-territorio-beneficiarios";
 import { useAuth } from "@/lib/auth-context";
 
-type Tab = "beneficiarios" | "asociaciones" | "oam" | "lineas";
+type Tab = "beneficiarios" | "asociaciones" | "oam" | "territorio" | "lineas";
 
 const PERMISO_ADMINISTRAR_LINEAS = "lineas_productivas.administrar";
 
@@ -65,6 +66,17 @@ export function GestionContrapartes() {
         >
           OAM
         </button>
+        <button
+          type="button"
+          onClick={() => setTab("territorio")}
+          className={`border-b-2 px-4 py-2 text-sm font-medium ${
+            tab === "territorio"
+              ? "border-ruralia-teal text-ruralia-teal-text"
+              : "border-transparent text-zinc-500 hover:text-zinc-800"
+          }`}
+        >
+          Territorio
+        </button>
         {puedeAdministrarLineas ? (
           <button
             type="button"
@@ -82,6 +94,8 @@ export function GestionContrapartes() {
 
       {tabVisible === "lineas" ? (
         <GestionLineasProductivas />
+      ) : tabVisible === "territorio" ? (
+        <MapaTerritorioBeneficiarios puedeGestionar={puedeGestionar} />
       ) : tabVisible === "beneficiarios" ? (
         <GestionBeneficiarios puedeGestionar={puedeGestionar} />
       ) : tabVisible === "oam" ? (

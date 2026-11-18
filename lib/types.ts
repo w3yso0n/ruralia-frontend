@@ -900,6 +900,16 @@ export interface Beneficiario {
   lineaProductiva?: string | null;
   lineaProductivaId?: string | null;
   nombreAsociacion?: string | null;
+  /** Ubicación propia del beneficiario (predio). No es la de la vereda. */
+  latitud?: number | null;
+  longitud?: number | null;
+  /** Altitud del predio (m s. n. m.). */
+  altitud?: number | null;
+  ubicacionFuente?: FuenteUbicacionBeneficiario | null;
+  ubicacionOrigenGps?: OrigenGpsUbicacion | null;
+  ubicacionPrecisionMetros?: number | null;
+  ubicacionCapturadaEn?: string | null;
+  ubicacionConfirmadaEn?: string | null;
   estaActivo: boolean;
   datosAdicionales?: DatosAdicionales;
   vereda?: VeredaResumen;
@@ -992,6 +1002,10 @@ export interface CrearBeneficiarioPayload {
   municipio?: string;
   lineaProductiva?: string;
   nombreAsociacion?: string;
+  /** Ubicación propia (predio). Latitud y longitud van juntas; null las borra. */
+  latitud?: number | null;
+  longitud?: number | null;
+  altitud?: number | null;
 }
 
 export interface ActualizarBeneficiarioPayload {
@@ -1010,6 +1024,10 @@ export interface ActualizarBeneficiarioPayload {
   municipio?: string;
   lineaProductiva?: string;
   nombreAsociacion?: string;
+  /** Ubicación propia (predio). Latitud y longitud van juntas; null las borra. */
+  latitud?: number | null;
+  longitud?: number | null;
+  altitud?: number | null;
 }
 
 export interface CrearAsociacionPayload {
@@ -1327,6 +1345,9 @@ export type CampoModeloBeneficiario =
   | "edad"
   | "fechaNacimiento"
   | "municipio"
+  | "latitud"
+  | "longitud"
+  | "altitud"
   | "lineaProductiva"
   | "nombreAsociacion"
   | "estado";
@@ -1716,3 +1737,58 @@ export interface ResumenDesviaciones {
   incumplimientos: number;
   detalle: DesviacionMeta[];
 }
+
+/** Beneficiario activo con su ubicación, para el mapa de territorio. */
+export interface PuntoTerritorioBeneficiario {
+  id: string;
+  nombres: string;
+  apellidos: string;
+  numeroDocumento: string;
+  lineaProductiva: string | null;
+  nombreAsociacion: string | null;
+  municipioTexto: string | null;
+  veredaId: string | null;
+  veredaNombre: string | null;
+  /** Código DANE de la vereda (8 dígitos). */
+  veredaCodigo: string | null;
+  municipioNombre: string | null;
+  /** Código DANE del municipio (5 dígitos). */
+  municipioCodigo: string | null;
+  departamentoNombre: string | null;
+  /** Código DANE del departamento (2 dígitos). */
+  departamentoCodigo: string | null;
+  /** Ubicación propia del beneficiario (predio), no la de la vereda. */
+  latitud: number | null;
+  longitud: number | null;
+  altitud: number | null;
+  ubicacionFuente: FuenteUbicacionBeneficiario | null;
+  ubicacionOrigenGps: OrigenGpsUbicacion | null;
+  ubicacionPrecisionMetros: number | null;
+  /** Una persona revisó y dio por buena la ubicación. */
+  ubicacionConfirmada: boolean;
+  /** Texto tal como llegó del Excel, para revisar lo que no se pudo leer. */
+  latitudOriginal: string | null;
+  longitudOriginal: string | null;
+  /** Ubicación de una carga que no se pudo interpretar ("lat | lng"). */
+  ubicacionPorRevisar: string | null;
+  /** Proyectos donde está activo (no cuenta reemplazados ni bajas). */
+  proyectoIds: string[];
+}
+
+export interface ProyectoTerritorio {
+  id: string;
+  nombre: string;
+  estado: EstadoProyecto;
+}
+
+export interface RespuestaTerritorioBeneficiarios {
+  beneficiarios: PuntoTerritorioBeneficiario[];
+  /** Proyectos con al menos un beneficiario activo, para el filtro. */
+  proyectos: ProyectoTerritorio[];
+}
+
+/** De dónde salió la ubicación propia del beneficiario. GPS es la de mayor prioridad. */
+export type FuenteUbicacionBeneficiario = "GPS" | "MANUAL" | "EXCEL";
+
+/** Igual que `UbicacionGps.origen` de la app de campo. */
+export type OrigenGpsUbicacion = "GPS" | "ULTIMA_CONOCIDA" | "ULTIMA_REGISTRADA";

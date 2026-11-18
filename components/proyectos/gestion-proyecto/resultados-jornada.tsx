@@ -69,9 +69,76 @@ function parsearLista(valor: unknown): string[] {
 function esDataUrlImagen(valor: string | null | undefined): boolean {
   if (!valor) return false;
   const texto = valor.trim();
+  // Admite parámetros como ";name=foto.jpg" antes de ";base64".
+  return /^data:image\/[\w+.-]+(?:;[^;,]*)*,/i.test(texto);
+}
+
+/** Archivo adjunto que viaja como data URL: `data:<mime>;name=<nombre>;base64,...`. */
+function leerDataUrlArchivo(
+  valor: string | null | undefined,
+): { mime: string; nombre: string | null; tamano: number } | null {
+  if (!valor) return null;
+  const texto = valor.trim();
+  const data = /^data:([^;,]+)((?:;[^;,]*)*?);base64,/i.exec(texto);
+  if (!data) return null;
+  const crudo = /;name=([^;,]*)/i.exec(data[2] ?? "")?.[1];
+  let nombre: string | null = null;
+  if (crudo) {
+    try {
+      nombre = decodeURIComponent(crudo);
+    } catch {
+      nombre = crudo;
+    }
+  }
+  return {
+    mime: data[1],
+    nombre,
+    tamano: Math.floor(((texto.length - data[0].length) * 3) / 4),
+  };
+}
+
+function formatearTamano(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
+}
+
+/** Descarga un data URL como archivo (el navegador no abre data URL en pestañas nuevas). */
+function descargarDataUrl(dataUrl: string, nombre: string, mime: string) {
+  const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+  const binario = atob(base64);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i += 1) bytes[i] = binario.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = nombre;
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function AdjuntoDataUrl({ url, etiqueta }: { url: string; etiqueta: string }) {
+  const datos = leerDataUrlArchivo(url);
+  if (!datos) return null;
+  const nombre = datos.nombre ?? `${etiqueta}${datos.mime.includes("pdf") ? ".pdf" : ""}`;
   return (
-    /^data:image\/[\w+.-]+;base64,/i.test(texto) ||
-    /^data:image\/[\w+.-]+,/i.test(texto)
+    <div className="mt-2 flex items-center gap-3 rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft px-3 py-2.5">
+      <FileText className="h-5 w-5 shrink-0 text-ruralia-teal-text" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-ruralia-teal-text">{nombre}</p>
+        <p className="text-xs text-zinc-500">{formatearTamano(datos.tamano)}</p>
+      </div>
+      <button
+        type="button"
+        onClick={() => descargarDataUrl(url, nombre, datos.mime)}
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-ruralia-teal-border bg-white px-3 py-1.5 text-xs font-medium text-ruralia-teal hover:bg-ruralia-teal-soft"
+      >
+        <Download className="h-3.5 w-3.5" />
+        Descargar
+      </button>
+    </div>
   );
 }
 
@@ -325,6 +392,8 @@ function CampoFormularioVista({
               className="max-h-48 w-full object-contain bg-zinc-50"
             />
           </div>
+        ) : url && leerDataUrlArchivo(url) ? (
+          <AdjuntoDataUrl url={url} etiqueta={etiquetaBase} />
         ) : (
           <p className="mt-2 text-sm text-zinc-400">Sin archivo</p>
         )}

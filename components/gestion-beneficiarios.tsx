@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, EyeOff, Trash2 } from "lucide-react";
+import { AlertTriangle, EyeOff, MapPin, Trash2 } from "lucide-react";
 import { Alerta, Modal, Spinner } from "@/components/ui/modal";
 import { SelectorLineaProductiva } from "@/components/ui/selector-linea-productiva";
 import {
@@ -67,6 +67,9 @@ interface FormularioBeneficiario {
   municipio: string;
   lineaProductiva: string;
   nombreAsociacion: string;
+  latitud: string;
+  longitud: string;
+  altitud: string;
 }
 
 const FORM_VACIO: FormularioBeneficiario = {
@@ -83,7 +86,18 @@ const FORM_VACIO: FormularioBeneficiario = {
   municipio: "",
   lineaProductiva: "",
   nombreAsociacion: "",
+  latitud: "",
+  longitud: "",
+  altitud: "",
 };
+
+/** Número escrito a mano: acepta coma o punto decimal. NaN si no es número. */
+function numeroDesdeTexto(texto: string): number | null {
+  const limpio = texto.trim().replace(",", ".");
+  if (!limpio) return null;
+  const valor = Number(limpio);
+  return Number.isFinite(valor) ? valor : Number.NaN;
+}
 
 const TIPOS_DOCUMENTO: { valor: TipoDocumento; etiqueta: string }[] = [
   { valor: "CC", etiqueta: "Cédula de ciudadanía" },
@@ -239,6 +253,9 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
         municipio: item.municipio ?? "",
         lineaProductiva: item.lineaProductiva ?? "",
         nombreAsociacion: item.nombreAsociacion ?? "",
+        latitud: item.latitud != null ? String(item.latitud) : "",
+        longitud: item.longitud != null ? String(item.longitud) : "",
+        altitud: item.altitud != null ? String(item.altitud) : "",
       });
       setModo("editar");
     } catch (err) {
@@ -286,6 +303,9 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
       municipio: formulario.municipio.trim(),
       lineaProductiva: formulario.lineaProductiva.trim(),
       nombreAsociacion: formulario.nombreAsociacion.trim(),
+      latitud: numeroDesdeTexto(formulario.latitud),
+      longitud: numeroDesdeTexto(formulario.longitud),
+      altitud: numeroDesdeTexto(formulario.altitud),
     };
   }
 
@@ -294,6 +314,17 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
     if (!token) return;
     if (formulario.edad.trim() && !/^\d{1,3}$/.test(formulario.edad.trim())) {
       setError("La edad debe ser un número entero");
+      return;
+    }
+    const latitud = numeroDesdeTexto(formulario.latitud);
+    const longitud = numeroDesdeTexto(formulario.longitud);
+    const altitud = numeroDesdeTexto(formulario.altitud);
+    if ([latitud, longitud, altitud].some((v) => Number.isNaN(v))) {
+      setError("La ubicación debe escribirse en grados decimales, por ejemplo 9.7309");
+      return;
+    }
+    if ((latitud === null) !== (longitud === null)) {
+      setError("La ubicación del predio necesita latitud y longitud juntas");
       return;
     }
     setEnviando(true);
@@ -656,6 +687,45 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
               <dt className="text-zinc-500">Municipio</dt>
               <dd className="font-medium">{seleccionado.municipio ?? "—"}</dd>
             </div>
+            <div className="sm:col-span-2">
+              <dt className="text-zinc-500">Ubicación del predio</dt>
+              <dd className="font-medium">
+                {seleccionado.latitud != null && seleccionado.longitud != null ? (
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span>
+                      {seleccionado.latitud.toFixed(5)}, {seleccionado.longitud.toFixed(5)}
+                      {seleccionado.altitud != null
+                        ? ` · ${seleccionado.altitud.toLocaleString("es-CO")} m s. n. m.`
+                        : ""}
+                    </span>
+                    {seleccionado.ubicacionFuente ? (
+                      <span className="rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-[11px] font-medium text-ruralia-teal-text">
+                        {seleccionado.ubicacionFuente === "GPS"
+                          ? `GPS de formulario${
+                              seleccionado.ubicacionPrecisionMetros != null
+                                ? ` (± ${Math.round(seleccionado.ubicacionPrecisionMetros)} m)`
+                                : ""
+                            }`
+                          : seleccionado.ubicacionFuente === "MANUAL"
+                            ? "Escrita a mano"
+                            : "Carga de Excel"}
+                        {seleccionado.ubicacionConfirmadaEn ? " · confirmada" : ""}
+                      </span>
+                    ) : null}
+                    <a
+                      href={`https://www.google.com/maps?q=${seleccionado.latitud},${seleccionado.longitud}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-ruralia-teal-text hover:underline"
+                    >
+                      <MapPin className="h-3.5 w-3.5" /> Ver en mapa
+                    </a>
+                  </span>
+                ) : (
+                  "Sin ubicación registrada"
+                )}
+              </dd>
+            </div>
             <div>
               <dt className="text-zinc-500">Asociación</dt>
               <dd className="font-medium">{seleccionado.nombreAsociacion ?? "—"}</dd>
@@ -878,6 +948,59 @@ export function GestionBeneficiarios({ puedeGestionar }: GestionBeneficiariosPro
                   }
                   className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm"
                 />
+              </div>
+            </div>
+            <div>
+              <p className="mb-1 text-sm font-medium text-zinc-700">
+                Ubicación del predio
+              </p>
+              <p className="mb-2 text-xs text-zinc-500">
+                Ubicación propia del beneficiario, distinta a la de la vereda. Grados
+                decimales; latitud y longitud van juntas.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">
+                  Latitud
+                </label>
+                <input
+                  inputMode="decimal"
+                  placeholder="9.7309"
+                  value={formulario.latitud}
+                  onChange={(e) =>
+                    setFormulario((f) => ({ ...f, latitud: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">
+                  Longitud
+                </label>
+                <input
+                  inputMode="decimal"
+                  placeholder="-75.1868"
+                  value={formulario.longitud}
+                  onChange={(e) =>
+                    setFormulario((f) => ({ ...f, longitud: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">
+                  Altitud (m s. n. m.)
+                </label>
+                <input
+                  inputMode="decimal"
+                  placeholder="237"
+                  value={formulario.altitud}
+                  onChange={(e) =>
+                    setFormulario((f) => ({ ...f, altitud: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm"
+                />
+              </div>
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">

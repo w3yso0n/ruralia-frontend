@@ -21,6 +21,7 @@ import type {
   AvancePeriodo,
   BandejaAprobacion,
   Beneficiario,
+  RespuestaTerritorioBeneficiarios,
   BeneficiarioResumen,
   EstadoFiltroBeneficiario,
   UsoBeneficiario,
@@ -2807,4 +2808,37 @@ export async function eliminarLineaProductiva(
   return fetchConAuth<void>(`/lineas-productivas/${id}`, token, {
     method: "DELETE",
   });
+}
+
+/** Revisión de Territorio: escribe la ubicación correcta (queda confirmada). */
+export async function corregirUbicacionBeneficiario(
+  token: string,
+  id: string,
+  payload: { latitud: number; longitud: number; altitud?: number | null },
+): Promise<Beneficiario> {
+  return fetchConAuth<Beneficiario>(`/beneficiarios/${id}/ubicacion`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Revisión de Territorio: la ubicación actual es correcta aunque parezca dudosa. */
+export async function confirmarUbicacionBeneficiario(
+  token: string,
+  id: string,
+): Promise<Beneficiario> {
+  return fetchConAuth<Beneficiario>(
+    `/beneficiarios/${id}/ubicacion/confirmar`,
+    token,
+    { method: "POST" },
+  );
+}
+
+export async function listarTerritorioBeneficiarios(
+  token: string,
+): Promise<RespuestaTerritorioBeneficiarios> {
+  return fetchConAuth<RespuestaTerritorioBeneficiarios>(
+    "/beneficiarios/territorio",
+    token,
+  );
 }
