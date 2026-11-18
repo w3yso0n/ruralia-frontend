@@ -652,6 +652,7 @@ export interface Jornada {
   estadoFuncional?: EstadoFuncional;
   requiereRevision?: boolean;
   tipo?: TipoJornada;
+  fase?: FaseFormulario;
   nombre?: string | null;
   observaciones?: string;
   cantidadEjecutada?: number;
@@ -709,6 +710,7 @@ export interface ItemBandejaAprobacion {
   fecha: string;
   nombre?: string | null;
   tipo?: TipoJornada;
+  fase?: FaseFormulario;
   estado: EstadoJornada;
   estadoFuncional: EstadoFuncional;
   proyecto: { id: string; nombre: string } | null;
@@ -1430,7 +1432,44 @@ export type TipoCampoFormulario =
   | "FOTO"
   | "FIRMA"
   | "ARCHIVO"
-  | "TABLA";
+  | "TABLA"
+  /** Selector departamento > municipio > vereda PDET (catálogo distinto del DANE). */
+  | "VEREDA_PDET";
+
+/** Ejecución (plan, metas, métricas) o línea base (levantamiento previo del beneficiario). */
+export type FaseFormulario = "EJECUCION" | "LINEA_BASE";
+
+export const ETIQUETA_FASE: Record<FaseFormulario, string> = {
+  EJECUCION: "Ejecución",
+  LINEA_BASE: "Línea base",
+};
+
+/** Pregunta de línea base que, al aprobar, guarda la respuesta en este dato del beneficiario. */
+export interface VinculoBeneficiario {
+  destino: string;
+  /** Hoy siempre false: la pregunta sale fija si la persona ya tiene el dato. */
+  permitirCambio?: boolean;
+}
+
+export interface DestinoVinculo {
+  destino: string;
+  etiqueta: string;
+  tipo: TipoCampoBeneficiario | "vereda_pdet";
+  grupo: "ficha" | "adicional";
+}
+
+export interface DestinosVinculo {
+  ficha: DestinoVinculo[];
+  adicionales: DestinoVinculo[];
+}
+
+/** Valor de una respuesta VEREDA_PDET. */
+export interface ValorVeredaPdet {
+  veredaPdetId: string;
+  codigo?: string;
+  nombre?: string;
+  municipioCodigo?: string;
+}
 
 export type TipoCampoColumnaTabla =
   | "TEXTO"
@@ -1510,6 +1549,7 @@ export interface CampoFormulario {
     | Record<string, unknown>;
   reglasValidacion?: Record<string, unknown>;
   autocompletar?: ConfigAutocompletado | null;
+  vincularBeneficiario?: VinculoBeneficiario | null;
 }
 
 export interface PlantillaFormulario {
@@ -1519,6 +1559,7 @@ export interface PlantillaFormulario {
   version: number;
   estaActivo: boolean;
   tipoPlantilla?: TipoPlantillaFormulario;
+  fase?: FaseFormulario;
   procesoIds: string[];
   subactividadIds: string[];
   usuarioIds: string[];
@@ -1580,12 +1621,14 @@ export interface CampoFormularioPayload {
   opciones?: Record<string, unknown>;
   reglasValidacion?: Record<string, unknown>;
   autocompletar?: ConfigAutocompletado | null;
+  vincularBeneficiario?: VinculoBeneficiario | null;
 }
 
 export interface CrearPlantillaFormularioPayload {
   nombre: string;
   descripcion?: string;
   tipoPlantilla?: TipoPlantillaFormulario;
+  fase?: FaseFormulario;
   procesoIds?: string[];
   subactividadIds?: string[];
   usuarioIds?: string[];
@@ -1596,6 +1639,7 @@ export interface ActualizarPlantillaFormularioPayload {
   nombre?: string;
   descripcion?: string;
   tipoPlantilla?: TipoPlantillaFormulario;
+  fase?: FaseFormulario;
   procesoIds?: string[];
   subactividadIds?: string[];
   usuarioIds?: string[];
@@ -1792,3 +1836,208 @@ export type FuenteUbicacionBeneficiario = "GPS" | "MANUAL" | "EXCEL";
 
 /** Igual que `UbicacionGps.origen` de la app de campo. */
 export type OrigenGpsUbicacion = "GPS" | "ULTIMA_CONOCIDA" | "ULTIMA_REGISTRADA";
+
+// ---------------------------------------------------------------------------
+// Línea base del proyecto
+// ---------------------------------------------------------------------------
+
+export type EstadoLineaBase =
+  | "SIN_ASIGNAR"
+  | "ASIGNADA"
+  | "ENVIADA"
+  | "EN_CORRECCION"
+  | "COMPLETA";
+
+export const ETIQUETA_ESTADO_LINEA_BASE: Record<EstadoLineaBase, string> = {
+  SIN_ASIGNAR: "Sin asignar",
+  ASIGNADA: "Asignada",
+  ENVIADA: "Enviada",
+  EN_CORRECCION: "En corrección",
+  COMPLETA: "Completa",
+};
+
+export interface ResumenLineaBase {
+  total: number;
+  sinAsignar: number;
+  asignada: number;
+  enviada: number;
+  enCorreccion: number;
+  completa: number;
+}
+
+export interface EstadoLineaBaseProyecto {
+  plantilla: {
+    id: string;
+    nombre: string;
+    version: number;
+    estaActivo: boolean;
+    cantidadPreguntas: number;
+  } | null;
+  resumen: ResumenLineaBase;
+}
+
+export interface FilaBeneficiarioLineaBase {
+  beneficiarioId: string;
+  nombreCompleto: string;
+  numeroDocumento: string;
+  tipoDocumento: string;
+  lineaProductiva?: string | null;
+  territorio: {
+    region?: string | null;
+    departamento?: string | null;
+    municipio?: string | null;
+    veredaDane?: string | null;
+    veredaPdet?: string | null;
+  };
+  estado: EstadoLineaBase;
+  jornadaId?: string | null;
+  fecha?: string | null;
+  tecnico?: string | null;
+  enviadoEn?: string | null;
+}
+
+export interface PaginaBeneficiariosLineaBase {
+  datos: FilaBeneficiarioLineaBase[];
+  total: number;
+  pagina: number;
+  limite: number;
+}
+
+export interface ResultadoAsignacionLineaBase {
+  creadas: number;
+  grupoJornadaId: string | null;
+  jornadaIds: string[];
+}
+
+export interface DetalleJornadaLineaBase {
+  jornada: {
+    id: string;
+    fecha: string;
+    estado: EstadoJornada;
+    estadoFuncional: EstadoFuncional;
+    tecnico: string;
+    latitud: number | null;
+    longitud: number | null;
+    plantilla: { id: string; nombre: string; version: number } | null;
+  };
+  beneficiario: { id: string; nombreCompleto: string; numeroDocumento: string } | null;
+  envio: { id: string; enviadoEn: string; usuario: string | null } | null;
+  campos: Array<{
+    id: string;
+    clave: string;
+    etiqueta: string;
+    tipoCampo: TipoCampoFormulario;
+    orden: number;
+    vincularBeneficiario: VinculoBeneficiario | null;
+  }>;
+  respuestas: Array<{
+    claveCampo: string;
+    campoId?: string;
+    valorTexto?: string | null;
+    valorNumero?: number | null;
+    valorFecha?: string | null;
+    valorBooleano?: boolean | null;
+    valorJson?: unknown;
+    urlArchivo?: string | null;
+  }>;
+  versiones: Array<{
+    id: string;
+    versionNumber: number;
+    status: string;
+    creadoEn: string;
+    creadoPor: string | null;
+    motivo: string | null;
+    snapshot: {
+      campos?: Array<{ clave?: string; etiqueta?: string; valor?: unknown }>;
+    } | null;
+  }>;
+  cambiosAplicados: Array<{
+    campo: string;
+    etiqueta: string;
+    valorAnterior: unknown;
+    valorNuevo: unknown;
+    usuario: string | null;
+    creadoEn: string;
+  }>;
+}
+
+// ---------------------------------------------------------------------------
+// Veredas PDET
+// ---------------------------------------------------------------------------
+
+export interface VeredaPdet {
+  id: string;
+  codigo: string;
+  nombre: string;
+  subregion: string | null;
+  estaActivo: boolean;
+  municipio: {
+    id: string;
+    codigo: string;
+    nombre: string;
+    departamento: { id: string; codigo: string; nombre: string } | null;
+  } | null;
+  veredaDane: { id: string; codigo: string; nombre: string } | null;
+}
+
+export interface CatalogoVeredasPdet {
+  actualizadoEn: string;
+  total: number;
+  departamentos: Array<{
+    id: string;
+    codigo: string;
+    nombre: string;
+    municipios: Array<{
+      id: string;
+      codigo: string;
+      nombre: string;
+      veredas: Array<{ id: string; codigo: string; nombre: string }>;
+    }>;
+  }>;
+}
+
+export type CampoMapeoPdet =
+  | "codigo"
+  | "nombre"
+  | "municipioCodigo"
+  | "municipio"
+  | "departamento"
+  | "subregion"
+  | "veredaDaneCodigo";
+
+export interface MapeoVeredasPdet {
+  filaEncabezado: number;
+  columnas: Partial<Record<CampoMapeoPdet, number>>;
+}
+
+export interface AnalisisVeredasPdet {
+  filaEncabezado: number;
+  totalFilas: number;
+  campos: Array<{ campo: CampoMapeoPdet; etiqueta: string; obligatorio: boolean }>;
+  columnas: Array<{
+    columna: number;
+    encabezado: string;
+    muestras: string[];
+    sugerencia: CampoMapeoPdet | null;
+  }>;
+  mapeoSugerido: MapeoVeredasPdet;
+}
+
+export interface FilaPreviewPdet {
+  fila: number;
+  codigo: string;
+  nombre: string;
+  subregion: string | null;
+  municipio: { id: string; codigo: string; nombre: string; departamento: string } | null;
+  veredaDane: { id: string; codigo: string; nombre: string } | null;
+  accion: "CREAR" | "ACTUALIZAR" | "SIN_CAMBIOS" | "ERROR";
+  errores: string[];
+}
+
+export interface TotalesImportacionPdet {
+  filas: number;
+  crear: number;
+  actualizar: number;
+  sinCambios: number;
+  errores: number;
+}

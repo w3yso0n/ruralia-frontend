@@ -12,7 +12,9 @@ import {
   ChevronUp,
   CircleDot,
   ClipboardList,
+  ClipboardCheck,
   Hash,
+  Map as IconoMapa,
   Link2,
   MapPin,
   Paperclip,
@@ -35,17 +37,25 @@ import {
   etiquetaOrigen,
   SelectorAutocompletado,
 } from "@/components/formularios/selector-autocompletado";
+import {
+  admiteVinculo,
+  etiquetaDestino,
+  SelectorVinculoBeneficiario,
+} from "@/components/formularios/selector-vinculo-beneficiario";
 import { Alerta, Spinner } from "@/components/ui/modal";
 import {
   actualizarPlantillaFormulario,
   crearPlantillaFormulario,
   listarOrigenesAutocompletado,
+  obtenerDestinosVinculo,
   obtenerPlantillaFormulario,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type {
   CampoFormularioPayload,
   ColumnaCampoTabla,
+  DestinosVinculo,
+  FaseFormulario,
   OrigenesAutocompletado,
   TipoCampoColumnaTabla,
   TipoCampoFormulario,
@@ -95,6 +105,12 @@ const TIPOS_CAMPO_BASE: {
     etiqueta: "Archivo",
     pista: "Documento adjunto",
     icono: Paperclip,
+  },
+  {
+    valor: "VEREDA_PDET",
+    etiqueta: "Vereda PDET",
+    pista: "Depto > municipio > vereda PDET",
+    icono: IconoMapa,
   },
 ];
 
@@ -345,6 +361,21 @@ function VistaPreviaCampo({ campo }: { campo: CampoEnEdicion }) {
       {campo.tipoCampo === "GPS" ? (
         <p className="text-xs text-zinc-500">Botón para marcar ubicación</p>
       ) : null}
+      {campo.tipoCampo === "VEREDA_PDET" ? (
+        <div className="space-y-1.5">
+          {["Departamento", "Municipio", "Vereda PDET"].map((nivel) => (
+            <div
+              key={nivel}
+              className="h-9 rounded-lg border border-dashed border-ruralia-teal-border bg-white px-3 text-sm leading-9 text-zinc-400"
+            >
+              {nivel}
+            </div>
+          ))}
+          <p className="text-[11px] text-zinc-500">
+            Catálogo PDET, distinto de la vereda DANE. Funciona sin conexión.
+          </p>
+        </div>
+      ) : null}
       {campo.tipoCampo === "FOTO" || campo.tipoCampo === "ARCHIVO" ? (
         <p className="text-xs text-zinc-500">
           {campo.tipoCampo === "FOTO" ? "Tomar o subir una foto" : "Adjuntar un archivo"}
@@ -402,6 +433,31 @@ export function EditorPlantillaFormulario({
   const [tipoPlantilla, setTipoPlantilla] =
     useState<TipoPlantillaFormulario>("INDIVIDUAL");
   const [estaActivo, setEstaActivo] = useState(false);
+  const [fase, setFase] = useState<FaseFormulario>("EJECUCION");
+  const [destinos, setDestinos] = useState<DestinosVinculo | null>(null);
+  const esLineaBase = fase === "LINEA_BASE";
+
+  // Formulario nuevo: el tipo llega de la pestaña del listado (?fase=LINEA_BASE).
+  useEffect(() => {
+    if (esEdicion) return;
+    const desdeUrl = new URLSearchParams(window.location.search).get("fase");
+    if (desdeUrl === "LINEA_BASE") setFase("LINEA_BASE");
+  }, [esEdicion]);
+
+  useEffect(() => {
+    if (!token || !esLineaBase || destinos) return;
+    let cancelado = false;
+    obtenerDestinosVinculo(token)
+      .then((datos) => {
+        if (!cancelado) setDestinos(datos);
+      })
+      .catch(() => {
+        if (!cancelado) setDestinos({ ficha: [], adicionales: [] });
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [token, esLineaBase, destinos]);
 
   const [campos, setCampos] = useState<CampoEnEdicion[]>([campoVacio(0)]);
   const [origenes, setOrigenes] = useState<OrigenesAutocompletado | null>(null);
@@ -429,6 +485,7 @@ export function EditorPlantillaFormulario({
         setNombre(plantilla.nombre);
         setDescripcion(plantilla.descripcion ?? "");
         setTipoPlantilla(plantilla.tipoPlantilla ?? "INDIVIDUAL");
+        setFase(plantilla.fase ?? "EJECUCION");
         setEstaActivo(plantilla.estaActivo);
         setCampos(
           (plantilla.campos ?? [])
@@ -442,7 +499,10 @@ export function EditorPlantillaFormulario({
               esObligatorio: campo.esObligatorio,
               orden: campo.orden,
               opciones: campo.opciones,
-              autocompletar: campo.autocompletar ?? null,
+              autocompletar: campo.vincularBeneficiario
+                ? null
+                : (campo.autocompletar ?? null),
+              vincularBeneficiario: campo.vincularBeneficiario ?? null,
               claveOpciones: Array.isArray(
                 (campo.opciones as { valores?: string[] } | undefined)
                   ?.valores,
@@ -472,6 +532,7 @@ export function EditorPlantillaFormulario({
         // Otro tipo de pregunta puede no aceptar el dato elegido: se vuelve a elegir.
         if (cambios.tipoCampo && cambios.tipoCampo !== campo.tipoCampo) {
           siguiente.autocompletar = null;
+          siguiente.vincularBeneficiario = null;
         }
         if (
           cambios.tipoCampo === "TABLA" &&
@@ -572,6 +633,18 @@ export function EditorPlantillaFormulario({
     }
   }
 
+  function cambiarFase(nueva: FaseFormulario) {
+    setFase(nueva);
+    if (nueva === "LINEA_BASE") {
+      // Línea base: siempre una persona por formulario.
+      cambiarTipoPlantilla("INDIVIDUAL");
+    } else {
+      setCampos((prev) =>
+        prev.map((campo) => ({ ...campo, vincularBeneficiario: null })),
+      );
+    }
+  }
+
   function agregarCampo() {
     setCampos((prev) => [...prev, campoVacio(prev.length)]);
   }
@@ -642,11 +715,19 @@ export function EditorPlantillaFormulario({
             esObligatorio: campo.esObligatorio,
             orden: indice,
             opciones,
+            // Una pregunta vinculada se autocompleta en el servidor con el mismo dato.
             autocompletar:
               tipoPlantilla === "INDIVIDUAL" &&
+              !(esLineaBase && campo.vincularBeneficiario) &&
               campo.autocompletar &&
               admiteAutocompletado(campo.tipoCampo)
                 ? campo.autocompletar
+                : null,
+            vincularBeneficiario:
+              esLineaBase &&
+              campo.vincularBeneficiario &&
+              admiteVinculo(campo.tipoCampo)
+                ? campo.vincularBeneficiario
                 : null,
           };
         },
@@ -667,6 +748,7 @@ export function EditorPlantillaFormulario({
           nombre,
           descripcion: descripcion || undefined,
           tipoPlantilla,
+          fase,
           campos: camposPayload,
         });
       } else {
@@ -674,6 +756,7 @@ export function EditorPlantillaFormulario({
           nombre,
           descripcion: descripcion || undefined,
           tipoPlantilla,
+          fase,
           campos: camposPayload,
         });
       }
@@ -758,6 +841,56 @@ export function EditorPlantillaFormulario({
             </div>
             <div>
               <p className="mb-2 text-sm font-medium text-zinc-700">
+                ¿Para qué se usa?
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {(
+                  [
+                    {
+                      id: "EJECUCION" as const,
+                      titulo: "Ejecución",
+                      texto: "Jornadas del plan: cuenta en el avance, metas y reportes.",
+                      Icono: ClipboardList,
+                    },
+                    {
+                      id: "LINEA_BASE" as const,
+                      titulo: "Línea base",
+                      texto: "Levantamiento inicial del beneficiario. No cuenta en métricas ni genera PDF.",
+                      Icono: ClipboardCheck,
+                    },
+                  ]
+                ).map(({ id, titulo, texto, Icono }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => cambiarFase(id)}
+                    className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition ${
+                      fase === id
+                        ? "border-ruralia-teal bg-ruralia-teal-soft/50 ring-2 ring-ruralia-teal/20"
+                        : "border-zinc-200 bg-white hover:border-ruralia-teal-border"
+                    }`}
+                  >
+                    <Icono className="mt-0.5 h-5 w-5 shrink-0 text-ruralia-teal" />
+                    <span>
+                      <span className="block font-semibold text-zinc-900">
+                        {titulo}
+                      </span>
+                      <span className="mt-0.5 block text-sm text-zinc-500">
+                        {texto}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {esEdicion ? (
+                <p className="mt-1.5 text-xs text-zinc-500">
+                  Solo se puede cambiar mientras el formulario no se haya usado.
+                </p>
+              ) : null}
+            </div>
+            {!esLineaBase ? (
+            <div>
+              <p className="mb-2 text-sm font-medium text-zinc-700">
                 ¿Quién responde?
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -801,6 +934,12 @@ export function EditorPlantillaFormulario({
                 </button>
               </div>
             </div>
+            ) : (
+              <p className="rounded-xl border border-ruralia-teal-border bg-ruralia-teal-soft/30 px-3 py-2 text-xs text-ruralia-teal-text">
+                Cada beneficiario responde su propio formulario. Puedes indicar
+                en cada pregunta en qué dato de la persona se guarda la respuesta.
+              </p>
+            )}
           </div>
         </section>
 
@@ -837,7 +976,14 @@ export function EditorPlantillaFormulario({
                     <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-ruralia-teal-soft px-2 text-xs font-bold text-ruralia-teal-text">
                       {indice + 1}
                     </span>
-                    {campo.autocompletar ? (
+                    {esLineaBase && campo.vincularBeneficiario ? (
+                      <span className="inline-flex min-w-0 items-center gap-1 truncate rounded-full bg-ruralia-teal-soft px-2.5 py-0.5 text-xs font-semibold text-ruralia-teal-text">
+                        <span className="truncate">
+                          Se guarda en: {etiquetaDestino(campo.vincularBeneficiario.destino, destinos)}
+                        </span>
+                      </span>
+                    ) : null}
+                    {campo.autocompletar && !(esLineaBase && campo.vincularBeneficiario) ? (
                       <span className="inline-flex min-w-0 items-center gap-1 truncate rounded-full border border-ruralia-teal-border bg-white px-2.5 py-0.5 text-xs font-medium text-ruralia-teal-text">
                         <Link2 className="h-3 w-3 shrink-0" />
                         <span className="truncate">
@@ -924,7 +1070,37 @@ export function EditorPlantillaFormulario({
                   </div>
                 ) : null}
 
+                {esLineaBase && admiteVinculo(campo.tipoCampo) ? (
+                  <div className="mt-4">
+                    <SelectorVinculoBeneficiario
+                      tipoCampo={campo.tipoCampo}
+                      etiquetaPregunta={campo.etiqueta}
+                      valor={campo.vincularBeneficiario}
+                      onChange={(vincularBeneficiario) =>
+                        actualizarCampo(indice, {
+                          vincularBeneficiario,
+                          autocompletar: null,
+                        })
+                      }
+                      destinos={destinos}
+                      onDatoCreado={(nuevo) =>
+                        setDestinos((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                adicionales: [...prev.adicionales, nuevo].sort((a, b) =>
+                                  a.etiqueta.localeCompare(b.etiqueta, "es"),
+                                ),
+                              }
+                            : prev,
+                        )
+                      }
+                    />
+                  </div>
+                ) : null}
+
                 {tipoPlantilla === "INDIVIDUAL" &&
+                !(esLineaBase && campo.vincularBeneficiario) &&
                 admiteAutocompletado(campo.tipoCampo) ? (
                   <div className="mt-4">
                     <SelectorAutocompletado

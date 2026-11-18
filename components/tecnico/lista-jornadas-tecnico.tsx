@@ -68,6 +68,8 @@ export async function cargarJornadasPropias(
       proyectoId,
       pagina,
       limite: 100,
+      // El técnico ve también sus jornadas de línea base.
+      fase: "TODAS",
     });
     todas.push(...respuesta.datos);
     totalPaginas = respuesta.totalPaginas;
@@ -120,6 +122,11 @@ function TarjetaJornada({
         <div className="min-w-0 space-y-1">
           <p className="font-semibold text-zinc-900">
             {jornada.nombre || actividad || "Jornada de campo"}
+            {jornada.fase === "LINEA_BASE" ? (
+              <span className="ml-2 rounded-full bg-ruralia-teal-soft px-2 py-0.5 align-middle text-[11px] font-semibold text-ruralia-teal-text">
+                Línea base
+              </span>
+            ) : null}
           </p>
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
             <span className="inline-flex items-center gap-1">

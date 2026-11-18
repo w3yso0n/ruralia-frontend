@@ -1,5 +1,5 @@
-import { GestionTerritorios } from "@/components/gestion-territorios";
+import { TerritoriosConPestanas } from "@/components/territorio/territorios-con-pestanas";
 
 export default function PaginaTerritorios() {
-  return <GestionTerritorios />;
+  return <TerritoriosConPestanas />;
 }

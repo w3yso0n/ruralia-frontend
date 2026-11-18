@@ -401,6 +401,21 @@ function CampoFormularioVista({
     );
   }
 
+  if (tipo === "VEREDA_PDET") {
+    const vereda = respuesta.valorJson as { nombre?: string; codigo?: string } | null;
+    return (
+      <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3">
+        <p className="text-xs font-medium text-zinc-500">{etiqueta}</p>
+        <p className="mt-1 text-sm font-medium text-zinc-900">
+          {vereda?.nombre ?? "Sin respuesta"}
+        </p>
+        {vereda?.codigo ? (
+          <p className="text-xs text-zinc-500">Vereda PDET {vereda.codigo}</p>
+        ) : null}
+      </div>
+    );
+  }
+
   if (tipo === "GPS") {
     const ubicacion = leerUbicacion(respuesta.valorJson);
     const mapa = ubicacion

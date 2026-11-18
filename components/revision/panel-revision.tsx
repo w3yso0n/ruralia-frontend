@@ -35,6 +35,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { usePermisos } from "@/lib/use-permisos";
 import type {
+  FaseFormulario,
   AuditLogItem,
   BandejaAprobacion,
   CategoriaRechazo,
@@ -283,6 +284,10 @@ export function PanelRevision() {
   const [proyectoId, setProyectoId] = useState(
     () => searchParams.get("proyectoId") ?? "",
   );
+  const [fase, setFase] = useState<FaseFormulario | "">(() => {
+    const valor = searchParams.get("fase");
+    return valor === "EJECUCION" || valor === "LINEA_BASE" ? valor : "";
+  });
   const [opcionesProyecto, setOpcionesProyecto] = useState<
     { id: string; nombre: string }[]
   >([]);
@@ -349,6 +354,7 @@ export function PanelRevision() {
         vista: esSupervisor ? "supervisor" : "tecnico",
         estadoFuncional: filtro === "TODOS" ? undefined : filtro,
         proyectoId: proyectoId || undefined,
+        fase: fase || undefined,
       });
       setBandeja(data);
       setSeleccion((prev) => {
@@ -361,7 +367,7 @@ export function PanelRevision() {
     } finally {
       setCargando(false);
     }
-  }, [token, esSupervisor, filtro, proyectoId]);
+  }, [token, esSupervisor, filtro, proyectoId, fase]);
 
   useEffect(() => {
     void cargar();
@@ -557,6 +563,27 @@ export function PanelRevision() {
             Filtra la bandeja por un proyecto o deja todos visibles.
           </p>
         </div>
+        <div className="w-full sm:max-w-xs">
+          <label className="mb-1 block text-sm font-medium text-zinc-700">
+            Tipo
+          </label>
+          <SelectorDesplegable
+            value={fase}
+            onChange={(id) => {
+              setFase(id as FaseFormulario | "");
+              setSeleccion(null);
+              setJornadaIdPendiente(null);
+            }}
+            opciones={[
+              { id: "EJECUCION", nombre: "Ejecución" },
+              { id: "LINEA_BASE", nombre: "Línea base", subtitulo: "No cuenta en métricas" },
+            ]}
+            placeholder="Todos los tipos"
+            permitirVacio
+            etiquetaVacio="Todos los tipos"
+            icono={ClipboardCheck}
+          />
+        </div>
 
         <div className="flex flex-wrap gap-2">
           {filtros.map((f) => (
@@ -606,6 +633,11 @@ export function PanelRevision() {
                       <div>
                         <p className="font-medium text-stone-900">
                           {item.nombre || item.meta?.nombre || "Jornada"}
+                          {item.fase === "LINEA_BASE" ? (
+                            <span className="ml-2 rounded-full bg-ruralia-teal-soft px-2 py-0.5 text-[11px] font-semibold text-ruralia-teal-text">
+                              Línea base
+                            </span>
+                          ) : null}
                         </p>
                         <p className="text-xs text-stone-500">
                           {item.fecha} · {item.proyecto?.nombre}

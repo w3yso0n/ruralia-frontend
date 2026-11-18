@@ -1,5 +1,21 @@
 import { firebaseConfigurado, obtenerAuth } from "@/lib/firebase";
 import type {
+  AnalisisVeredasPdet,
+  CatalogoVeredasPdet,
+  DestinoVinculo,
+  DestinosVinculo,
+  DetalleJornadaLineaBase,
+  EstadoLineaBase,
+  EstadoLineaBaseProyecto,
+  FaseFormulario,
+  FilaBeneficiarioLineaBase,
+  FilaPreviewPdet,
+  MapeoVeredasPdet,
+  PaginaBeneficiariosLineaBase,
+  ResultadoAsignacionLineaBase,
+  TotalesImportacionPdet,
+  VeredaPdet,
+  TipoCampoBeneficiario,
   AdministracionLineasProductivas,
   LineaProductiva,
   LineaProductivaProyecto,
@@ -1251,6 +1267,8 @@ export async function listarJornadas(
     proyectoId?: string;
     pagina?: number;
     limite?: number;
+    /** Por defecto el backend devuelve solo EJECUCION. */
+    fase?: FaseFormulario | "TODAS";
   },
 ): Promise<RespuestaPaginada<Jornada>> {
   return fetchConAuth<RespuestaPaginada<Jornada>>(
@@ -2347,6 +2365,7 @@ export async function obtenerBandejaAprobaciones(
     vista?: "tecnico" | "supervisor" | "coordinacion";
     estadoFuncional?: string;
     proyectoId?: string;
+    fase?: FaseFormulario;
   },
 ): Promise<BandejaAprobacion> {
   return fetchConAuth<BandejaAprobacion>(
@@ -2840,5 +2859,239 @@ export async function listarTerritorioBeneficiarios(
   return fetchConAuth<RespuestaTerritorioBeneficiarios>(
     "/beneficiarios/territorio",
     token,
+  );
+}
+
+/* ─── Línea base del proyecto ─── */
+
+export async function obtenerLineaBaseProyecto(
+  token: string,
+  proyectoId: string,
+): Promise<EstadoLineaBaseProyecto> {
+  return fetchConAuth<EstadoLineaBaseProyecto>(
+    `/proyectos/${proyectoId}/linea-base`,
+    token,
+  );
+}
+
+export async function configurarLineaBaseProyecto(
+  token: string,
+  proyectoId: string,
+  plantillaFormularioId: string | null,
+): Promise<EstadoLineaBaseProyecto> {
+  return fetchConAuth<EstadoLineaBaseProyecto>(
+    `/proyectos/${proyectoId}/linea-base/configuracion`,
+    token,
+    { method: "PUT", body: JSON.stringify({ plantillaFormularioId }) },
+  );
+}
+
+export async function listarBeneficiariosLineaBase(
+  token: string,
+  proyectoId: string,
+  params?: {
+    pagina?: number;
+    limite?: number;
+    estado?: EstadoLineaBase;
+    busqueda?: string;
+  },
+): Promise<PaginaBeneficiariosLineaBase> {
+  return fetchConAuth<PaginaBeneficiariosLineaBase>(
+    `/proyectos/${proyectoId}/linea-base/beneficiarios${construirQuery(params)}`,
+    token,
+  );
+}
+
+export async function altaRapidaBeneficiarioLineaBase(
+  token: string,
+  proyectoId: string,
+  datos: {
+    nombres: string;
+    apellidos: string;
+    numeroDocumento: string;
+    tipoDocumento?: string;
+  },
+): Promise<FilaBeneficiarioLineaBase> {
+  return fetchConAuth<FilaBeneficiarioLineaBase>(
+    `/proyectos/${proyectoId}/linea-base/beneficiarios`,
+    token,
+    { method: "POST", body: JSON.stringify(datos) },
+  );
+}
+
+export async function asignarLineaBase(
+  token: string,
+  proyectoId: string,
+  datos: {
+    beneficiarioIds: string[];
+    tecnicoId: string;
+    fecha?: string;
+    observaciones?: string;
+  },
+): Promise<ResultadoAsignacionLineaBase> {
+  return fetchConAuth<ResultadoAsignacionLineaBase>(
+    `/proyectos/${proyectoId}/linea-base/jornadas`,
+    token,
+    { method: "POST", body: JSON.stringify(datos) },
+  );
+}
+
+export async function obtenerDetalleJornadaLineaBase(
+  token: string,
+  proyectoId: string,
+  jornadaId: string,
+): Promise<DetalleJornadaLineaBase> {
+  return fetchConAuth<DetalleJornadaLineaBase>(
+    `/proyectos/${proyectoId}/linea-base/jornadas/${jornadaId}`,
+    token,
+  );
+}
+
+/** Excel de línea base del proyecto: una fila por beneficiario, una columna por pregunta. */
+export async function descargarExcelLineaBase(
+  token: string,
+  proyectoId: string,
+): Promise<{ blob: Blob; nombreArchivo: string }> {
+  const respuesta = await fetchConToken(
+    token,
+    `${API_URL}/proyectos/${proyectoId}/linea-base/excel`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
+  const disposicion = respuesta.headers.get("Content-Disposition") ?? "";
+  const nombre = /filename="?([^";]+)"?/.exec(disposicion)?.[1];
+  return {
+    blob: await respuesta.blob(),
+    nombreArchivo: nombre ? decodeURIComponent(nombre) : "linea-base.xlsx",
+  };
+}
+
+/* ─── Vínculos pregunta -> dato del beneficiario ─── */
+
+export async function obtenerDestinosVinculo(
+  token: string,
+): Promise<DestinosVinculo> {
+  return fetchConAuth<DestinosVinculo>("/formularios/vinculos/destinos", token);
+}
+
+export async function crearDatoAdicionalBeneficiario(
+  token: string,
+  etiqueta: string,
+  tipo: TipoCampoBeneficiario,
+): Promise<DestinoVinculo> {
+  return fetchConAuth<DestinoVinculo>(
+    "/formularios/vinculos/datos-adicionales",
+    token,
+    { method: "POST", body: JSON.stringify({ etiqueta, tipo }) },
+  );
+}
+
+/* ─── Veredas PDET ─── */
+
+export async function listarVeredasPdet(
+  token: string,
+  params?: {
+    municipioId?: string;
+    departamentoId?: string;
+    busqueda?: string;
+    incluirInactivas?: boolean;
+    pagina?: number;
+    limite?: number;
+  },
+): Promise<{ datos: VeredaPdet[]; total: number; pagina: number; limite: number }> {
+  return fetchConAuth(`/territorios/veredas-pdet${construirQuery(params)}`, token);
+}
+
+export async function obtenerCatalogoVeredasPdet(
+  token: string,
+  proyectoId?: string,
+): Promise<CatalogoVeredasPdet> {
+  return fetchConAuth<CatalogoVeredasPdet>(
+    `/territorios/veredas-pdet/catalogo${construirQuery({ proyectoId })}`,
+    token,
+  );
+}
+
+export async function crearVeredaPdet(
+  token: string,
+  datos: {
+    municipioId: string;
+    codigo: string;
+    nombre: string;
+    subregion?: string;
+    veredaDaneId?: string | null;
+  },
+): Promise<VeredaPdet> {
+  return fetchConAuth<VeredaPdet>("/territorios/veredas-pdet", token, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function actualizarVeredaPdet(
+  token: string,
+  id: string,
+  datos: {
+    nombre?: string;
+    subregion?: string | null;
+    veredaDaneId?: string | null;
+    estaActivo?: boolean;
+  },
+): Promise<VeredaPdet> {
+  return fetchConAuth<VeredaPdet>(`/territorios/veredas-pdet/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(datos),
+  });
+}
+
+async function subirArchivoPdet<T>(
+  token: string,
+  ruta: string,
+  archivo: File,
+  mapeo?: MapeoVeredasPdet,
+): Promise<T> {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  if (mapeo) formData.append("mapeo", JSON.stringify(mapeo));
+  const respuesta = await fetchConToken(token, `${API_URL}${ruta}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
+  return respuesta.json() as Promise<T>;
+}
+
+export function analizarArchivoVeredasPdet(token: string, archivo: File) {
+  return subirArchivoPdet<AnalisisVeredasPdet>(
+    token,
+    "/territorios/veredas-pdet/importar/analizar",
+    archivo,
+  );
+}
+
+export function previsualizarVeredasPdet(
+  token: string,
+  archivo: File,
+  mapeo: MapeoVeredasPdet,
+) {
+  return subirArchivoPdet<{ filas: FilaPreviewPdet[]; totales: TotalesImportacionPdet }>(
+    token,
+    "/territorios/veredas-pdet/importar/previsualizar",
+    archivo,
+    mapeo,
+  );
+}
+
+export function importarVeredasPdet(
+  token: string,
+  archivo: File,
+  mapeo: MapeoVeredasPdet,
+) {
+  return subirArchivoPdet<{ totales: TotalesImportacionPdet; errores: FilaPreviewPdet[] }>(
+    token,
+    "/territorios/veredas-pdet/importar",
+    archivo,
+    mapeo,
   );
 }

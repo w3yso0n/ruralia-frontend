@@ -1,5 +1,7 @@
 "use client";
 
+import { SelectorVeredaPdet } from "@/components/ui/selector-vereda-pdet";
+import type { ValorVeredaPdet } from "@/lib/types";
 import { useState } from "react";
 import { Lock, ShieldAlert } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
@@ -39,6 +41,7 @@ function valorInicial(campo: CampoFormulario, respuesta?: RespuestaFormularioDet
       return Array.isArray(filas) ? (filas as Fila[]) : [];
     }
     case "GPS":
+    case "VEREDA_PDET":
       return respuesta.valorJson ?? null;
     case "FOTO":
     case "FIRMA":
@@ -82,6 +85,7 @@ function valorParaEnviar(campo: CampoFormulario, valor: unknown): unknown {
       };
     }
     case "GPS":
+    case "VEREDA_PDET":
       return valor ?? undefined;
     default:
       return typeof valor === "string" && valor.trim() ? valor.trim() : undefined;
@@ -112,6 +116,14 @@ function Control({
   onChange: (valor: unknown) => void;
   etiqueta: string;
 }) {
+  if (tipo === "VEREDA_PDET") {
+    return (
+      <SelectorVeredaPdet
+        valor={valor as ValorVeredaPdet | null}
+        onChange={(v) => onChange(v)}
+      />
+    );
+  }
   if (tipo === "SI_NO") {
     const actual = valor === true ? "si" : valor === false ? "no" : String(valor ?? "");
     return (

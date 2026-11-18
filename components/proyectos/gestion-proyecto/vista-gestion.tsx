@@ -9,6 +9,7 @@ import { CadenaAprobacionProyecto } from "@/components/proyectos/gestion-proyect
 import { EquipoVinculos } from "@/components/proyectos/gestion-proyecto/equipo-vinculos";
 import { PanelExpediente } from "@/components/proyectos/gestion-proyecto/panel-expediente";
 import { PanelJornadas } from "@/components/proyectos/gestion-proyecto/panel-jornadas";
+import { PanelLineaBase } from "@/components/proyectos/gestion-proyecto/panel-linea-base";
 import { PanelPlan } from "@/components/proyectos/gestion-proyecto/panel-plan";
 import { PanelTerritorio } from "@/components/proyectos/gestion-proyecto/panel-territorio";
 import { ResumenInformacionBasica } from "@/components/proyectos/gestion-proyecto/resumen-informacion-basica";
@@ -34,6 +35,7 @@ import type {
 type Tab =
   | "resumen"
   | "territorio"
+  | "linea-base"
   | "plan"
   | "jornadas"
   | "equipo"
@@ -43,6 +45,7 @@ type Tab =
 const TABS_VALIDOS: Tab[] = [
   "resumen",
   "territorio",
+  "linea-base",
   "plan",
   "jornadas",
   "equipo",
@@ -263,6 +266,9 @@ function VistaGestionProyectoCompleta({
   const tabs: { id: Tab; etiqueta: string }[] = [
     { id: "resumen", etiqueta: "Resumen" },
     { id: "territorio", etiqueta: "Territorio" },
+    ...(puede("linea_base.ver")
+      ? [{ id: "linea-base" as const, etiqueta: "Línea base" }]
+      : []),
     { id: "plan", etiqueta: "Plan del proyecto" },
     { id: "jornadas", etiqueta: "Jornadas" },
     { id: "equipo", etiqueta: "Equipo y contraparte" },
@@ -631,6 +637,10 @@ function VistaGestionProyectoCompleta({
           puedeGestionar={puedeGestionar}
           onIrAEquipo={() => cambiarTab("equipo")}
         />
+      ) : null}
+
+      {tab === "linea-base" && puede("linea_base.ver") ? (
+        <PanelLineaBase token={token} proyectoId={proyectoId} proyecto={proyecto} />
       ) : null}
 
       {tab === "plan" ? (
