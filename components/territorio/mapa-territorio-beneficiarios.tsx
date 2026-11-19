@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ChevronRight,
   Crosshair,
   FolderKanban,
   Layers,
@@ -28,7 +29,10 @@ import {
   type ItemRevision,
 } from "@/components/territorio/revision-ubicaciones";
 import {
+  CAPA_VIAS,
   CAPAS_TERRITORIALES,
+  DETALLE_VIAS,
+  grosorVia,
   normalizarCodigo,
   type CapaTerritorial,
   type NivelCapaTerritorial,
@@ -41,6 +45,7 @@ import {
   type FeatureTerritorial,
 } from "@/lib/territorio/geometria";
 import { SelectorDesplegable } from "@/components/ui/selector-desplegable";
+import { Modal } from "@/components/ui/modal";
 import type {
   Beneficiario,
   EstadoProyecto,
@@ -96,6 +101,26 @@ interface PoligonoIndexado {
 interface Seleccion {
   nivel: NivelCapaTerritorial;
   codigo: string;
+  /** Punto donde se hizo clic: sirve para saber qué capas lo contienen. */
+  punto?: { lat: number; lng: number };
+}
+
+interface ZonaHover {
+  capa: string;
+  nombre: string;
+}
+
+/** Atributos que se resumen en la tarjeta flotante (el detalle completo va abajo). */
+const RESUMEN_TARJETA: Record<NivelCapaTerritorial, string[]> = {
+  departamento: ["DeCodigo", "DeArea"],
+  municipio: ["NOM_SUBREG", "PROYECTO", "NUMERO_VER", "AREA_Ha"],
+  vereda: ["NOM_MPIO", "NOMBRE_UBP", "PROYECTO", "AREA_Ha"],
+};
+
+function formatearValor(valor: unknown): string {
+  return typeof valor === "number"
+    ? valor.toLocaleString("es-CO", { maximumFractionDigits: 1 })
+    : String(valor);
 }
 
 /** Por beneficiario: código del polígono que lo contiene en cada capa. */
@@ -141,8 +166,10 @@ export function MapaTerritorioBeneficiarios({
   const contenedorRef = useRef<HTMLDivElement>(null);
   const mapaRef = useRef<google.maps.Map | null>(null);
   const capasDataRef = useRef<Partial<Record<NivelCapaTerritorial, google.maps.Data>>>({});
+  const viasDataRef = useRef<google.maps.Data | null>(null);
   const infoRef = useRef<google.maps.InfoWindow | null>(null);
   const encuadradoRef = useRef(false);
+  const detalleRef = useRef<HTMLElement>(null);
   const marcadorRevisionRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
 
   const [mapaListo, setMapaListo] = useState(false);
@@ -167,8 +194,13 @@ export function MapaTerritorioBeneficiarios({
     vereda: true,
   });
   const [mostrarBeneficiarios, setMostrarBeneficiarios] = useState(true);
+  const [mostrarVias, setMostrarVias] = useState(false);
+  const [vias, setVias] = useState<object | null>(null);
+  const [estadoVias, setEstadoVias] = useState<"inicial" | "cargando" | "error">("inicial");
   const [tipoMapa, setTipoMapa] = useState<TipoMapaBase>("roadmap");
   const [seleccion, setSeleccion] = useState<Seleccion | null>(null);
+  const [hover, setHover] = useState<ZonaHover | null>(null);
+  const [revisionAbierta, setRevisionAbierta] = useState(false);
   const [busqueda, setBusqueda] = useState("");
 
   /* ---------- Carga de datos ---------- */
@@ -340,6 +372,24 @@ export function MapaTerritorioBeneficiarios({
     );
   }, [seleccion, conCoordenadas, ubicaciones]);
 
+  /** Departamento > municipio > vereda que contienen el punto del clic (o solo la selección). */
+  const jerarquia = useMemo(() => {
+    if (!seleccion) return [];
+    if (!seleccion.punto) {
+      return poligonoSeleccionado
+        ? [{ capa: capaPorId(seleccion.nivel), poligono: poligonoSeleccionado }]
+        : [];
+    }
+    const { lat, lng } = seleccion.punto;
+    return CAPAS_TERRITORIALES.flatMap((capa) => {
+      if (!visibles[capa.id]) return [];
+      const poligono = indices[capa.id]?.find((pol) =>
+        puntoEnGeometria(lng, lat, pol.feature.geometry!, pol.caja),
+      );
+      return poligono ? [{ capa, poligono }] : [];
+    });
+  }, [seleccion, poligonoSeleccionado, indices, visibles]);
+
   const beneficiariosFiltrados = useMemo(() => {
     const termino = busqueda.trim().toLowerCase();
     if (!termino) return beneficiariosSeleccion;
@@ -510,6 +560,7 @@ export function MapaTerritorioBeneficiarios({
       cancelado = true;
       infoRef.current?.close();
       Object.values(capasData).forEach((data) => data?.setMap(null));
+      viasDataRef.current?.setMap(null);
       if (marcadorRevisionRef.current) marcadorRevisionRef.current.map = null;
     };
   }, []);
@@ -535,7 +586,26 @@ export function MapaTerritorioBeneficiarios({
           evento.feature.getProperty(capa.propiedadCodigo),
           capa.longitudCodigo,
         );
-        if (codigo) setSeleccion({ nivel: capa.id, codigo });
+        if (!codigo) return;
+        const punto = evento.latLng
+          ? { lat: evento.latLng.lat(), lng: evento.latLng.lng() }
+          : undefined;
+        setSeleccion({ nivel: capa.id, codigo, punto });
+      });
+      data.addListener("mouseover", (evento: google.maps.Data.MouseEvent) => {
+        data.revertStyle();
+        data.overrideStyle(evento.feature, {
+          strokeWeight: capa.estilo.grosorBorde + 1,
+          fillOpacity: capa.estilo.opacidadRelleno + 0.1,
+        });
+        setHover({
+          capa: capa.nombre.replace(/s$/, ""),
+          nombre: String(evento.feature.getProperty(capa.propiedadNombre) ?? "Sin nombre"),
+        });
+      });
+      data.addListener("mouseout", () => {
+        data.revertStyle();
+        setHover(null);
       });
       capasDataRef.current[capa.id] = data;
 
@@ -574,7 +644,7 @@ export function MapaTerritorioBeneficiarios({
           strokeOpacity: 0.9,
           fillColor: seleccionado ? COLOR_SELECCION : capa.estilo.relleno,
           fillOpacity: seleccionado
-            ? Math.max(capa.estilo.opacidadRelleno, 0.18)
+            ? Math.max(capa.estilo.opacidadRelleno, 0.22)
             : capa.estilo.opacidadRelleno,
           zIndex: capa.zIndex,
           clickable: true,
@@ -582,6 +652,40 @@ export function MapaTerritorioBeneficiarios({
       });
     }
   }, [mapaListo, colecciones, visibles, seleccion]);
+
+  /* ---------- Vías (líneas; solo se dibujan y muestran sus atributos) ---------- */
+
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapaListo || !mapa || !vias) return;
+    if (!viasDataRef.current) {
+      const data = new google.maps.Data();
+      data.addGeoJson(vias);
+      data.setStyle((feature) => ({
+        strokeColor: CAPA_VIAS.color,
+        strokeWeight: grosorVia(feature.getProperty("TIPO_VIA")),
+        strokeOpacity: 0.85,
+        zIndex: CAPA_VIAS.zIndex,
+        clickable: true,
+      }));
+      data.addListener("click", (evento: google.maps.Data.MouseEvent) => {
+        const filas = DETALLE_VIAS.map(({ propiedad, etiqueta }) => {
+          const valor = evento.feature.getProperty(propiedad);
+          if (valor === null || valor === undefined || valor === "") return "";
+          const texto = propiedad === "TIPO_VIA" ? `Tipo ${valor}` : String(valor);
+          return `<p style="margin:0 0 2px"><span style="color:#71717a">${escaparHtml(etiqueta)}:</span> ${escaparHtml(texto)}</p>`;
+        }).join("");
+        infoRef.current?.setContent(`
+          <div style="font-family:system-ui;max-width:260px;padding:2px;font-size:12px">
+            <p style="font-weight:600;margin:0 0 4px;font-size:13px">Vía</p>${filas}
+          </div>`);
+        infoRef.current?.setPosition(evento.latLng);
+        infoRef.current?.open({ map: mapa });
+      });
+      viasDataRef.current = data;
+    }
+    viasDataRef.current.setMap(mostrarVias ? mapa : null);
+  }, [mapaListo, vias, mostrarVias]);
 
   /* ---------- Beneficiarios (un marcador por ubicación compartida) ---------- */
 
@@ -668,6 +772,23 @@ export function MapaTerritorioBeneficiarios({
 
   const sinUbicacion = puntosFiltrados.length - conCoordenadas.length;
 
+  /** Las vías pesan más: se descargan la primera vez que se activan. */
+  function cambiarVias(activar: boolean) {
+    setMostrarVias(activar);
+    if (!activar || vias || estadoVias === "cargando") return;
+    setEstadoVias("cargando");
+    fetch(CAPA_VIAS.archivo)
+      .then((r) => {
+        if (!r.ok) throw new Error(`No se encontró ${CAPA_VIAS.archivo}`);
+        return r.json() as Promise<object>;
+      })
+      .then((coleccion) => {
+        setVias(coleccion);
+        setEstadoVias("inicial");
+      })
+      .catch(() => setEstadoVias("error"));
+  }
+
   /** Al elegir un proyecto, encuadra el mapa en sus beneficiarios. */
   function cambiarProyecto(id: string) {
     setProyectoFiltro(id);
@@ -718,8 +839,8 @@ export function MapaTerritorioBeneficiarios({
             <h3 className="text-sm font-semibold text-zinc-900">Capas</h3>
           </div>
           <p className="mb-3 text-xs text-zinc-500">
-            Límites definidos por el equipo con base en PDET. Puedes ver varias
-            capas al mismo tiempo.
+            Límites y red vial definidos por el equipo con base en PDET. Puedes
+            ver varias capas al mismo tiempo; las vías se descargan al activarlas.
           </p>
 
           <ul className="flex flex-col gap-2">
@@ -771,6 +892,30 @@ export function MapaTerritorioBeneficiarios({
               );
             })}
 
+            <li>
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm hover:border-ruralia-teal-border">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-ruralia-teal"
+                  checked={mostrarVias}
+                  onChange={(e) => cambiarVias(e.target.checked)}
+                />
+                <span
+                  className="h-0.75 w-3 shrink-0 rounded-full"
+                  style={{ backgroundColor: CAPA_VIAS.color }}
+                />
+                <span className="flex-1 font-medium">{CAPA_VIAS.nombre}</span>
+                {estadoVias === "error" ? (
+                  <TriangleAlert
+                    className="h-4 w-4 text-amber-600"
+                    aria-label="No se pudo cargar la capa de vías"
+                  />
+                ) : estadoVias === "cargando" ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin text-ruralia-teal" />
+                ) : null}
+              </label>
+            </li>
+
             <li className="mt-1 border-t border-zinc-100 pt-3">
               <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm hover:border-ruralia-teal-border">
                 <input
@@ -814,7 +959,23 @@ export function MapaTerritorioBeneficiarios({
         <section className="rounded-2xl border border-ruralia-teal-border bg-white p-4">
           <div className="mb-3 flex items-center gap-2">
             <Users className="h-4 w-4 text-ruralia-teal" />
-            <h3 className="text-sm font-semibold text-zinc-900">Ubicación de beneficiarios</h3>
+            <h3 className="flex-1 text-sm font-semibold text-zinc-900">
+              Ubicación de beneficiarios
+            </h3>
+            {!cargandoPuntos && !errorPuntos && itemsRevision.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setRevisionAbierta(true)}
+                title={`Ubicaciones por revisar (${itemsRevision.length})`}
+                aria-label={`Ubicaciones por revisar (${itemsRevision.length})`}
+                className="relative rounded-lg p-1.5 text-amber-600 hover:bg-amber-50"
+              >
+                <TriangleAlert className="h-4 w-4" />
+                <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-amber-500 px-1 text-center text-[10px] font-semibold leading-4 text-white">
+                  {itemsRevision.length > 99 ? "99+" : itemsRevision.length}
+                </span>
+              </button>
+            ) : null}
           </div>
 
           {errorPuntos ? (
@@ -835,18 +996,6 @@ export function MapaTerritorioBeneficiarios({
               </div>
             </dl>
           )}
-          {itemsRevision.length > 0 ? (
-            <a
-              href="#revision-ubicaciones"
-              className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100"
-            >
-              <span className="flex items-center gap-1.5">
-                <TriangleAlert className="h-3.5 w-3.5" />
-                Ubicaciones por revisar
-              </span>
-              <span className="font-semibold">{itemsRevision.length}</span>
-            </a>
-          ) : null}
           <p className="mt-2 text-[11px] text-zinc-500">
             Cada punto es la ubicación propia del beneficiario (su predio), no la de
             su vereda. Quien no la tiene registrada no aparece en el mapa.
@@ -925,10 +1074,120 @@ export function MapaTerritorioBeneficiarios({
             className="h-130 w-full bg-zinc-100 lg:h-160"
             aria-label="Mapa de territorio de beneficiarios"
           />
+
+          {hover && mapaListo ? (
+            <div className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full border border-ruralia-teal-border bg-white px-3 py-1 text-xs shadow-sm shadow-zinc-900/10">
+              <span className="text-zinc-500">{hover.capa}:</span>{" "}
+              <span className="font-semibold text-zinc-900">{hover.nombre}</span>
+            </div>
+          ) : null}
+
+          {poligonoSeleccionado && capaSeleccion && mapaListo ? (
+            <div className="absolute left-3 top-14 z-10 w-72 max-w-[calc(100%-1.5rem)] rounded-2xl border border-ruralia-teal-border bg-white p-4 shadow-lg shadow-zinc-900/10">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-ruralia-teal-text">
+                    {capaSeleccion.nombre.replace(/s$/, "")}
+                  </p>
+                  <h3 className="truncate text-base font-semibold text-zinc-900">
+                    {poligonoSeleccionado.nombre}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSeleccion(null);
+                    setBusqueda("");
+                  }}
+                  className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-50 hover:text-zinc-700"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {jerarquia.length > 1 ? (
+                <div className="mt-2 flex flex-wrap items-center gap-1">
+                  {jerarquia.map(({ capa, poligono }, i) => {
+                    const activo = capa.id === seleccion?.nivel;
+                    return (
+                      <span key={capa.id} className="flex items-center gap-1">
+                        {i > 0 ? <ChevronRight className="h-3 w-3 text-zinc-300" /> : null}
+                        <button
+                          type="button"
+                          title={`Ver ${capa.nombre.replace(/s$/, "").toLowerCase()}`}
+                          onClick={() =>
+                            setSeleccion((prev) =>
+                              prev ? { ...prev, nivel: capa.id, codigo: poligono.codigo } : prev,
+                            )
+                          }
+                          className={`max-w-28 truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            activo
+                              ? "bg-ruralia-teal text-white"
+                              : "bg-ruralia-teal-soft text-ruralia-teal-text hover:bg-ruralia-teal-border"
+                          }`}
+                        >
+                          {poligono.nombre}
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                {RESUMEN_TARJETA[capaSeleccion.id].map((propiedad) => {
+                  const valor = poligonoSeleccionado.propiedades[propiedad];
+                  if (valor === null || valor === undefined || valor === "") return null;
+                  const etiqueta =
+                    capaSeleccion.propiedadesDetalle.find((d) => d.propiedad === propiedad)
+                      ?.etiqueta ?? propiedad;
+                  return (
+                    <div key={propiedad} className="min-w-0">
+                      <dt className="text-zinc-500">{etiqueta}</dt>
+                      <dd className="truncate font-medium text-zinc-800" title={formatearValor(valor)}>
+                        {formatearValor(valor)}
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
+
+              <div className="mt-3 flex items-center gap-2 rounded-xl bg-ruralia-teal-soft px-3 py-2 text-xs text-ruralia-teal-text">
+                <Users className="h-3.5 w-3.5" />
+                <span>
+                  <span className="font-semibold">{beneficiariosSeleccion.length}</span>{" "}
+                  beneficiario(s) dentro
+                </span>
+              </div>
+
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={encuadrarSeleccion}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:border-ruralia-teal-border hover:text-ruralia-teal-text"
+                >
+                  <Crosshair className="h-3.5 w-3.5" /> Centrar
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    detalleRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                  className="inline-flex flex-1 items-center justify-center rounded-xl bg-ruralia-teal px-3 py-1.5 text-xs font-semibold text-white hover:bg-ruralia-teal-hover"
+                >
+                  Ver detalle
+                </button>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         {poligonoSeleccionado && capaSeleccion ? (
-          <section className="rounded-2xl border border-ruralia-teal-border bg-white p-4">
+          <section
+            ref={detalleRef}
+            className="scroll-mt-4 rounded-2xl border border-ruralia-teal-border bg-white p-4"
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-ruralia-teal-text">
@@ -1037,15 +1296,24 @@ export function MapaTerritorioBeneficiarios({
           </p>
         )}
 
-        {!cargandoPuntos && !errorPuntos ? (
+        <Modal
+          titulo={`Ubicaciones por revisar (${itemsRevision.length})`}
+          abierto={revisionAbierta}
+          onCerrar={() => setRevisionAbierta(false)}
+          ancho="xl"
+        >
           <RevisionUbicaciones
+            embebido
             items={itemsRevision}
             puedeGestionar={puedeGestionar}
             describirPunto={describirPunto}
-            onVer={verEnMapa}
+            onVer={(latitud, longitud) => {
+              setRevisionAbierta(false);
+              verEnMapa(latitud, longitud);
+            }}
             onActualizado={alActualizarUbicacion}
           />
-        ) : null}
+        </Modal>
       </div>
     </div>
   );

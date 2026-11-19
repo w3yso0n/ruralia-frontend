@@ -5,8 +5,9 @@ import type { PuntoTerritorioBeneficiario } from "@/lib/types";
  *
  * Los límites NO son los de Google ni los de internet: cada capa se dibuja
  * exactamente con el archivo GeoJSON entregado por el equipo (WGS84) que vive
- * en `public/territorio/`. Para activar un nivel nuevo basta con copiar su
- * archivo ahí y completar `archivo` y las propiedades de esta tabla.
+ * en `public/territorio/`. Esos archivos se generan con
+ * `node scripts/optimizar-capas-territorio.mjs` a partir de los GeoJSON
+ * originales (coordenadas a 6 decimales y solo los atributos que se usan).
  *
  * El orden del arreglo es la jerarquía: de la capa más amplia a la más fina.
  */
@@ -63,13 +64,19 @@ export const CAPAS_TERRITORIALES: CapaTerritorial[] = [
   {
     id: "municipio",
     nombre: "Municipios",
-    archivo: null,
+    archivo: "/territorio/municipios.geojson",
     propiedadCodigo: "COD_DANE",
     propiedadNombre: "NOM_MPIO",
     propiedadesDetalle: [
       { propiedad: "COD_DANE", etiqueta: "Código DANE" },
       { propiedad: "NOM_DPTO", etiqueta: "Departamento" },
       { propiedad: "NOM_SUBREG", etiqueta: "Subregión PDET" },
+      { propiedad: "PROYECTO", etiqueta: "Proyecto" },
+      { propiedad: "BPIN", etiqueta: "BPIN" },
+      { propiedad: "AREA_Ha", etiqueta: "Área (ha)" },
+      { propiedad: "NUMERO_VER", etiqueta: "Veredas" },
+      { propiedad: "UBP_TOTAL", etiqueta: "UBP" },
+      { propiedad: "UBP_ACTIVA", etiqueta: "UBP activas" },
     ],
     codigoBeneficiario: (b) => b.municipioCodigo,
     longitudCodigo: 5,
@@ -84,13 +91,20 @@ export const CAPAS_TERRITORIALES: CapaTerritorial[] = [
   {
     id: "vereda",
     nombre: "Veredas",
-    archivo: null,
+    archivo: "/territorio/veredas.geojson",
     propiedadCodigo: "COD_VERE",
     propiedadNombre: "NOM_VERE",
     propiedadesDetalle: [
       { propiedad: "COD_VERE", etiqueta: "Código DANE" },
       { propiedad: "NOM_MPIO", etiqueta: "Municipio" },
+      { propiedad: "NOM_DPTO", etiqueta: "Departamento" },
+      { propiedad: "NOM_SUBREG", etiqueta: "Subregión PDET" },
       { propiedad: "NOMBRE_UBP", etiqueta: "UBP" },
+      { propiedad: "PROYECTO", etiqueta: "Proyecto" },
+      { propiedad: "ESTADO", etiqueta: "Estado" },
+      { propiedad: "FOCAL_MGA", etiqueta: "Focalización MGA" },
+      { propiedad: "FUENTE", etiqueta: "Fuente" },
+      { propiedad: "AREA_Ha", etiqueta: "Área (ha)" },
     ],
     codigoBeneficiario: (b) => b.veredaCodigo,
     longitudCodigo: 8,
@@ -102,6 +116,39 @@ export const CAPAS_TERRITORIALES: CapaTerritorial[] = [
     },
     zIndex: 3,
   },
+];
+
+/**
+ * Red vial del equipo. Es una capa de líneas: no contiene beneficiarios ni se
+ * cruza con la ficha; solo se dibuja y muestra sus atributos al hacer clic.
+ * Pesa más que las otras, por eso se descarga la primera vez que se activa.
+ */
+export const CAPA_VIAS = {
+  nombre: "Vías",
+  archivo: "/territorio/vias.geojson",
+  color: "#52525b",
+  zIndex: 4,
+} as const;
+
+/**
+ * Grosor por tipo de vía (TIPO_VIA, clasificación del IGAC: 1 es la de mayor
+ * categoría y 7 la menor).
+ */
+export function grosorVia(tipo: unknown): number {
+  const n = Number(tipo);
+  if (n <= 2) return 3.5;
+  if (n <= 4) return 2.5;
+  if (n <= 5) return 1.8;
+  return 1.2;
+}
+
+/** Atributos de la vía que se muestran al hacer clic. Los valores son códigos del IGAC. */
+export const DETALLE_VIAS: { propiedad: string; etiqueta: string }[] = [
+  { propiedad: "TIPO_VIA", etiqueta: "Tipo de vía" },
+  { propiedad: "ESTADO_SUP", etiqueta: "Estado de la superficie (código)" },
+  { propiedad: "NUMERO_CAR", etiqueta: "Número de carriles (código)" },
+  { propiedad: "ACCESIBILI", etiqueta: "Accesibilidad (código)" },
+  { propiedad: "PROYECTO", etiqueta: "Proyecto" },
 ];
 
 export function normalizarCodigo(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, UserCheck } from "lucide-react";
+import { Lock, Plus, UserCheck } from "lucide-react";
 import { crearDatoAdicionalBeneficiario } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type {
@@ -100,7 +100,7 @@ export function SelectorVinculoBeneficiario({
         tipoNuevo,
       );
       onDatoCreado(creado);
-      onChange({ destino: creado.destino, permitirCambio: true });
+      onChange({ destino: creado.destino, permitirCambio: false });
       setCreando(false);
       setNombreNuevo("");
     } catch (err) {
@@ -133,7 +133,7 @@ export function SelectorVinculoBeneficiario({
           setCreando(false);
           onChange(
             e.target.value
-              ? { destino: e.target.value, permitirCambio: true }
+              ? { destino: e.target.value, permitirCambio: false }
               : null,
           );
         }}
@@ -205,10 +205,10 @@ export function SelectorVinculoBeneficiario({
 
       {seleccionado && !creando ? (
         <p className="mt-1.5 flex items-start gap-1.5 text-xs text-ruralia-teal-text">
-          <UserCheck className="mt-0.5 h-3 w-3 shrink-0" />
+          <Lock className="mt-0.5 h-3 w-3 shrink-0" />
           {esPdet
             ? "Al aprobar la jornada, la vereda elegida queda como vereda PDET del beneficiario."
-            : "Si la persona ya tiene el dato, llega lleno y el técnico lo puede corregir. Al aprobar la jornada, la respuesta se guarda en su ficha y el valor anterior queda en el historial."}
+            : "Si la persona ya tiene el dato, llega lleno y bloqueado. Si le falta, el técnico lo captura y se guarda en su ficha al aprobar la jornada."}
         </p>
       ) : (
         <p className="mt-1.5 text-xs text-zinc-500">

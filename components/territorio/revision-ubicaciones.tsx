@@ -37,6 +37,8 @@ interface RevisionUbicacionesProps {
   describirPunto: (latitud: number, longitud: number) => string | null;
   onVer: (latitud: number, longitud: number) => void;
   onActualizado: (id: string, beneficiario: Beneficiario) => void;
+  /** Dentro de un modal: sin borde ni título propios (los pone el modal). */
+  embebido?: boolean;
 }
 
 const POR_PAGINA = 25;
@@ -54,6 +56,7 @@ export function RevisionUbicaciones({
   describirPunto,
   onVer,
   onActualizado,
+  embebido = false,
 }: RevisionUbicacionesProps) {
   const [tipo, setTipo] = useState<TipoRevision>("ilegible");
   const [busqueda, setBusqueda] = useState("");
@@ -97,17 +100,19 @@ export function RevisionUbicaciones({
   return (
     <section
       id="revision-ubicaciones"
-      className="rounded-2xl border border-amber-200 bg-white p-4"
+      className={embebido ? "" : "rounded-2xl border border-amber-200 bg-white p-4"}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <TriangleAlert className="h-4 w-4 text-amber-600" />
-            <h3 className="text-sm font-semibold text-zinc-900">
-              Ubicaciones por revisar ({items.length})
-            </h3>
-          </div>
-          <p className="mt-1 text-xs text-zinc-500">
+          {embebido ? null : (
+            <div className="flex items-center gap-2">
+              <TriangleAlert className="h-4 w-4 text-amber-600" />
+              <h3 className="text-sm font-semibold text-zinc-900">
+                Ubicaciones por revisar ({items.length})
+              </h3>
+            </div>
+          )}
+          <p className={`text-xs text-zinc-500 ${embebido ? "" : "mt-1"}`}>
             Corrige la ubicación o confirma que es correcta. Lo confirmado deja de
             aparecer aquí hasta que la ubicación cambie.
           </p>
